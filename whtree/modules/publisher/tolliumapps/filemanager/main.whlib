@@ -1725,8 +1725,7 @@ PUBLIC STATIC OBJECTTYPE App EXTEND TolliumScreenBase <
   // Helper function - filelist ordering action helpers
   //
 
-  MACRO ExecuteReordering(STRING movetype, INTEGER ARRAY selected, INTEGER refid DEFAULTSTO 0)
-  {
+  MACRO ExecuteReordering(STRING movetype, INTEGER ARRAY selected, INTEGER refid DEFAULTSTO 0) {
     RECORD ARRAY elements :=
         SELECT rowkey :=      rowkey
              , id

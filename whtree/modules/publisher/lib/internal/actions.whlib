@@ -24,8 +24,7 @@ BOOLEAN FUNCTION IsSafeDefaultIndex(STRING ns) {
                 "platform:filetypes.dynamicfoldercontents" ];
 }
 
-MACRO DoRecurseUpdatePublish(OBJECT repubstate, RECORD site, INTEGER folderid, BOOLEAN setpublish, BOOLEAN toplevel, INTEGER ARRAY acceptabletypes, OBJECT handler)
-{
+MACRO DoRecurseUpdatePublish(OBJECT repubstate, RECORD site, INTEGER folderid, BOOLEAN setpublish, BOOLEAN toplevel, INTEGER ARRAY acceptabletypes, OBJECT handler) {
   IF(RecordExists(site))
   {
     RECORD parentfolder := SELECT * FROM system.fs_objects WHERE id=folderid;
@@ -82,8 +81,7 @@ PUBLIC MACRO RecurseUpdatePublish(INTEGER folderid, BOOLEAN setpublish)
     repubstate->DoRepublishes();
 }
 
-MACRO HandlePlanBeforeEffects(OBJECT repubstate, INTEGER destfolder, RECORD ARRAY plan)
-{
+MACRO HandlePlanBeforeEffects(OBJECT repubstate, INTEGER destfolder, RECORD ARRAY plan) {
   FOREVERY(RECORD entry FROM plan)
   {
     IF(entry.destparent != 0 AND entry.kind = "move")
@@ -91,11 +89,9 @@ MACRO HandlePlanBeforeEffects(OBJECT repubstate, INTEGER destfolder, RECORD ARRA
   }
 }
 
-MACRO HandlePlanAfterEffects(OBJECT repubstate, INTEGER destfolder, RECORD ARRAY plan)
-{
+MACRO HandlePlanAfterEffects(OBJECT repubstate, INTEGER destfolder, RECORD ARRAY plan) {
   //FIXME PERFORMANCE - a much smarter analysis of republish rules and plan should be possible....
-  FOREVERY(RECORD entry FROM plan)
-  {
+  FOREVERY(RECORD entry FROM plan) {
     IF(entry.destparent=0)
       CONTINUE;
 

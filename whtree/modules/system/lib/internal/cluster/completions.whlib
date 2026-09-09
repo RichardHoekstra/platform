@@ -14,8 +14,7 @@ OBJECT trans;
 BOOLEAN webhare_started;
 
 //Handle completions
-MACRo HandleCompletions(RECORD ARRAY completions)
-{
+MACRo HandleCompletions(RECORD ARRAY completions) {
   OBJECT torepub := CreateRepublishState();
 
   trans->BeginWork();
@@ -25,12 +24,10 @@ MACRo HandleCompletions(RECORD ARRAY completions)
 
   //ADDME merge events and allow partial completions
 
-  FOREVERY(RECORD compl FROM completions)
-  {
+  FOREVERY(RECORD compl FROM completions) {
     //PRINT("XX^ Handle completion\n" || AnyToString(compl, "tree"));
 
-    IF("addfile" IN compl.actions OR "replacefile" IN compl.actions)
-    {
+    IF("addfile" IN compl.actions OR "replacefile" IN compl.actions) {
         RECORD newfile := __FindFile(compl.id);
         IF(NOT RecordExists(newfile))
           CONTINUE;
