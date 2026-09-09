@@ -7,6 +7,7 @@ import { toCamelCase, toSnakeCase, type ToSnakeCase, nameToSnakeCase } from "@we
 import type { CSPApplyRule, CSPContentType, CSPMember, CSPMemberOverride, CustomFieldsLayout } from "@webhare/whfs/src/siteprofiles";
 import { parseYamlComponent } from "./parser";
 import { getAuthorizationInterface, type AuthorizationInterface } from "@webhare/auth";
+import { getPoliciesForObject, type PolicyMap } from "./fsobjectpolicy";
 
 interface MetadataSection {
   title: string;
@@ -21,6 +22,7 @@ interface MetadataSection {
 
 const hsinfo = Symbol("hsinfo");
 
+/** Editor configuration information */
 interface MetaTabs {
   types: Array<{
     namespace: string;
@@ -45,6 +47,8 @@ interface MetaTabs {
     seoTab: boolean;
     seoTitle: boolean;
   };
+  /** Relevant policy objects */
+  policies: PolicyMap;
 }
 
 interface MetaTabsWithHSInfo extends MetaTabs {
@@ -154,7 +158,9 @@ async function getFilteredExtendProps(applytester: WHFSApplyTester, user: Author
   return { extendProps, issues };
 }
 
-/** @param options.isObjectProps - requesting metadata for objectprops screen */
+/** Describe configuration for an editor
+    @param options.isObjectProps - requesting metadata for objectprops screen
+*/
 export async function describeMetaTabs(applytester: WHFSApplyTester, options?: {
   isObjectProps?: boolean;
   user?: AuthorizationInterface;
@@ -184,6 +190,7 @@ export async function describeMetaTabs(applytester: WHFSApplyTester, options?: {
     issues: aboutExtendProps.issues,
     [hsinfo]: applytester.__getHSInfo(),
     workflowEditor: null,
+    policies: await getPoliciesForObject(applytester, ["getFallbackMetaTitle"]),
     baseProperties: {
       description: baseProps.description,
       keywords: baseProps.keywords,
@@ -320,6 +327,7 @@ interface MetaTabsForHS {
   //TODO do we need this? just inform the objecteditor about baseprops/edit_workflow_metadata
   workfloweditor: Record<never, never> | null;
   base_properties: ToSnakeCase<MetaTabs['baseProperties']>;
+  policies: ToSnakeCase<PolicyMap>;
 }
 
 export function remapForHs(metatabs: MetaTabs): MetaTabsForHS {
@@ -341,6 +349,7 @@ export function remapForHs(metatabs: MetaTabs): MetaTabsForHS {
     issues: metatabs.issues,
     extend_props: toSnakeCase(metatabs.extendProps),
     base_properties: toSnakeCase(metatabs.baseProperties),
+    policies: toSnakeCase(metatabs.policies)
   };
   return translated;
 }

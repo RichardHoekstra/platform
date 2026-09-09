@@ -1,13 +1,14 @@
 import { importJSObject } from "@webhare/services";
 import { openFileOrFolder } from "@webhare/whfs";
-import type { FSObjectPolicy, FSObjectPolicyBaseContext, PublicationDefaults } from "@webhare/backend-integration";
-import { getApplyTesterForObject } from "@webhare/whfs/src/applytester";
+import type { FSObjectPolicy, PublicationDefaults } from "@webhare/backend-integration";
+import { getApplyTesterForObject, type WHFSApplyTester } from "@webhare/whfs/src/applytester";
 
 type HSPolicyContext = {
   id: number;
   title: string;
 };
 
+export type PolicyMap = { [Key in keyof FSObjectPolicy]?: string[] };
 
 async function findObjectPolicyWithHandler<Handler extends keyof FSObjectPolicy>(id: number, handler: Handler): Promise<(FSObjectPolicy & Required<Pick<FSObjectPolicy, Handler>>) | null> {
   const applytester = await getApplyTesterForObject(await openFileOrFolder(id, { allowHistoric: true }));
@@ -25,9 +26,39 @@ async function findObjectPolicyWithHandler<Handler extends keyof FSObjectPolicy>
   return null;
 }
 
+/** List which policy objects actually affect a policy for an object */
+export async function getPoliciesForObject(applytester: WHFSApplyTester, policies: (keyof FSObjectPolicy)[]): Promise<PolicyMap> {
+  const fsObjectPolicyRules = await applytester["getMatchingRules"]("fsobjectpolicy");
+
+  const policymap: PolicyMap = {};
+  for (const rule of fsObjectPolicyRules) {
+    const fsObjectPolicy = rule.fsobjectpolicy;
+    if (fsObjectPolicy) {
+      const policy = await importJSObject<FSObjectPolicy>(fsObjectPolicy);
+      for (const policyKey of policies) {
+        if (policy[policyKey]) {
+          policymap[policyKey] ||= [];
+          policymap[policyKey].push(fsObjectPolicy);
+        }
+      }
+    }
+  }
+  return policymap;
+}
+
 export async function getPublicationDefaults(context: HSPolicyContext): Promise<PublicationDefaults | null> {
   const policy = await findObjectPolicyWithHandler(context.id, "getPublicationDefaults");
   if (policy)
-    return await policy.getPublicationDefaults({ fsObject: context.id, title: context.title } satisfies FSObjectPolicyBaseContext);
+    return await policy.getPublicationDefaults({ fsObject: context.id, title: context.title });
+  return null;
+}
+
+export async function getFallbackMetaTitle(context: HSPolicyContext, policies: PolicyMap): Promise<string | null> {
+  const policyName = (policies.getFallbackMetaTitle ?? []).at(-1);
+  if (policyName) {
+    const obj = await importJSObject<FSObjectPolicy>(policyName);
+    if (obj?.getFallbackMetaTitle) //still there?
+      return await obj.getFallbackMetaTitle({ fsObject: context.id, title: context.title });
+  }
   return null;
 }

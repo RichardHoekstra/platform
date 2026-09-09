@@ -441,13 +441,6 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
       this->DoCanceldraft();
   }
 
-  RECORD FUNCTION GetPolicyContext() { //Returns a HSPolicyContext
-    RETURN CELL[
-      id := this->workflowmgr->__GetAutosavedObject()->id,
-      title := ^title->value
-    ];
-  }
-
   BOOLEAN FUNCTION ExecuteSave(RECORD options DEFAULTSTO DEFAULT RECORD) {
     options := ValidateOptions(CELL[ finalize := FALSE, schedule_dialog := FALSE ], options);
     BOOLEAN publish := options.finalize;
