@@ -53,6 +53,9 @@ ASYNC MACRO TestCreateRTD() {
   TT(":File name")->value := "this-name-please";
   TT(":File name")->SetDirty();
 
+  // Set a value in the BaseTestProps section
+  TT(":anyfield")->value := "Updated anyfield";
+
   //Save this
   TTClick(":Save");
   TestEq(FALSE, TT(":File name")->required);
@@ -71,6 +74,21 @@ ASYNC MACRO TestCreateRTD() {
   AWAIT RestartEditorAndVerify();
 
   AWAIT ExpectScreenChange(-1, PTR TTEscape); //exit editor
+
+  //////////////////
+  //STORY: Test versions dialog
+  TT("filelist")->value := INTEGER[ createdid ];
+  AWAIT ExpectScreenChange(+1, PTR TTClick(":Versions[menuitem]"));
+
+  // Expect 5 versions
+  TestEQ([ "0.1", "0.2", "0.3", "0.4", "1.0" ], SELECT AS STRING ARRAY versionnumber FROM TT("versions")->rows ORDER BY versionnumber);
+  TTFillByTitle("versions", "1.0", [ cellname := "versionnumber" ]);
+  TestEQ("Updated anyfield", TT(":anyfield")->value);
+
+  TTFillByTitle("versions", "0.3", [ cellname := "versionnumber" ]);
+  TestEQ("", TT(":anyfield")->value);
+
+  AWAIT ExpectScreenChange(-1, PTR TTEscape); //exit versions dialog
 
   //////////////////
   //STORY: Collide against the previously generated file
