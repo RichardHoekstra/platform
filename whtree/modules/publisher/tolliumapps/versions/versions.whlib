@@ -43,6 +43,8 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
 
   OBJECT maintabs;
 
+  RECORD ARRAY extendprops;
+
   //OBJECT historyextcomp;
   //OBJECT policy;
 
@@ -97,6 +99,8 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
     ^versions->SetValueIfValid(data.id);
     IF(targetinfo.snapshotfor != 0) //if we deeplinked to a version, select it
       ^versions->selection := SELECT * FROM ^versions->rows WHERE snapshot = targetinfo.id;
+
+    this->contexts->applytester := GetApplyTesterForObject(this->liveobject->id);
   }
 
   MACRO OnFilterChange() {
@@ -206,19 +210,23 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
       this->LoadBaseData(sel);
 
       // Now load meta tabs
-      this->renderer := CreateMetatabsRenderer([
-        objectid := this->liveobject->id,
-        parent := this->liveobject->parent,
-        isfolder := this->liveobject->isfolder,
-        type := this->liveobject->type,
-        isobjectprops := FALSE
-      ]);
+      IF (NOT ObjectExists(this->renderer)) {
+        this->renderer := CreateMetatabsRenderer([
+          objectid := this->liveobject->id,
+          parent := this->liveobject->parent,
+          isfolder := this->liveobject->isfolder,
+          type := this->liveobject->type,
+          isobjectprops := FALSE
+        ]);
+      } ELSE
+        this->renderer->Reset();
 
       this->renderer->RegisterMetaController(^webmetadata->type, ^webmetadata);
 
       RECORD ARRAY instances := ListInstances(sel.snapshot);
 
       RECORD ARRAY metacontrollers;
+      RECORD ARRAY extendprops;
 
       INTEGER insertpos := 1;
       IF(RecordExists(this->renderer->metatabsconfig)) {
@@ -235,6 +243,8 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
           RECORD renderresult := this->renderer->RenderTypeIntoTabs(this->contexts, type, this->maintabs, insertpos);
           insertpos := renderresult.insertpos;
         }
+
+        extendprops := this->renderer->RenderLegacyExtensions(this->contexts, ^maintab);
       }
 
       // Disable all metacontrollers so the fields are disabled too
@@ -243,6 +253,10 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
       // Load the data
       FOREVERY (RECORD controller FROM this->renderer->metacontrollers)
         controller.fsinstance->value := controller.type->GetInstanceData(sel.snapshot);
+
+      //make sure the rest of the UI is initialized. ensure eg. toolbar buttons are visible when asking about restoring draft/autosave or the formeditor would look half-done
+      FOREVERY(RECORD extendprop FROM extendprops)
+        extendprop.tabs->RunExtensionsPostInit();
 
       this->maintabs->RunExtensionsPostInit();
       this->ApplyBaseSettings();

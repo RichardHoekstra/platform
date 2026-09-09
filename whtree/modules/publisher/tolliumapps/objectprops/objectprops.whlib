@@ -658,7 +658,7 @@ PUBLIC STATIC OBJECTTYPE ObjectProps EXTEND PublisherEditorBase <
 
   MACRO ResetSiteprofExtensions(INTEGER parentid, INTEGER newtype) {
     FOREVERY(RECORD extendprop FROM this->extendprops) {
-      OBJECT comp := extendprop.whfsinstance;
+      OBJECT comp := extendprop.fsinstance;
       IF(ObjectExists(comp)) {
         TRY {
           comp->SetDefaultInstanceDataForParent(parentid, this->isfolder, newtype);
@@ -735,7 +735,7 @@ PUBLIC STATIC OBJECTTYPE ObjectProps EXTEND PublisherEditorBase <
           INSERT CELL[ propeditor.whfs_type
                      , loadresult.components
                      , loadresult.fragment
-                     , whfsinstance
+                     , fsinstance := whfsinstance
                      , tabs := DEFAULT OBJECT
                      ] INTO this->extendprops AT END;
       }

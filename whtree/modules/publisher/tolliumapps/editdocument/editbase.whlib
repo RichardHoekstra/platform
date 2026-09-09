@@ -279,7 +279,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
   MACRO RefreshMetaTabsReadonly() {
     this->renderer->SetControllersEnabled(this->editable);
     FOREVERY(RECORD extendprop FROM this->extendprops) //TODO integrate into renderer ... or move renderer into a lower class
-      extendprop.whfsinstance->enabled := this->editable;
+      extendprop.fsinstance->enabled := this->editable;
 
     // objectprops is not allowed to edit workflow fields when editing existing files which have a true workflow (and document editor)
     BOOLEAN edit_workflow_metadata := this->isnew OR NOT RecordExists(this->workfloweditor) OR NOT this->isobjectprops;
@@ -316,8 +316,8 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
         controller.fsinstance->value := sourceobject->GetInstanceData(controller.type->namespace);
 
     FOREVERY(RECORD extendprop FROM this->extendprops)
-      IF(NOT (isduplicate AND NOT extendprop.whfsinstance->type->cloneoncopy)) {
-        extendprop.whfsinstance->value := sourceobject->GetInstanceData(extendprop.whfsinstance->type->namespace);
+      IF(NOT (isduplicate AND NOT extendprop.fsinstance->type->cloneoncopy)) {
+        extendprop.fsinstance->value := sourceobject->GetInstanceData(extendprop.fsinstance->type->namespace);
       }
   }
 
@@ -348,7 +348,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
       target->SetInstanceData(controller.type->namespace, controller.fsinstance->GetUpdateValue());
     }
     FOREVERY(RECORD extendprop FROM this->extendprops)
-      target->SetInstanceData(extendprop.whfsinstance->type->namespace, extendprop.whfsinstance->GetUpdateValue());
+      target->SetInstanceData(extendprop.fsinstance->type->namespace, extendprop.fsinstance->GetUpdateValue());
 
     RECORD metadata := this->GetMetadata();
     IF(RecordExists(metadata))
@@ -402,7 +402,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
 
     FOREVERY(RECORD extendprop FROM this->extendprops)
       IF(extendprop.whfs_type = whfstype) {
-        OBJECT cellobj := extendprop.whfsinstance->GetComponent(cellname);
+        OBJECT cellobj := extendprop.fsinstance->GetComponent(cellname);
         IF(ObjectExists(cellobj))
           RETURN cellobj;
       }
@@ -436,9 +436,21 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
   // Controllers for the metadata. For now we'll rely on compositions
   PUBLIC RECORD ARRAY metacontrollers;
 
+  /// Components that need to be removed when the metadata is re-rendered.
+  PUBLIC OBJECT ARRAY components;
+
   MACRO NEW(RECORD config, OBJECT applytester) {
     this->metatabsconfig := config;
     this->applytester := applytester;
+  }
+
+  PUBLIC MACRO Reset() {
+    FOREVERY (OBJECT comp FROM this->components)
+      comp->DeleteComponent();
+    FOREVERY (RECORD rec FROM this->metacontrollers)
+      rec.fsinstance->DeleteComponent();
+    this->components := DEFAULT OBJECT ARRAY;
+    this->metacontrollers := DEFAULT RECORD ARRAY;
   }
 
   PUBLIC MACRO RegisterMetaController(OBJECT type, OBJECT composition) {
@@ -496,6 +508,7 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
       FOREVERY(RECORD line FROM section.lines) {
         newtab->layout := line.layout;
         newtab->InsertComponentAfter(line.line, DEFAULT OBJECT, TRUE);
+        INSERT line.line INTO this->components AT END;
       }
     }
 
@@ -505,6 +518,60 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
   PUBLIC MACRO SetControllersEnabled(BOOLEAN enabled) {
     FOREVERY(RECORD controller FROM this->metacontrollers)
       controller.fsinstance->enabled := enabled;
+  }
+
+  PUBLIC RECORD ARRAY FUNCTION RenderLegacyExtensions(OBJECT contexts, OBJECT container) {
+    RECORD ARRAY extendprops;
+
+    //Legacy extensions expect to be loaded into a tab. Build tabs to make them happy
+    FOREVERY(RECORD ext FROM this->metatabsconfig.extend_props) {
+      //Build a tabs container and an instance to exchange whfstype data
+      OBJECT tabs := contexts->screen->CreateTolliumComponent("tabs");
+      //TODO setup whfsinstance->basefsobject like objectprops does? but objectprops seems a bit dangerous for New Item and Duplicate Item, where sourceitem does not point to the target
+      OBJECT fsinstance := contexts->screen->CreateCustomComponent("http://www.webhare.net/xmlns/publisher/components", "whfsinstance");
+      fsinstance->type := OpenWHFSType(ext.whfs_type);
+      INSERT CELL[ fsinstance, fsinstance->type ] INTO this->metacontrollers AT END;
+
+      tabs->extendcomponents := [[ name := "contentdata", component := fsinstance ]];
+      tabs->width := "1pr";
+
+      //'Dummy' main tab for components which expect an insertpoint to exist there
+      OBJECT maintab := tabs->InsertTabAt(0, GetTid("publisher:tolliumapps.objectprops.objectprops.maintab"));
+      OBJECT insertpoint := contexts->screen->CreateTolliumComponent("spacer");
+      insertpoint->visible := FALSE;
+      maintab->InsertComponentAfter(insertpoint, DEFAULT OBJECT, TRUE);
+      FOREVERY(STRING name FROM [ "name", "title", "description", "keywords", "publicationsettings", "settings", "properties", "seosettings", "advancesettings" ])
+        INSERT CELL[ name, component := insertpoint ] INTO tabs->insertpoints AT END;
+
+      RECORD loadresult := tabs->LoadTabsExtension(ext.extension);
+      IF(Length(maintab->GetChildComponents()) = 1) //no inserts
+        maintab->visible := FALSE;
+
+      OBJECT ARRAY visiblepages := SELECT AS OBJECT ARRAY page FROM ToRecordArray(tabs->pages,"page") WHERE page->visible;
+      IF(Length(visiblepages) = 1) {
+        tabs->selectedtab := visiblepages[0];
+        visiblepages[0]->spacers := DEFAULT RECORD;
+        tabs->type := "server";
+      }
+
+      //Add the tabs as a section
+      OBJECT newsection := contexts->screen->CreateTolliumComponent("section");
+      //Copy only tab's title unless its just the General tab
+      newsection->title := tabs->type = "server" AND maintab->visible = FALSE? visiblepages[0]->title : GetTid(ext.title);
+      newsection->open := FALSE;
+      newsection->panel->InsertComponentAfter(tabs, DEFAULT OBJECT, TRUE);
+      container->InsertComponentAfter(newsection, DEFAULT OBJECT, TRUE);
+
+      INSERT CELL[ ext.whfs_type
+                 , loadresult.components
+                 , loadresult.fragment
+                 , fsinstance
+                 , tabs
+                 , newsection
+                 ] INTO extendprops AT END;
+      INSERT newsection INTO this->components AT END;
+    }
+    RETURN extendprops;
   }
 >;
 
