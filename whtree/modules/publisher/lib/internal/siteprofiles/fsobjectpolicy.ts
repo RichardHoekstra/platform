@@ -1,10 +1,11 @@
 import { importJSObject } from "@webhare/services";
 import { openFileOrFolder } from "@webhare/whfs";
-import type { FSObjectPolicy, PublicationDefaults } from "@webhare/backend-integration";
+import type { FSObjectPolicy, FSObjectPolicyBaseContext, PublicationDefaults } from "@webhare/backend-integration";
 import { getApplyTesterForObject, type WHFSApplyTester } from "@webhare/whfs/src/applytester";
 
 type HSPolicyContext = {
-  id: number;
+  target: number;
+  content: number;
   title: string;
 };
 
@@ -46,10 +47,18 @@ export async function getPoliciesForObject(applytester: WHFSApplyTester, policie
   return policymap;
 }
 
+function mapHSContext(inContext: HSPolicyContext): FSObjectPolicyBaseContext {
+  return {
+    targetObject: inContext.target,
+    contentObject: inContext.content,
+    title: inContext.title
+  };
+}
+
 export async function getPublicationDefaults(context: HSPolicyContext): Promise<PublicationDefaults | null> {
-  const policy = await findObjectPolicyWithHandler(context.id, "getPublicationDefaults");
+  const policy = await findObjectPolicyWithHandler(context.target, "getPublicationDefaults");
   if (policy)
-    return await policy.getPublicationDefaults({ fsObject: context.id, title: context.title });
+    return await policy.getPublicationDefaults(mapHSContext(context));
   return null;
 }
 
@@ -58,7 +67,7 @@ export async function getFallbackMetaTitle(context: HSPolicyContext, policies: P
   if (policyName) {
     const obj = await importJSObject<FSObjectPolicy>(policyName);
     if (obj?.getFallbackMetaTitle) //still there?
-      return await obj.getFallbackMetaTitle({ fsObject: context.id, title: context.title });
+      return await obj.getFallbackMetaTitle(mapHSContext(context));
   }
   return null;
 }
