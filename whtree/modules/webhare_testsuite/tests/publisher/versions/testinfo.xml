@@ -1,3 +1,4 @@
 <group xmlns="http://www.webhare.net/xmlns/system/testinfo">
   <test script="test-newitem-versions.whscr" />
+  <test script="test-newitem-versions-js.whscr" />
 </group>

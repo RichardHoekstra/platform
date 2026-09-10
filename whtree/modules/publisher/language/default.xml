@@ -1460,6 +1460,9 @@
       <text tid="contentsnippets">Content snippets</text>
       <text tid="slots">Slots folder</text>
     </textgroup>
+    <textgroup gid="internaltypes">   <!-- siteprofile.internaltypes -->
+      <text tid="lifecycle">Lifecycle</text>
+    </textgroup>
     <textgroup gid="widgets">   <!-- siteprofile.widgets -->
       <text tid="embedhtml">HTML block</text>
       <text tid="embedvideo">Embedded video</text>
@@ -1910,6 +1913,7 @@
           <text tid="include_autosaves">Include autosaves</text>
           <text tid="metadata">Metadata</text>
           <text tid="newdocumentnopreview">This version (document creation) does not have a preview</text>
+          <text tid="previewisnothistoricsnapshot">This preview is not a historic snapshot, but the the contents of this version rendered in the current site.</text>
           <text tid="previewtab">Preview</text>
           <text tid="unknownuser">Unknown user</text>
           <text tid="versionnumber">Content version</text>

@@ -20,8 +20,9 @@
       <action name="canceldraft" frameflags="canrevertdraft" onexecute="docanceldraft" />
       <action name="sendpreviewlink" ellipsis="true" onexecute="dosendpreviewlink" />
       <action name="publish" frameflags="canpublish" onexecute="dopublish" />
+
       <!-- this action will *always* lead to editing publicadtion schedule settings. for now used by the draftbar and needed in non-experimental mode -->
-      <action name="schedulepublication" frameflags="!readonly" onexecute="dopublish_schedule" ellipsis="true" />
+      <action name="schedulepublication" ellipsis="true" frameflags="!readonly" onexecute="dopublish_schedule" />
       <action name="close" onexecute="doclose" tid="~close" />
       <windowopenaction name="viewpublished"
                         frameflags="canview"
@@ -119,7 +120,7 @@
         <part name="doceditor" width="2pr" />
         <part name="metapart" width="1pr">
           <tabs name="filetabs" height="1pr">
-            <tab name="metadatatab" tid=".metadata" vscroll="true" dirtylistener="dirtylistener">
+            <tab name="metadatatab" dirtylistener="dirtylistener" tid=".metadata" vscroll="true">
               <section name="mainsection" open="true" tid="tolliumapps.objectprops.objectprops.maintab">
                 <heading name="maintab_heading" tid="tolliumapps.objectprops.objectprops.nametitle" />  <!-- doclink="publisher:objectprops/nametitle" -->
                 <line>
@@ -129,11 +130,7 @@
                     <option rowkey="true" tid="tolliumapps.objectprops.objectprops.isunlisted-true" />
                   </select>
                 </line>
-                <textedit name="name"
-                          width="1pr"
-                          maxlength="256"
-                          tid="~name"
-                          validationchecks="whfsname">
+                <textedit name="name" width="1pr" maxlength="256" tid="~name" validationchecks="whfsname">
                   <button name="refreshnamebutton"
                           action="refreshname"
                           icon="tollium:actions/refresh"

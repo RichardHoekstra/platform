@@ -28,11 +28,13 @@ interface MetaTabs {
     namespace: string;
     layout?: string[];
     sections: MetadataSection[];
+    workflow: boolean;
   }>;
   extendProps: Array<{
     title: string;
     whfsType: string;
     extension: string;
+    workflow: boolean;
   }>;
   /** Issues - for now simply strings */
   issues: string[];
@@ -117,7 +119,7 @@ function determineComponent(constraints: ValueConstraints | null, setComponent: 
   };
 }
 
-async function getFilteredExtendProps(applytester: WHFSApplyTester, user: AuthorizationInterface | undefined, editWorkflowMetadata: boolean, isObjectProps: boolean): Promise<Pick<MetaTabs, 'extendProps' | 'issues'>> {
+async function getFilteredExtendProps(applytester: WHFSApplyTester, user: AuthorizationInterface | undefined, editWorkflowMetadata: boolean, editNonWorkflowMetadata: boolean, editNonCloneOnCopy: boolean): Promise<Pick<MetaTabs, 'extendProps' | 'issues'>> {
   const extendProps: MetaTabs['extendProps'] = [];
   const issues: string[] = [];
 
@@ -143,26 +145,31 @@ async function getFilteredExtendProps(applytester: WHFSApplyTester, user: Author
       continue;
     }
 
-    if (!isObjectProps //then assuming we're in document editor
-      && matchtype.workflow === false) { //type is explicitly non-workflow
+    if (!matchtype.workflow && !editNonWorkflowMetadata) {
       issues.push(`Type ${prop.whfsType} is not defined for workflow, but this context requires workflow`);
+      continue;
+    }
+    if (!matchtype.cloneoncopy && !matchtype.cloneonarchive && !editNonCloneOnCopy) {
+      issues.push(`Type ${prop.whfsType} is not cloneOnCopy or cloneOnArchive, may not be shown in versions context`);
       continue;
     }
 
     extendProps.push({
       whfsType: prop.whfsType,
       extension: prop.extension,
-      title: matchtype.title || `:${matchtype.scopedtype || matchtype.namespace}`
+      title: matchtype.title || `:${matchtype.scopedtype || matchtype.namespace}`,
+      workflow: matchtype.workflow
     });
   }
   return { extendProps, issues };
 }
 
 /** Describe configuration for an editor
-    @param options.isObjectProps - requesting metadata for objectprops screen
-*/
-export async function describeMetaTabs(applytester: WHFSApplyTester, options?: {
-  isObjectProps?: boolean;
+ * @param options.mode - Mode to determine which metadata tabs to describe
+ * @param user - User used for rights checks
+ */
+export async function describeMetaTabs(applytester: WHFSApplyTester, options: {
+  mode: "editor" | "objectProps" | "versions" | "all";
   user?: AuthorizationInterface;
 }): Promise<MetaTabs> {
   const cf = await applytester.__getCustomFields();
@@ -182,8 +189,10 @@ export async function describeMetaTabs(applytester: WHFSApplyTester, options?: {
   const needsTemplate = applytester.isTypeNeedsTemplate();
 
   // objectprops is not allowed to edit workflow fields when editing existing files which have a document editor
-  const editWorkflowMetadata = applytester.isMocked() || !options?.isObjectProps || !setContentEditor?.documentEditor;
-  const aboutExtendProps = await getFilteredExtendProps(applytester, options?.user, editWorkflowMetadata, options?.isObjectProps || false);
+  const editWorkflowMetadata = applytester.isMocked() || options.mode !== "objectProps" || !setContentEditor?.documentEditor;
+  const editNonWorkflowMetadata = options.mode !== "editor";
+  const editNonCloneOnCopy = options.mode !== "versions";
+  const aboutExtendProps = await getFilteredExtendProps(applytester, options?.user, editWorkflowMetadata, editNonWorkflowMetadata, editNonCloneOnCopy);
   const metasettings: MetaTabsWithHSInfo = {
     types: [],
     extendProps: aboutExtendProps.extendProps,
@@ -220,9 +229,12 @@ export async function describeMetaTabs(applytester: WHFSApplyTester, options?: {
       metasettings.issues.push(`Type ${contenttype} is defined for workflow, but this context cannot edit workflow controlled fields`);
       continue;
     }
-    if (!options?.isObjectProps //then assuming we're in document editor
-      && matchtype.workflow === false) { //type is explicitly non-workflow
+    if (!matchtype.workflow && !editNonWorkflowMetadata) {
       metasettings.issues.push(`Type ${contenttype} is not defined for workflow, but this context requires workflow`);
+      continue;
+    }
+    if (!matchtype.cloneoncopy && !matchtype.cloneonarchive && !editNonCloneOnCopy) {
+      metasettings.issues.push(`Type ${contenttype} is not cloneOnCopy or cloneOnArchive, may not be shown in versions context`);
       continue;
     }
 
@@ -298,6 +310,7 @@ export async function describeMetaTabs(applytester: WHFSApplyTester, options?: {
     metasettings.types.push({
       namespace: matchtype.namespace,
       sections: sections.filter(section => section.fields.length > 0),
+      workflow: matchtype.workflow,
     });
   }
 
@@ -320,6 +333,7 @@ interface MetaTabsForHS {
         };
       }>;
     }>;
+    workflow: boolean;
   }>;
   __hsinfo: unknown;
   issues: string[];
@@ -354,7 +368,7 @@ export function remapForHs(metatabs: MetaTabs): MetaTabsForHS {
   return translated;
 }
 
-export async function describeMetaTabsForHS(obj: { objectid: number; parent: number; isfolder: boolean; type: number; isobjectprops: boolean; user: number }): Promise<MetaTabsForHS | null> {
+export async function describeMetaTabsForHS(obj: { objectid: number; parent: number; isfolder: boolean; type: number; mode: "editor" | "objectProps" | "versions"; user: number }): Promise<MetaTabsForHS | null> {
   let applytester;
   if (obj.objectid) {
     applytester = await getApplyTesterForObject(await openFileOrFolder(obj.objectid, { allowHistoric: true }));
@@ -363,6 +377,6 @@ export async function describeMetaTabsForHS(obj: { objectid: number; parent: num
     applytester = await getApplyTesterForMockedObject(await openFolder(obj.parent, { allowRoot: true }), obj.isfolder, typens);
   }
 
-  const metatabs = await describeMetaTabs(applytester, { isObjectProps: obj.isobjectprops, user: obj.user ? getAuthorizationInterface(obj.user) : undefined });
+  const metatabs = await describeMetaTabs(applytester, { mode: obj.mode, user: obj.user ? getAuthorizationInterface(obj.user) : undefined });
   return remapForHs(metatabs);
 }

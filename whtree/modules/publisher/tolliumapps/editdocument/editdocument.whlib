@@ -61,7 +61,7 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
   //
   // Init
   //
-  MACRO NEW() : PublisherEditorBase(FALSE) {
+  MACRO NEW() : PublisherEditorBase([ mode := "editor" ]) {
 
   }
 

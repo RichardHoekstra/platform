@@ -104,8 +104,8 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
   /// Source item (original file for duplications, draft or edited file when editing).
   OBJECT sourceitem;
 
-  /// Are we objectprops? some tweaks will be done
-  BOOLEAN isobjectprops;
+  /// Mode ("editor", "objectProps", "versions" or "all")
+  STRING mode;
   /// Workflow editor settings, if any
   RECORD workfloweditor;
 
@@ -122,8 +122,9 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
 
   OBJECT workflowmgr;
 
-  MACRO NEW(BOOLEAN isobjectprops) {
-    this->isobjectprops := isobjectprops;
+  MACRO NEW(RECORD options) {
+    options := ValidateOptions([ mode := "all" ], options, [ required := [ "mode" ], enums := [ mode := [ "editor", "objectProps", "all" ] ] ]);
+    this->mode := options.mode;
     this->editable := TRUE; //needed as objectproperties.whlib doesn't invoke RefreshReadonly. but once it does we'll have to deal with objectprops ignoring workflow editable
   }
 
@@ -164,7 +165,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
     }
 
     //TODO generalize further so metadata.ts also managed SEO settings
-    this->renderer->RegisterMetaController(^webmetadata->type, ^webmetadata);
+    this->renderer->RegisterMetaController(^webmetadata->type, ^webmetadata, TRUE);
   }
 
   RECORD FUNCTION UpdatePinned()
@@ -196,7 +197,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
     options := ValidateOptions(CELL[ assumewriteaccess := FALSE
                                   ], options);
 
-    this->renderer := CreateMetatabsRenderer(CELL[ objectid, parent, isfolder, type, this->isobjectprops ]);
+    this->renderer := CreateMetatabsRenderer(CELL[ objectid, parent, isfolder, type, this->mode ]);
     this->metatabsconfig := this->renderer->metatabsconfig;
     this->workfloweditor := RecordExists(this->metatabsconfig) ? this->metatabsconfig.workfloweditor : DEFAULT RECORD;
     this->contexts->applytester := this->renderer->applytester;
@@ -282,7 +283,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
       extendprop.fsinstance->enabled := this->editable;
 
     // objectprops is not allowed to edit workflow fields when editing existing files which have a true workflow (and document editor)
-    BOOLEAN edit_workflow_metadata := this->isnew OR NOT RecordExists(this->workfloweditor) OR NOT this->isobjectprops;
+    BOOLEAN edit_workflow_metadata := this->isnew OR NOT RecordExists(this->workfloweditor) OR this->mode != "objectProps";
     BOOLEAN needstemplate := this->isfolder ? FALSE : this->contexts->applytester->IsTypeNeedsTemplate();
     //As these are published, only files that go through a webdesign can show something useful
     ^seotitle->visible := needstemplate AND this->renderer->metatabsconfig.base_properties.seo_title AND edit_workflow_metadata;
@@ -436,27 +437,14 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
   // Controllers for the metadata. For now we'll rely on compositions
   PUBLIC RECORD ARRAY metacontrollers;
 
-  /// Components that need to be removed when the metadata is re-rendered.
-  PUBLIC OBJECT ARRAY components;
-
   MACRO NEW(RECORD config, OBJECT applytester) {
     this->metatabsconfig := config;
     this->applytester := applytester;
   }
 
-  PUBLIC MACRO Reset() {
-    FOREVERY (OBJECT comp FROM this->components)
-      comp->DeleteComponent();
-    FOREVERY (RECORD rec FROM this->metacontrollers)
-      rec.fsinstance->DeleteComponent();
-    this->components := DEFAULT OBJECT ARRAY;
-    this->metacontrollers := DEFAULT RECORD ARRAY;
+  PUBLIC MACRO RegisterMetaController(OBJECT type, OBJECT composition, BOOLEAN workflow) {
+    INSERT CELL[ fsinstance := composition, type, components := OBJECT[], workflow ] INTO this->metacontrollers AT END;
   }
-
-  PUBLIC MACRO RegisterMetaController(OBJECT type, OBJECT composition) {
-    INSERT CELL[ fsinstance := composition, type ] INTO this->metacontrollers AT END;
-  }
-
 
   PUBLIC RECORD ARRAY FUNCTION PrepareTypeSections(OBJECT contexts, RECORD type, RECORD options DEFAULTSTO DEFAULT RECORD) {
     options := ValidateOptions([
@@ -464,10 +452,11 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
     ], options);
 
     OBJECT fsinstance := contexts->screen->CreateTolliumComponent("record");
-    RECORD controller := CELL [ fsinstance, type := OpenWHFSType(type.namespace) ];
+    RECORD controller := CELL [ fsinstance, type := OpenWHFSType(type.namespace), components := OBJECT[], type.workflow ];
     fsinstance->yamlscope := NEW FieldScope(fsinstance, controller);
     INSERT controller INTO this->metacontrollers AT END;
     RECORD ARRAY sections;
+    OBJECT ARRAY components;
 
     FOREVERY(RECORD section FROM type.sections) {
       RECORD addsection := [ title := GetTid(section.title)
@@ -489,14 +478,17 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
           OBJECT heading := contexts->screen->CreateTolliumComponent("heading");
           heading->title := title;
           INSERT CELL[ layout := "form", line := heading ] INTO addsection.lines AT END;
+          INSERT heading INTO components AT END;
         }
 
         newcomp->title := (layout = "inline" ? title : "");
         newcomp->errorlabel := title;
         INSERT CELL[ layout := layout = "inline" ? "form" : "left", line := newcomp ] INTO addsection.lines AT END;
+        INSERT newcomp INTO components AT END;
       }
       INSERT addsection INTO sections AT END;
     }
+    UPDATE this->metacontrollers SET components := COLUMN components CONCAT VAR components WHERE COLUMN type->namespace = VAR type.namespace;
     RETURN sections;
   }
 
@@ -505,11 +497,14 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
       OBJECT newtab := maintabs->InsertTabAt(insertpos, section.title);
       insertpos := insertpos + 1;
 
+      OBJECT ARRAY components := [ newtab ];
       FOREVERY(RECORD line FROM section.lines) {
         newtab->layout := line.layout;
         newtab->InsertComponentAfter(line.line, DEFAULT OBJECT, TRUE);
-        INSERT line.line INTO this->components AT END;
+        INSERT line.line INTO components AT END;
       }
+
+      UPDATE this->metacontrollers SET components := COLUMN components CONCAT VAR components WHERE COLUMN type->namespace = VAR type.namespace;
     }
 
     RETURN CELL [ insertpos ];
@@ -520,7 +515,11 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
       controller.fsinstance->enabled := enabled;
   }
 
-  PUBLIC RECORD ARRAY FUNCTION RenderLegacyExtensions(OBJECT contexts, OBJECT container) {
+  PUBLIC RECORD ARRAY FUNCTION RenderLegacyExtensions(OBJECT contexts, OBJECT container, RECORD options DEFAULTSTO DEFAULT RECORD) {
+    options := ValidateOptions([
+      propertiescontainer := DEFAULT OBJECT
+    ], options);
+
     RECORD ARRAY extendprops;
 
     //Legacy extensions expect to be loaded into a tab. Build tabs to make them happy
@@ -530,7 +529,7 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
       //TODO setup whfsinstance->basefsobject like objectprops does? but objectprops seems a bit dangerous for New Item and Duplicate Item, where sourceitem does not point to the target
       OBJECT fsinstance := contexts->screen->CreateCustomComponent("http://www.webhare.net/xmlns/publisher/components", "whfsinstance");
       fsinstance->type := OpenWHFSType(ext.whfs_type);
-      INSERT CELL[ fsinstance, fsinstance->type ] INTO this->metacontrollers AT END;
+      this->RegisterMetaController(fsinstance->type, fsinstance, ext.workflow);
 
       tabs->extendcomponents := [[ name := "contentdata", component := fsinstance ]];
       tabs->width := "1pr";
@@ -540,7 +539,7 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
       OBJECT insertpoint := contexts->screen->CreateTolliumComponent("spacer");
       insertpoint->visible := FALSE;
       maintab->InsertComponentAfter(insertpoint, DEFAULT OBJECT, TRUE);
-      FOREVERY(STRING name FROM [ "name", "title", "description", "keywords", "publicationsettings", "settings", "properties", "seosettings", "advancesettings" ])
+      FOREVERY(STRING name FROM [ "name", "title", "description", "keywords", "publicationsettings", "tasksettings", "settings", "properties", "seosettings", "advancesettings" ])
         INSERT CELL[ name, component := insertpoint ] INTO tabs->insertpoints AT END;
 
       RECORD loadresult := tabs->LoadTabsExtension(ext.extension);
@@ -560,7 +559,9 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
       newsection->title := tabs->type = "server" AND maintab->visible = FALSE? visiblepages[0]->title : GetTid(ext.title);
       newsection->open := FALSE;
       newsection->panel->InsertComponentAfter(tabs, DEFAULT OBJECT, TRUE);
-      container->InsertComponentAfter(newsection, DEFAULT OBJECT, TRUE);
+
+      OBJECT usecontainer := ext.workflow ? container : (options.propertiescontainer ?? container);
+      usecontainer->InsertComponentAfter(newsection, DEFAULT OBJECT, TRUE);
 
       INSERT CELL[ ext.whfs_type
                  , loadresult.components
@@ -568,8 +569,10 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
                  , fsinstance
                  , tabs
                  , newsection
+                 , ext.workflow
                  ] INTO extendprops AT END;
-      INSERT newsection INTO this->components AT END;
+
+      UPDATE this->metacontrollers SET components := COLUMN components CONCAT [ newsection ] WHERE type->namespace = ext.whfs_type;
     }
     RETURN extendprops;
   }
@@ -589,10 +592,11 @@ PUBLIC OBJECT FUNCTION CreateMetatabsRenderer(RECORD objdata) {
     parent := 0,
     isfolder := FALSE,
     type := -1,
-    isobjectprops := FALSE,
+    mode := "all",
     user := GetEffectiveUser()->entityid //TODO FIX for overrideuser, has no entityid
   ], objdata, [
-    required := STRING[ "objectid", "parent", "isfolder", "type", "isobjectprops" ]
+    required := STRING[ "objectid", "parent", "isfolder", "type", "mode" ],
+    enums := [ mode := STRING[ "editor", "objectProps", "versions", "all" ] ]
   ]);
 
   RECORD metatabsconfig := CallJS("@mod-publisher/lib/internal/siteprofiles/metatabs.ts#describeMetaTabsForHS", objdata);

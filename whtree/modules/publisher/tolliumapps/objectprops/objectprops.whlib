@@ -185,7 +185,7 @@ PUBLIC STATIC OBJECTTYPE ObjectProps EXTEND PublisherEditorBase <
   // Constructor & init
   //
 
-  MACRO NEW(): PublisherEditorBase(TRUE) {
+  MACRO NEW(): PublisherEditorBase([ mode := "objectProps" ]) {
     this->contexts->objectpropsapi := NEW ObjectPropsAPI(this);
   }
 
@@ -429,7 +429,7 @@ PUBLIC STATIC OBJECTTYPE ObjectProps EXTEND PublisherEditorBase <
     //configure settings that depend on the applytester
     this->SetupBaseSettings();
 
-    this->renderer->RegisterMetaController(^webconfig->type, ^webconfig);
+    this->renderer->RegisterMetaController(^webconfig->type, ^webconfig, TRUE);
   }
 
   // ---------------------------------------------------------------------------

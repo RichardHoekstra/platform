@@ -12,8 +12,8 @@ runCli({
       arguments: [{ name: "<object>", description: "Object to evaluate" }],
       main: async ({ args, opts }) => {
         const toopen = args.object.match(/^[\d]+$/) ? parseInt(args.object) : args.object;
-        const applyester = await getApplyTesterForObject(await openFileOrFolder(toopen, { allowRoot: true, allowHistoric: true }));
-        console.log(JSON.stringify(await applyester.__getAllMatches({ yamlonly: opts.yaml }), null, 2));
+        const applytester = await getApplyTesterForObject(await openFileOrFolder(toopen, { allowRoot: true, allowHistoric: true }));
+        console.log(JSON.stringify(await applytester.__getAllMatches({ yamlonly: opts.yaml }), null, 2));
       }
     },
     "dump-fields": {
@@ -21,8 +21,8 @@ runCli({
       arguments: [{ name: "<object>", description: "Object to evaluate" }],
       main: async ({ args, opts }) => {
         const toopen = args.object.match(/^[\d]+$/) ? parseInt(args.object) : args.object;
-        const applyester = await getApplyTesterForObject(await openFileOrFolder(toopen, { allowRoot: true, allowHistoric: true }));
-        const tabs = await describeMetaTabs(applyester);
+        const applytester = await getApplyTesterForObject(await openFileOrFolder(toopen, { allowRoot: true, allowHistoric: true }));
+        const tabs = await describeMetaTabs(applytester, { mode: "all" });
         console.log(JSON.stringify(tabs, null, 2));
       }
     }
