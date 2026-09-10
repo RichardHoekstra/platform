@@ -25,7 +25,7 @@ PUBLIC STATIC OBJECTTYPE PublishDialog EXTEND TolliumScreenBase <
     ^end_at->value := this->initialscheduleinfo.end_at;
 
     IF(^publish_at->value = DEFAULT DATETIME AND ^end_at->value = DEFAULT DATETIME) { //no values yet set
-      RECORD pubdefaults := CallJS("mod::publisher/lib/internal/siteprofiles/fsobjectpolicy.ts#getPublicationDefaults", data.currentdraft);
+      RECORD pubdefaults := CallJS("mod::publisher/lib/internal/siteprofiles/fsobjectpolicy.ts#getPublicationDefaults", data.policycontext);
       IF(RecordExists(pubdefaults)) {
         IF(CellExists(pubdefaults,'start')) {
           ^publish->value := "publish_at";

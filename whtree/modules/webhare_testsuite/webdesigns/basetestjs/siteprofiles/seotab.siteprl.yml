@@ -17,6 +17,9 @@ apply:
     baseProps:
       seoTitle: true
   - to:
+      sitePath: "*seopolicy*"
+    fsObjectPolicy: ./seotab.ts#seoPolicy
+  - to:
       sitePath: "*pageheading*"
     baseProps:
       pageHeading: true

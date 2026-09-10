@@ -111,6 +111,34 @@ ASYNC MACRO TestCreateRTD() {
   //FIXME check if pinned files can't be asynchronously overwritten
 }
 
+ASYNC MACRO TestCreateRTDSeoTitle() { //test the properties dialog behavior of a new rtd
+  testfw->BeginWork();
+  OBJECT testfile_seotitle := GetTestsuiteJSTempFolder()->CreateFile([name := "seotitle", typens := "platform:filetypes.richdocument"]);
+  OBJECT testfile_seotitle_policy := GetTestsuiteJSTempFolder()->CreateFile([name := "seotitle-seopolicy", typens := "platform:filetypes.richdocument"]);
+  testfw->CommitWork();
+
+  STRING default_placeholder := "Overwrite title used in search results/browser title";
+
+  AWAIT ExpectScreenChange(+1, PTR TTLaunchApp("publisher:edit", [ params := STRING[ testfile_seotitle->whfspath ]]));
+  TestEq(default_placeholder, TT(":Meta title")->placeholder);
+  TT(":Title")->value := "mydoc";
+  TestEq(default_placeholder, TT(":Meta title")->placeholder);
+  TT(":Title")->SetDirty();
+  TTClick(":Save");
+  AWAIT ExpectScreenChange(-1, PTR TTEscape); //exit editor
+
+  //seopolicy has a fsobjectpolicy modifying the Metatitle suggestion
+  AWAIT ExpectScreenChange(+1, PTR TTLaunchApp("publisher:edit", [ params := STRING[ testfile_seotitle_policy->whfspath ]]));
+  TestEq("Initial placeholder title", TT(":Meta title")->placeholder);
+  TT(":Title")->value := "mydoc";
+  TestEq("mydoc - Home", TT(":Meta title")->placeholder);
+  TT(":Title")->value := "default";
+  TestEq(default_placeholder, TT(":Meta title")->placeholder);
+  TT(":Title")->SetDirty();
+  TTClick(":Save");
+  AWAIT ExpectScreenChange(-1, PTR TTEscape); //exit editor
+}
+
 ASYNC MACRO TestCreateRTDProps() { //test the properties dialog behavior of a new rtd
   AWAIT ExpectScreenChange(+1, PTR TTLaunchApp("publisher:app", [ params := STRING[ GetTestsuiteTempFolder()->whfspath ]]));
 
@@ -161,9 +189,11 @@ ASYNC MACRO TestCreateFolder() {
   AWAIT ExpectScreenChange(-1, PTR TTEscape);
 }
 
-RunTestframework([ PTR TestCreateFile
-                 , PTR TestCreateRTD
-                 , PTR TestCreateRTDProps
-                 , PTR TestCreateFolder
-                 ], [ testusers := [[ login := "sysop", grantrights := ["system:sysop"] ]
-                                   ]]);
+RunTestframework([
+   PTR TestCreateFile,
+   PTR TestCreateRTD,
+   PTR TestCreateRTDSeoTitle,
+   PTR TestCreateRTDProps,
+   PTR TestCreateFolder,
+  ], [ testusers := [[ login := "sysop", grantrights := ["system:sysop"] ]
+                  ]]);

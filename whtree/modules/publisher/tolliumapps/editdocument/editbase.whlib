@@ -79,6 +79,10 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
   RECORD curtype;
   /// Can the name follow the title?
   BOOLEAN namefollowstitle;
+  /// Does the seotitle follow title?
+  BOOLEAN seotitle_follows_title;
+  /// Original seotitle placeholder
+  STRING seotitle_placeholder;
   // Metatabs config as received from describeMetaTabsForHS
   RECORD metatabsconfig;
   // Controllers for the metadata. For now we'll rely on compositions
@@ -135,17 +139,28 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
     RETURN this->isnew OR (NOT RecordExists(this->recyclebininfo) AND this->tolliumuser->HasRightOn("system:fs_fullaccess", this->itemid));
   }
 
+  RECORD FUNCTION GetPolicyContext() { //Returns a HSPolicyContext
+    RETURN CELL[
+      content := ObjectExists(this->workflowmgr) ? this->workflowmgr->__GetAutosavedObject()->id : this->itemid,
+      target := this->itemid,
+      title := ^title->value
+    ];
+  }
+
   MACRO SetupBaseSettings()
   {
+    this->seotitle_placeholder := ^seotitle->placeholder;
     ^name->title := this->isfolder ? GetTid("~foldername") : GetTid("~filename");
     ^description->visible := this->renderer->metatabsconfig.base_properties.description;
     ^keywords->visible := this->renderer->metatabsconfig.base_properties.keywords;
     ^isunlisted->visible := this->renderer->metatabsconfig.base_properties.is_unlisted;
     ^title->required := this->renderer->metatabsconfig.base_properties.require_title;
 
-    IF(this->namefollowstitle) {
-      ^title->onchange := PTR this->SyncNameWithTitle;
-      this->SyncNameWithTitle();
+    //TODO we should align with ^seotitle->visible instead of base_properties.seo_title but that one is a bit more dynamic and initialized later
+    this->seotitle_follows_title := this->renderer->metatabsconfig.base_properties.seo_title AND CellExists(this->renderer->metatabsconfig.policies,"GET_FALLBACK_META_TITLE");
+    IF(this->namefollowstitle OR this->seotitle_follows_title) {
+      ^title->onchange := PTR this->SyncTitle;
+      this->SyncTitle();
     }
 
     //TODO generalize further so metadata.ts also managed SEO settings
@@ -243,10 +258,17 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
     RETURN SELECT AS STRING name FROM system.fs_objects WHERE id = this->itemid;
   }
 
-  MACRO SyncNameWithTitle()  {
-    ^name->placeholder := this->GetSuggestedSlug(0);
-    //TODO can Tollium control the refresh button's visibility based on title set/not set ?
-    ^refreshnamebutton->visible := ^title->value != "";
+  MACRO SyncTitle()  {
+    IF(this->namefollowstitle) {
+      ^name->placeholder := this->GetSuggestedSlug(0);
+      //TODO can Tollium control the refresh button's visibility based on title set/not set ?
+      ^refreshnamebutton->visible := ^title->value != "";
+    }
+
+    IF(this->seotitle_follows_title) {
+      VARIANT suggestion := CallJS([camelcase := TRUE ], "mod::publisher/lib/internal/siteprofiles/fsobjectpolicy.ts#getFallbackMetaTitle", this->GetPolicyContext(), this->renderer->metatabsconfig.policies);
+      ^seotitle->placeholder := TYPEID(suggestion) = TYPEID(STRING) ? suggestion : this->seotitle_placeholder;
+    }
   }
 
   MACRO DoRefreshName() {
