@@ -183,8 +183,8 @@
           <text tid="metadata">Web/SEO metadata</text>
           <text tid="page_heading">Paginakop</text>
           <text tid="page_heading-placeholder">Overschrijf de titel zoals gebruikt op de pagina</text>
-          <text tid="seo_title">Meta titel</text>
-          <text tid="seo_title-placeholder">Overschrijf de titel zoals gebruikt in zoekresultaten/browser title</text>
+          <text tid="seo_title">Metatitel</text>
+          <text tid="seo_title-placeholder">Overschrijf de titel zoals gebruikt in zoekresultaten/browsertitel</text>
         </textgroup>
         <textgroup gid="sitesettings">   <!-- siteprofiles.types.web.sitesettings -->
           <text tid="productionurl">Productie-URL</text>
