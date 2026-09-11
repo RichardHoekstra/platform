@@ -1,3 +1,7 @@
+// This gets TypeScript to refer to us by our @webhare/... name in auto imports:
+declare module "@webhare/tollium-test" {
+}
+
 /* tolliumtest is a 'clean start' to not have to restucture and refactor the original
    tollium test APIs
 
@@ -5,7 +9,7 @@
         return null (lots of !s) or start throwing if a component was not found */
 
 import { toElement, type CastableToElement } from "dompack/testframework/pointer";
-import { getCurrentScreen, getTestScreen, type ScreenProxy } from "./testframework";
+import { getCurrentScreen, getTestScreen, type ScreenProxy } from "@mod-tollium/js/testframework.ts";
 
 import * as test from "@webhare/test-frontend";
 import { changeValue, isFormControl, qSA, type FormControlElement } from "@webhare/dompack";

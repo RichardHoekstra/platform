@@ -1,0 +1,16 @@
+{
+  "name": "@webhare/tollium-test",
+  "type": "module",
+  "version": "",
+  "description": "",
+  "main": "src/tollium-test.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "typedocOptions": {
+    "entryPoints": [
+      "./src/tollium-test.ts"
+    ]
+  },
+  "private": true
+}
