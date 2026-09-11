@@ -81,6 +81,8 @@ class ComponentProxy implements CastableToElement {
   private getIfTextValue(): string | undefined {
     if (this.node.matches("t-textarea, t-textedit"))
       return this.getHTMLFormControl()?.value;
+    if (this.node.matches("t-text"))
+      return this.node.textContent || '';
   }
 
   /** Obtain the 'natural' value for this component's form control */

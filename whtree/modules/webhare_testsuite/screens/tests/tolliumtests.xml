@@ -8,6 +8,7 @@
         <option rowkey="opt1" title="Opt 1" />
         <option rowkey="opt2" title="Opt 2" />
       </select>
+      <text name="text" title="Textfield" value="Textvalue" />
     </body>
   </screen>
 
