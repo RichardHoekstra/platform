@@ -171,7 +171,7 @@ async function testServiceTimeout(protocol: BackendServiceProtocol) {
 }
 
 async function runBackendServiceTest_JS(protocol: BackendServiceProtocol) {
-  await test.throws(/Service 'webharedev_jsbridges:nosuchservice' is unavailable.*/, services.openBackendService("webharedev_jsbridges:nosuchservice", ["x"], { timeout: 300, linger: true, protocol }));
+  await test.throws(/Service 'webhare_testsuite:nosuchservice' is unavailable.*/, services.openBackendService("webhare_testsuite:nosuchservice", ["x"], { timeout: 300, linger: true, protocol }));
   await new Promise(r => setTimeout(r, 5));
   await waitForPortCounts({ pipes: 0, ports: 0 }, `${protocol}: Failed attempts above should not have kept a pending reference`);
 

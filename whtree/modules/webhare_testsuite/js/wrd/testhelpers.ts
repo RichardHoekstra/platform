@@ -401,7 +401,6 @@ export async function createWRDTestSchema(options?: {
 
   await test.reset();
 
-  // FIXME here we're assuming whdb work to be global but that's just asking for conflicts in real code. See webharedev_jsbridges#4
   const schemaobj = await getLegacyWRDSchema();
   test.assert(schemaobj);
   await whdb.beginWork();
