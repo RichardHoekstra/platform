@@ -12,18 +12,26 @@ type CleanupAttributes<T> = {
   : K]?: T[K];
 };
 
-type EventHandlersFor<E extends keyof HTMLElementTagNameMap> = {
-  on?: { [K in keyof HTMLElementEventMap]?: (this: HTMLElementTagNameMap[E], ev: HTMLElementEventMap[K]) => void; };
-};
+type EventHandlersFor<E extends CustomElementName | keyof HTMLElementTagNameMap> =
+  E extends keyof HTMLElementTagNameMap ? {
+    on?: { [K in keyof HTMLElementEventMap]?: (this: HTMLElementTagNameMap[E], ev: HTMLElementEventMap[K]) => void; };
+  } : {
+    on?: { [K in keyof HTMLElementEventMap]?: (this: HTMLElement, ev: HTMLElementEventMap[K]) => void; };
+  };
 
-type CreateAttributesFor<K extends keyof HTMLElementTagNameMap> = CleanupAttributes<HTMLElementTagNameMap[K]> & EventHandlersFor<K> & {
+type CreateAttributesFor<K extends CustomElementName | keyof HTMLElementTagNameMap> = CleanupAttributes<K extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[K] : HTMLElement> & EventHandlersFor<K> & {
   style?: Partial<CSSStyleDeclaration> & object;
 };
 
-export function html<K extends keyof HTMLElementTagNameMap>(elementname: K, attributes?: CreateAttributesFor<K>, children?: Array<Node | string>): HTMLElementTagNameMap[K] {
+type CustomElementName = `${string}-${string}`;
+
+export function html<K extends CustomElementName | keyof HTMLElementTagNameMap>(
+  elementname: K,
+  attributes?: CreateAttributesFor<K>, children?: Array<Node | string>):
+  K extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[K] : HTMLElement {
   //TODO consider making second parameter optional?
   const el = createElement(elementname, attributes, false);
   if (children?.length)
     el.append(...children);
-  return el as HTMLElementTagNameMap[K];
+  return el as K extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[K] : HTMLElement;
 }
