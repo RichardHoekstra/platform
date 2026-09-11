@@ -1,6 +1,6 @@
 import type { ServiceCallMessage, ServiceCallResult, ServiceEventMessage, WebHareServiceDescription, WebHareServiceIPCLinkType } from "@mod-system/js/internal/types";
 import bridge, { type IPCMarshallableData } from "@mod-system/js/internal/whmanager/bridge";
-import type { PromisifyFunctionReturnType } from "@webhare/js-api-tools";
+import type { PromisifyInterface } from "@webhare/js-api-tools";
 import { parseTyped, sleep, stringify } from "@webhare/std";
 import type { BackendServices } from "@webhare/services";
 import { getFullConfigFile } from "@mod-system/js/internal/configuration";
@@ -210,10 +210,7 @@ export interface BackendServiceOptions {
  * Removes the "close" method and all methods starting with `_`, and converts all return types to a promise. Readds "close" as added by ServiceBase
  * @typeParam BackendHandlerType - Type definition of the service class that implements this service.
 */
-type ConvertToClientInterface<BackendHandlerType extends object> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- using any is needed for this type definition
-  [K in Exclude<keyof BackendHandlerType, `_${string}` | "close" | "emit" | "onClose"> as BackendHandlerType[K] extends (...a: any) => any ? K : never]: BackendHandlerType[K] extends (...a: any[]) => void ? PromisifyFunctionReturnType<BackendHandlerType[K]> : never;
-} & ServiceBase;
+type ConvertToClientInterface<BackendHandlerType extends object> = PromisifyInterface<BackendHandlerType, `_${string}` | "close" | "emit" | "onClose"> & ServiceBase;
 
 async function attemptAutoStart(name: string) {
   //TODO avoid a thundering herd, throttle repeated auto starts form our side

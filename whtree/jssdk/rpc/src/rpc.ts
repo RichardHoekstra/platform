@@ -6,7 +6,7 @@ declare module "@webhare/rpc" {
 }
 
 import { debugFlags, backendBase } from "@webhare/env";
-import { type StackTrace, parseTrace, prependStackTrace, type PromisifyFunctionReturnType } from "@webhare/js-api-tools";
+import { type StackTrace, parseTrace, prependStackTrace, type PromisifyInterface } from "@webhare/js-api-tools";
 import { omit, parseTyped, stringify } from "@webhare/std";
 
 //Preload interface definitions. To solve this cleaner we would have to do some sort of auto-inject but how to robustly do that accross IDEs/Tscs ?
@@ -288,15 +288,8 @@ export type OmitRPCContextArgs<ServiceType> = {
   [K in keyof ServiceType as ServiceType[K] extends (...a: any) => any ? K : never]: ServiceType[K] extends (...a: any[]) => void ? OmitFirstArg<ServiceType[K]> : never;
 };
 
-/** Creates an async version of the functions in a class, removes context parameters
- * @typeParam ServiceType - Type definition of the service class that implements this service.
-*/
-type ConvertToRPCInterface<ServiceType> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- using any is needed for this type definition
-  [K in keyof ServiceType as ServiceType[K] extends (...a: any) => any ? K : never]: ServiceType[K] extends (...a: any[]) => void ? PromisifyFunctionReturnType<ServiceType[K]> : never;
-};
 
-type ExtractInterface<Service extends object> = ConvertToRPCInterface<Service> & ServiceBase<ConvertToRPCInterface<Service>>;
+type ExtractInterface<Service extends object> = PromisifyInterface<Service> & ServiceBase<PromisifyInterface<Service>>;
 
 /** Get the client interface type as would be returned by createClient
  * @typeParam Service - either the `module:service` name or the interface to implement. If you want to pass the implementation's type you should wrap it into `OmitRPCContextArgs`.
