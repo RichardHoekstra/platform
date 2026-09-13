@@ -32,9 +32,9 @@ export type DevToolsRequest = {
 
 
 export interface TestService {
-  invoke(libfunc: string, params: unknown[]): Promise<unknown>;
-  submitReport(reportid: string, result: TestReport): Promise<void>;
-  syncDevToolsRequest(reportid: string, request: unknown): Promise<unknown>;
+  invoke(testtoken: string, libfunc: string, params: unknown[]): Promise<unknown>;
+  submitReport(testtoken: string, reportid: string, result: TestReport): Promise<void>;
+  syncDevToolsRequest(testtoken: string, reportid: string, request: unknown): Promise<unknown>;
 }
 
 export type SingleTestResult = {
@@ -132,6 +132,7 @@ type Signals = {
   pageload?: Promise<void> | null;
 };
 
+
 class TestFramework {
   currenttest = -1;
   currentstep = -1;
@@ -219,6 +220,10 @@ class TestFramework {
         this.rebuildFrameTabs();
       }
     });
+  }
+
+  getTestPageToken() {
+    return document.documentElement.dataset.testpagetoken ?? throwError(`Missing test token on URL: ${location.href}`);
   }
 
   onMessage = (event: MessageEvent) => {
@@ -357,7 +362,7 @@ class TestFramework {
   }
 
   async sendDevtoolsRequest(request: DevToolsRequest) {
-    return await jstestsrpc.syncDevToolsRequest(this.reportid!, request);
+    return await jstestsrpc.syncDevToolsRequest(this.getTestPageToken(), this.reportid!, request);
   }
 
   /// Sends a report with the current progress
@@ -386,7 +391,7 @@ class TestFramework {
     } else
       console.log(`Submitting ${finished ? "final" : "partial"} report`);
 
-    await jstestsrpc.submitReport(this.reportid, result);
+    await jstestsrpc.submitReport(this.getTestPageToken(), this.reportid, result);
     if (finished && window.location.href.match(/autotests=close/)) {
       // Close the current window (from http://productforums.google.com/forum/#!topic/chrome/GjsCrvPYGlA)
       window.open('', '_self', '');

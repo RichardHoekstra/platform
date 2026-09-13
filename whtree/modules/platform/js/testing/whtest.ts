@@ -6,7 +6,7 @@
 import type { TestService } from "@mod-system/web/systemroot/jstests/testsuite";
 import { dispatchCustomEvent } from "@webhare/dompack";
 import { createClient } from "@webhare/jsonrpc-client";
-import { parseTyped, stringify } from "@webhare/std";
+import { parseTyped, stringify, throwError } from "@webhare/std";
 
 //By definition we re-export all of @webhare/test
 export * from "@webhare/test";
@@ -92,6 +92,8 @@ interface RawExtractedMailResult { //See HS ProcessExtractedMail
 
 const jstestsrpc = createClient<TestService>("system:jstests");
 
+let testpagetoken = typeof window !== "undefined" ? window.top?.__testframework?.getTestPageToken() : '';
+
 /** Invoke any remote function as long as its name starts with TESTFW_. This allows you to quickly run code in the backend without having to set up explicit RPCs
  * @param libfunc - `<library>#TESTFW_<function>` to call
 */
@@ -103,7 +105,8 @@ export async function invoke(libfunc: string, ...params: unknown[]): Promise<any
 
   // console.log(`test.invoke ${libfunc}`, params);
   const isjs = libfunc.includes('.ts#') || libfunc.includes('.js#');
-  const result = await jstestsrpc.invoke(libfunc, isjs ? [stringify(params, { typed: true })] : params);
+
+  const result = await jstestsrpc.invoke(testpagetoken ?? throwError("Cannot find testframework to get testpagetoken from"), libfunc, isjs ? [stringify(params, { typed: true })] : params);
   if (isjs)
     return parseTyped(result as string);
 
@@ -160,4 +163,8 @@ export async function waitForEmails(email: string, options?: WaitForEmailOptions
   });
 
   return outmails;
+}
+
+export function setTestPageToken(token: string) {
+  testpagetoken = token;
 }

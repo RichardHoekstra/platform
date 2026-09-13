@@ -8,6 +8,7 @@ LOADLIB "mod::publisher/lib/siteprofiles.whlib";
 
 LOADLIB "mod::system/lib/database.whlib";
 
+LOADLIB "mod::system/lib/webserver.whlib";
 LOADLIB "mod::system/lib/testfw/runtest.whlib";
 LOADLIB "mod::system/lib/internal/webhareconstants.whlib";
 
@@ -83,6 +84,9 @@ FOREVERY(STRING tag FROM alltags)
 testsbytag := SELECT * FROM testsbytag ORDER BY ToUppercase(title);
 
 OBJECT webdesign := GetWebdesign(whconstant_whfsid_webharebackend);
+IF(NOT webdesign->GetWRDAuthPlugin()->RequireLoggedInUser()->HasRight("system:sysop"))
+  AbortWithHTTPError(403, "Forbidden", [ htmlbody := `<h1>403 Forbidden</h1><p>You must be logged in as a sysop to run tests</p>`]);
+
 webdesign->RunPageWithContents(PTR LoadWittyLibrary("mod::system/lib/testfw/testpage.witty", "HTML")->RunComponent("testoverview",
   [ testsbygroup := testsbygroup
   , testsbytag := testsbytag

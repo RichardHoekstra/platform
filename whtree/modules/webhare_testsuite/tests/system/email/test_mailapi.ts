@@ -1,4 +1,5 @@
 import * as test from "@webhare/test-backend";
+import { generateTestPageToken } from "@webhare/test-backend/src/support";
 import { prepareMail } from "@webhare/services";
 import { runInWork } from "@webhare/whdb";
 import { readFileSync } from "fs";
@@ -81,6 +82,8 @@ async function testMailAPI() {
   await mail.attachResource("mod::webhare_testsuite/data/test/system/mailer/deeper/attachment.txt");
 
   await runInWork(async () => await mail.queue());
+
+  test.setTestPageToken(generateTestPageToken());
 
   const themail = await test.waitForEmails("test-mailapi-1@beta.webhare.net", { timeout: 10000 });
   test.eq(1, themail[0].attachments.length);

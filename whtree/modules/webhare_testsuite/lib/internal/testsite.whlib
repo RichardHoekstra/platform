@@ -1557,7 +1557,8 @@ PUBLIC RECORD FUNCTION TestInvoke_SetupForTestSetup(RECORD options DEFAULTSTO DE
   {
     OpenPrimary();
     STRING peerserver := ReadRegistryKey("webhare_testsuite.tests.secondhareinterface");
-    RETURN CallJSONRPC(ResolveToAbsoluteURL(peerserver,"/wh_services/system/jstests"), "invoke", Resolve("#SetupForTestSetup"), VARIANT[CELL[ ...options, DELETE onpeerserver ]]);
+    STRING testtoken := ReadRegistryKey("webhare_testsuite.tests.secondharetesttoken");
+    RETURN CallJSONRPC(ResolveToAbsoluteURL(peerserver,"/wh_services/system/jstests"), "invoke", testtoken, Resolve("#SetupForTestSetup"), VARIANT[CELL[ ...options, DELETE onpeerserver ]]);
   }
 
   RECORD testfwoptions := [ testusers := RECORD[]

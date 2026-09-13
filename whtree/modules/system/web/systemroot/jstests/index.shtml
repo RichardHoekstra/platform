@@ -1,5 +1,8 @@
 ﻿<?wh
 
+/* This page hosts every /.system/jstests/... URL
+*/
+
 LOADLIB "wh::javascript.whlib";
 LOADLIB "wh::witty.whlib";
 LOADLIB "wh::internet/urls.whlib";
@@ -8,6 +11,7 @@ LOADLIB "wh::util/algorithms.whlib";
 LOADLIB "mod::system/lib/configure.whlib";
 LOADLIB "mod::system/lib/database.whlib";
 LOADLIB "mod::system/lib/resources.whlib";
+LOADLIB "mod::system/lib/userrights.whlib";
 LOADLIB "mod::system/lib/webserver.whlib";
 
 LOADLIB "mod::publisher/lib/publisher.whlib";
@@ -17,6 +21,18 @@ LOADLIB "mod::system/lib/internal/webhareconstants.whlib";
 
 
 OBJECT trans := OpenPrimary();
+
+// Verify the user is logged in as sysop.
+STRING testpagetoken := GetWebVariable("testpagetoken");
+IF(testpagetoken != "") { //wh runtest will give us one on the URL
+  ValidateTestPageToken(testpagetoken);
+} ELSE {
+  OBJECT user := GetPrimaryWebhareAuthPlugin()->RequireExternalLoggedinUser();
+  IF(NOT user->HasRight("system:sysop"))
+    AbortWithHTTPError(403, "Forbidden", [ htmlbody := `<h1>403 Forbidden</h1><p>You must be logged in as a sysop to run tests</p>`]);
+
+  testpagetoken := GenerateTestPageToken();
+}
 
 STRING ARRAY masks;
 STRING ARRAY skips;
@@ -44,7 +60,7 @@ IF(urlbase LIKE "*/!/*")
 
       SendWebFile(EncodeJSONBlob(
         SELECT name :=    testname
-             , url :=     "../testpage/" || testname
+             , url :=     "../testpage/" || testname || "?testpagetoken=" || EncodeURL(testpagetoken)
              , args :=    testscript.args
              , tags
           FROM tests));
@@ -137,6 +153,7 @@ IF (testlisturl = "")
       , skip :=       Detokenize(skips, ",")
       , tags :=       GetWebVariable("tags")
       , site :=       GetWebVariable("site")
+      , testpagetoken := testpagetoken
       ]);
 }
 
@@ -150,6 +167,7 @@ RECORD data := [ printheaders :=    PTR Print(GetAssetpackIntegrationCode("platf
                , testsiteroot :=    testsiteroot
                , webhareversionnumber := GetWebhareVersionNumber()
                , hasdevkitmodule := IsModuleInstalled("devkit")
+               , testpagetoken :=   testpagetoken
                ];
 
 testrunwitty->RunComponent("hostingpage", data);

@@ -13,6 +13,8 @@ LOADLIB "mod::system/lib/validation.whlib";
 LOADLIB "mod::system/lib/configure.whlib";
 LOADLIB "mod::system/lib/database.whlib";
 LOADLIB "mod::system/lib/resources.whlib";
+LOADLIB "mod::system/lib/internal/cluster/secrets.whlib";
+
 
 CONSTANT INTEGER default_test_timeout := 15 * 60 * 1000;
 
@@ -407,3 +409,13 @@ PUBLIC STATIC OBJECTTYPE RunTests
     RETURN tests;
   }
 >;
+
+PUBLIC STRING FUNCTION GenerateTestPageToken() {
+  RETURN EncryptForThisServer("platform:testpagetoken", CELL[ expires := AddTimeToDate(60 * 68 * 1000, GetCurrentDatetime()) ]);
+}
+
+PUBLIC MACRO ValidateTestPageToken(STRING tok) {
+  RECORD decrypted := DecryptForThisServer("platform:testpagetoken", tok);
+  IF(NOT CellExists(decrypted, "expires") OR decrypted.expires < GetCurrentDatetime())
+    THROW NEW Exception(`Invalid or expired test page token`);
+}

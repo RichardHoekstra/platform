@@ -1,7 +1,7 @@
 import type { DevToolsRequest, TestReport } from "@mod-system/web/systemroot/jstests/testsuite";
 import { launchPuppeteer, type Puppeteer } from "@webhare/deps";
 import { formatTrace } from "@webhare/js-api-tools/src/stacktracing";
-import { broadcast, subscribeToEventStream } from "@webhare/services";
+import { broadcast, encryptForThisServer, subscribeToEventStream } from "@webhare/services";
 import { generateRandomId, sleep } from "@webhare/std";
 import { storeDiskFile } from "@webhare/system-tools";
 import type { KeyboardModifierOptions } from "dompack/testframework/keyboard";
@@ -133,9 +133,12 @@ export async function runTest(test: Test) {
     throw new Error("ForegroundRunner not initialized");
 
   const reportid = generateRandomId("hex");
+  const testpagetoken = encryptForThisServer("platform:testpagetoken", { expires: new Date(Date.now() + 60 * 68 * 1000) });
+
   const testurl = new URL(test.baseurl);
   testurl.searchParams.set("mask", test.testname);
   testurl.searchParams.set("reportid", reportid);
+  testurl.searchParams.set("testpagetoken", testpagetoken);
 
   // Begin listening for reports before setting the URL
   const events = subscribeToEventStream(["system:jstest.report." + reportid, "system:jstest.devtools." + reportid]);
