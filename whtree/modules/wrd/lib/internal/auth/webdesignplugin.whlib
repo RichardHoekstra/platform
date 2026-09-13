@@ -1346,6 +1346,8 @@ PUBLIC STATIC OBJECTTYPE WRDAuthPlugin EXTEND WebDesignPluginBase <
     OBJECT user := this->GetCurrentWebhareUser();
     IF(NOT ObjectExists(user))
       this->__RedirectToLogin();
+    IF(GetWebVariable("wrdauth_proof") != "")
+      Redirect(UpdateURLVariables(GetClientRequestURL(), [ wrdauth_proof := ""]));
     this->__RemoveAuthReturnedIfNeeded();
     RETURN user;
   }
@@ -1553,6 +1555,7 @@ PUBLIC STATIC OBJECTTYPE WRDAuthPlugin EXTEND WebDesignPluginBase <
 
         RETURN parseresult;
       }
+      Redirect(UpdateURLVariables(GetClientRequestURL(), [ wrdauth_proof := "" ]));
     }
 
     STRING ext_cookie := GetWebCookie(cookiename);
