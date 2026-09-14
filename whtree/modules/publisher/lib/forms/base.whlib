@@ -30,6 +30,7 @@ LOADLIB "mod::publisher/lib/forms/components.whlib";
 LOADLIB "mod::system/lib/configure.whlib";
 LOADLIB "mod::system/lib/database.whlib";
 LOADLIB "mod::system/lib/logging.whlib";
+LOADLIB "mod::system/lib/resources.whlib";
 LOADLIB "mod::system/lib/services.whlib";
 LOADLIB "mod::system/lib/webserver.whlib";
 LOADLIB "mod::system/lib/remoting/server.whlib";
@@ -811,6 +812,12 @@ PUBLIC STATIC OBJECTTYPE FormBase <
            ];
   }
 
+  PUBLIC RECORD FUNCTION RunFormFilter() {
+    RECORD filterresult := CELL[ form := this, result := "pass" ];
+    filterresult := RunModuleHookTarget("publisher:form_filter", filterresult);
+    RETURN filterresult;
+  }
+
   PUBLIC OBJECT FUNCTION __GetFormMember(STRING name)
   {
     /* TODO Turns out we also get invoked if a form randomly makes up fieldnames
@@ -1317,6 +1324,7 @@ PUBLIC STATIC OBJECTTYPE FormBase <
         , idfieldvalue := ""
         , isedit := FALSE
         , ispending := FALSE
+        , isspam := FALSE
         , extradata := DEFAULT RECORD
         , __formsubmittype := ""
         ], options);

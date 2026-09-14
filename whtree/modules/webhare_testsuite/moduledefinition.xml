@@ -593,6 +593,9 @@
     <intercept name="publisher_whfsindex"
                interceptfunction="lib/internal/hooks.whlib#HookPublisherIndexPriorities"
                target="publisher:whfsindex_priority" />
+    <intercept name="publisher_formfilter"
+               interceptfunction="lib/internal/hooks.whlib#HookPublisherForm"
+               target="publisher:form_filter" />
   </hooking>
 
   <documentation>

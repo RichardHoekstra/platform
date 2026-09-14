@@ -717,6 +717,7 @@
     <target name="documenteditor" />  <!-- Siteprofile hooks into the document editor -->
     <target name="whfsindex_priority" />  <!-- Hooks for publisher:whfs index priority -->
     <target name="dashboard_sites_export" />  <!-- Allows you to extend the sites export -->
+    <target name="form_filter" />  <!-- Allows you to mark form results as spam -->
   </hooking>
 
   <documentation>

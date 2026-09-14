@@ -53,6 +53,7 @@ PUBLIC OBJECTTYPE StoreResultsHandler EXTEND FormHandlerBase <
                                , idfieldvalue := ""
                                , isedit := FALSE
                                , ispending := FALSE
+                               , isspam := FALSE
                                , __formsubmittype := ""
                                ], options);
 
@@ -134,7 +135,7 @@ PUBLIC OBJECTTYPE StoreResultsHandler EXTEND FormHandlerBase <
 
     //take the version from our fields source (webtoolformid)
     RECORD versioninfo := form->__form.webtoolformid != 0 ? GetCurrentVersion(form->__form.webtoolformid) : DEFAULT RECORD;
-    RECORD formdata := [ status := options.ispending ? VAR whconstant_formstatus_pendingconfirmation : VAR whconstant_formstatus_final
+    RECORD formdata := [ status        := options.isspam ? whconstant_formstatus_spam : options.ispending ? VAR whconstant_formstatus_pendingconfirmation : VAR whconstant_formstatus_final
                        , expiration    := AddDaysToDate(days.storeresults, when)
                        , deletion      := AddDaysToDate(days.processresults, when)
                        , results       := store.stringpart

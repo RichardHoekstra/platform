@@ -94,7 +94,7 @@ PUBLIC INTEGER FUNCTION GetFinalResultId(INTEGER objectid, STRING formname, STRI
                             AND (options.showexpiredresults OR expiration > GetCurrentDatetime());
   }
 
-  INTEGER ARRAY validstatus := [ VAR whconstant_formstatus_final ];
+  INTEGER ARRAY validstatus := [ VAR whconstant_formstatus_final, VAR whconstant_formstatus_spam ];
   IF(options.allowcancelled)
     INSERT whconstant_formstatus_cancelled INTO validstatus AT END;
   IF(options.allowpending)
@@ -328,6 +328,7 @@ STATIC OBJECTTYPE WHFSForm
           FROM publisher.formresults
          WHERE formresults.form_fsobject = this->whfsobject->id
                AND formresults.form_name = this->formname
+               AND status != VAR whconstant_formstatus_spam
                AND (options.showexpiredresults OR expiration > GetCurrentDatetime())
                AND (status = VAR whconstant_formstatus_final OR (options.showpendingresults AND status = VAR whconstant_formstatus_pendingconfirmation));
   }
