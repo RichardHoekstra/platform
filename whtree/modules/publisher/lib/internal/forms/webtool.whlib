@@ -353,11 +353,17 @@ PUBLIC STATIC OBJECTTYPE WebtoolFormBase EXTEND FormBase <
 
     this->pvt_resultguid := this->pvt_editguid ?? GenerateUFS128BitId();
 
+    RECORD filterresult := this->RunFormFilter();
+    IF(filterresult.result NOT IN ["pass","spam"])
+      THROW NEW Exception("Invalid filter result: " || filterresult.result);
+
+    BOOLEAN skiphandlers := filterresult.result = "spam";
+
     /* If the validation hasn't failed, run the WebtoolFormPage submit handler. This is done before confirmationhandler
        by convention (it might have theoretically made more sense to run this after confirmation handlers, but we decided
        not to and users rely on that) */
     RECORD result;
-    IF (NOT work->HasFailed())
+    IF (NOT work->HasFailed() AND NOT skiphandlers)
     {
       OBJECT hookobject := this->__directhookobject;
       IF (ObjectExists(hookobject))
@@ -366,7 +372,7 @@ PUBLIC STATIC OBJECTTYPE WebtoolFormBase EXTEND FormBase <
 
     RECORD ARRAY activehandlers := this->__GetActiveHandlers();
     FOREVERY(RECORD handler FROM activehandlers)
-      IF (NOT work->HasFailed())
+      IF (NOT work->HasFailed() AND NOT skiphandlers)
         handler.handlerobject->PrepareSubmit(work);
 
     RECORD stats := this->pvt_statstype->GetInstanceData(this->__form.webtoolformid);
@@ -380,7 +386,7 @@ PUBLIC STATIC OBJECTTYPE WebtoolFormBase EXTEND FormBase <
       {
         this->formsubmittype := "pending";
 
-        IF (NOT work->HasFailed())
+        IF (NOT work->HasFailed() AND NOT skiphandlers)
         {
           IF(confirmationhandler.handlertask != "")
             ScheduleManagedTask(confirmationhandler.handlertask,
@@ -407,7 +413,7 @@ PUBLIC STATIC OBJECTTYPE WebtoolFormBase EXTEND FormBase <
     }
 
     // If the WebtoolFormPage submit handler hasn't failed and this isn't a duplicate submission, run the store results handler
-    IF (NOT work->HasFailed() AND this->formsubmittype = "confirm")
+    IF (NOT work->HasFailed() AND this->formsubmittype = "confirm" AND NOT skiphandlers)
     {
       this->__FinalizeResult(this->pvt_editguid, this->formsubmittype);
     }
@@ -418,13 +424,15 @@ PUBLIC STATIC OBJECTTYPE WebtoolFormBase EXTEND FormBase <
                                , guid := this->pvt_resultguid
                                , isedit := this->pvt_editguid != ""
                                , ispending := this->formsubmittype = "pending"
+                               , isspam := filterresult.result = "spam"
                                , extradata
                                , __formsubmittype := this->formsubmittype
                                ]);
     }
 
     IF (this->formsubmittype NOT IN [ "pending", "duplicate" ] // don't run handlers for pending or duplicate submissions
-        AND NOT work->HasFailed())
+        AND NOT work->HasFailed()
+        AND NOT skiphandlers)
     {
       RECORD upd := [ numresults := stats.numresults + 1];
       IF(stats.firstresult = DEFAULT DATETIME)
@@ -447,19 +455,19 @@ PUBLIC STATIC OBJECTTYPE WebtoolFormBase EXTEND FormBase <
                   , submittype := this->formsubmittype
                   ];
 
-    IF (this->formsubmittype NOT IN [ "pending", "duplicate" ])
+    IF (this->formsubmittype NOT IN [ "pending", "duplicate" ] AND NOT skiphandlers)
     {
       //NOW aftersubmit handlers can do their thing
       FOREVERY (RECORD handler FROM activehandlers)
         result := handler.handlerobject->UpdateResultAfterSubmit(result);
     }
-    ELSE IF(this->formsubmittype = "pending")
+    ELSE IF(this->formsubmittype = "pending" AND NOT skiphandlers)
     {
       IF (RecordExists(confirmationhandler))
         result := confirmationhandler.handlerobject->UpdateResultPendingSubmit(result);
     }
 
-    IF (RecordExists(confirmationhandler) AND this->formsubmittype IN ["pending","confirm","duplicate"])
+    IF (RecordExists(confirmationhandler) AND this->formsubmittype IN ["pending","confirm","duplicate"] AND NOT skiphandlers)
     {
       RECORD results := this->formresults->GetSingleResult(this->pvt_resultguid, [ __form := this, allowpending := TRUE ]);
       confirmationhandler.handlerobject->RunConfirmationUpdates(results);
