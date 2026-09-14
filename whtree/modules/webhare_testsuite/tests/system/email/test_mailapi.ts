@@ -1,6 +1,67 @@
 import * as test from "@webhare/test-backend";
 import { prepareMail } from "@webhare/services";
 import { runInWork } from "@webhare/whdb";
+import { readFileSync } from "fs";
+import { parseSNSMessage } from "@mod-platform/js/email/aws-ses";
+import { parseSendGridMessage } from "@mod-platform/js/email/sendgrid";
+import { decodeYAML } from "@mod-platform/js/devsupport/validation";
+import type { ParsedBounceMessage } from "@mod-platform/js/email/types";
+
+type SNSTestData = Array<{
+  description: string;
+  expect: Partial<ParsedBounceMessage>;
+} & ({
+  //Full SNS message
+  message: string;
+} | {
+  //Message we still need to wrap in the SNS boilerplate
+  innerMessage: string;
+})>;
+
+type SendGridTestData = Array<{
+  description: string;
+  expect: Partial<ParsedBounceMessage>;
+  message: string;
+}>;
+
+function wrapSESv2MessageinBoilerplate(message: unknown) {
+  return `
+      {
+      "Type" : "Notification",
+      "MessageId" : "00000000-0000-0000-0000-000000000001",
+      "TopicArn" : "arn:aws:sns:eu-west-1:0000000000:webhare-mail",
+      "Subject" : "Amazon SES Email Event Notification",
+      "Message" : ${JSON.stringify(message)},
+      "Timestamp" : "2026-02-18T09:41:33.767Z",
+      "SignatureVersion" : "1",
+      "Signature" : "sig==",
+      "SigningCertURL" : "https://sns.eu-west-1.amazonaws.com/SimpleNotificationService-7506a1e35b36ef5a444dd1a8e7cc3ed8.pem",
+      "UnsubscribeURL" : "https://sns.eu-west-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:eu-west-1:0000000000:webhare-mail:00000000-0000-0000-0000-000000000000"
+    }`;
+}
+
+async function testSNSParser() {
+  for (const [idx, msg] of decodeYAML<SNSTestData>(readFileSync(__dirname + "/data/sns-test-data.yaml", "utf-8")).entries()) {
+    if (typeof msg.expect.basicobject?.timestamp === "string")
+      msg.expect.basicobject.timestamp = Temporal.Instant.from(msg.expect.basicobject.timestamp);
+
+    // console.log(idx, msg.description);
+    const msgBody = "innerMessage" in msg ? wrapSESv2MessageinBoilerplate(msg.innerMessage) : msg.message;
+    const result = parseSNSMessage(msgBody);
+    test.eqPartial(msg.expect, result, `Failed test case ${idx} (${msg.description})`);
+  }
+}
+
+async function testSendGridParser() {
+  for (const [idx, msg] of decodeYAML<SendGridTestData>(readFileSync(__dirname + "/data/sendgrid-test-data.yaml", "utf-8")).entries()) {
+    if (typeof msg.expect.basicobject?.timestamp === "string")
+      msg.expect.basicobject.timestamp = Temporal.Instant.from(msg.expect.basicobject.timestamp);
+
+    // console.log(idx, msg.description);
+    const result = parseSendGridMessage(JSON.parse(msg.message));
+    test.eqPartial(msg.expect, result, `Failed test case ${idx} (${msg.description})`);
+  }
+}
 
 async function testMailAPI() {
   await test.throws(/Cannot load/, prepareMail("mod::webhare_testsuite/data/test/system/mailer/nosuchtemplate.html"));
@@ -27,6 +88,10 @@ async function testMailAPI() {
 }
 
 test.runTests([
+  "SNS parser",
+  testSNSParser,
+  "SendGrid parser",
+  testSendGridParser,
   "Basics mail APIs",
   testMailAPI
 ]);
