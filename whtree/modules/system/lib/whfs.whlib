@@ -1,6 +1,9 @@
 ﻿<?wh
 /** @topic sitedev/whfs */
 
+LOADLIB "wh::javascript.whlib";
+LOADLIB "wh::util/algorithms.whlib";
+
 LOADLIB "mod::system/lib/database.whlib";
 LOADLIB "mod::system/lib/internal/whfs/base.whlib" EXPORT WHFSException, GetWHFSFileDirect;
 LOADLIB "mod::system/lib/internal/whfs/control.whlib" EXPORT ScheduleRepublish;
@@ -149,4 +152,39 @@ PUBLIC OBJECT FUNCTION OpenWHFSPrivateFolder(STRING modulename)
     THROW NEW Exception(`No such folder '/webhare-private/${modulename}/'`);
 
   RETURN folder;
+}
+
+RECORD historyinfobaserec := [
+  publish := FALSE,
+  current_final := 0,
+  current_draft := 0,
+];
+
+/** Adds WHFS version information to the given rows based on their IDs
+    @param inrows The rows to enrich with WHFS version information
+    @param options Options for enrichment, including:
+    @cell options.cellname: The name of the cell containing the ID (default "id")
+    @cell options.fields: The fields to include (default [ "publish", "current_final", "current_draft" ])
+    @return The enriched rows
+*/
+PUBLIC RECORD ARRAY FUNCTION EnrichWithWHFSVersionInfo(RECORD ARRAY inrows, RECORD options DEFAULTSTO DEFAULT RECORD) {
+  options := ValidateOptions([
+    cellname := "id",
+    fields := [ "publish", "current_final", "current_draft" ]
+  ], options, [
+    enums := [ fields := [ "publish", "current_final", "current_draft" ] ]
+  ]);
+
+  INTEGER ARRAY ids := SELECT AS INTEGER ARRAY GetCell(inrows, options.cellname) FROM inrows;
+  STRING ARRAY getfields := STRING[ "id", ...SELECT AS STRING ARRAY ToCamelCase(field) FROM ToRecordArray(options.fields, "field") ];
+  RECORD ARRAY data := EnforceStructure([
+    [
+      id := 0,
+      publish := FALSE,
+      current_final := 0,
+      current_draft := 0,
+    ]
+  ], CallJS([ camelcase := TRUE ], "@webhare/whfs#listWHFSObjects", getfields, CELL[ ids ]));
+
+  RETURN JoinArrays(inrows, options.cellname, data, PickCells(historyinfobaserec, options.fields), [ joinfield := "id" ]);
 }
