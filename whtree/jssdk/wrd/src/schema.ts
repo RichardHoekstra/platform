@@ -907,9 +907,14 @@ export class WRDType<S extends SchemaTypeDefinition, T extends keyof S & string>
     if (!typeRec)
       throw new Error(`No such type ${JSON.stringify(this.tag)}`);
 
-    await db<PlatformDB>().deleteFrom("wrd.entities").where("id", "in", ids).execute();
-    for (const id of ids)
-      wrdFinishHandler().entityDeleted(schemadata.schema.id, typeRec.id, id);
+    // Keep deletion within this type (including descendants in the same schema).
+    const deleted = await db<PlatformDB>().deleteFrom("wrd.entities")
+      .where("id", "in", ids)
+      .where("type", "in", typeRec.childTypeIds)
+      .returning(["id", "type"])
+      .execute();
+    for (const entity of deleted)
+      wrdFinishHandler().entityDeleted(schemadata.schema.id, entity.type, entity.id);
     return;
   }
 
