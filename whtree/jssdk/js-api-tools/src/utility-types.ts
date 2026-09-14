@@ -15,6 +15,15 @@ export type RecursivePartial<T> = T extends Array<infer U> ? Array<RecursivePart
 export type PromisifyFunctionReturnType<T extends (...a: any) => any> = (...a: Parameters<T>) => ReturnType<T> extends (1 & ReturnType<T>) ? Promise<any> : ReturnType<T> extends Promise<any> ? ReturnType<T> : Promise<ReturnType<T>>;
 // The above definition use `extends (1 & ReturnType<T>)` to detect 'any'
 
+/** Promisify all functions in an interface
+ * @typeParam ServiceType - The interface type whose functions will be promisified
+ * @typeParam ExcludeKeys - Keys to exclude from promisification
+ */
+export type PromisifyInterface<ServiceType, ExcludeKeys extends string = never> = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- using any is needed for this type definition
+  [K in Exclude<keyof ServiceType, ExcludeKeys> as ServiceType[K] extends (...a: any) => any ? K : never]: ServiceType[K] extends (...a: any[]) => void ? PromisifyFunctionReturnType<ServiceType[K]> : never;
+};
+
 /** Given a type Contract and a type Actual that extends Contract, returns Contract with
  * properties that are added in Actual with type never. If used in a function signature like
  * this: `<Actual extends Contact>(param: Actual & DisallowExtraPropsRecursive<Actual, Contract>`,

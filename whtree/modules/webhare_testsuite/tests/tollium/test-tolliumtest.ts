@@ -2,7 +2,7 @@
 //this is currently a test of cleaning up tollium testframework
 
 import * as test from "@webhare/test";
-import * as tt from "@mod-tollium/js/tolliumtest";
+import * as tt from "@webhare/tollium-test";
 
 async function testTTAPI() {
   await tt.launchScreen("mod::webhare_testsuite/screens/tests/tolliumtests.xml");
@@ -10,12 +10,15 @@ async function testTTAPI() {
   test.assert(tt.comp("button") === tt.comp(":First button"));
   test.assert(tt.comp("textedit") === tt.comp(":First textedit"));
   test.assert(tt.comp("pulldown") === tt.comp(":First pulldown"));
+  test.assert(tt.comp("text") === tt.comp(":Textfield"));
   test.eq("Opt 1", tt.comp("pulldown").getTextValue());
   test.eq("opt1", tt.comp("pulldown").getValue());
   tt.comp("pulldown").setValue("opt2");
   test.eq("Opt 2", tt.comp("pulldown").getTextValue());
   tt.comp("pulldown").setValue(":Opt 1");
   test.eq("opt1", tt.comp("pulldown").getValue());
+  test.eq("Textvalue", tt.comp("text").getTextValue());
+  test.eq("Textvalue", tt.comp("text").getValue());
 }
 
 test.runTests(

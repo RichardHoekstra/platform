@@ -114,6 +114,8 @@ test.runTests(
       html("li", { style: { display: "none", marginTop: "5px" } });
       //@ts-expect-error -- but not string style (unsafe-inline)
       html("li", { style: "display:none" });
+
+      html("x-unknown-node", { className: "unknownNode" }) satisfies HTMLElement;
     },
 
     "Array/String.prototype.at polyfill",

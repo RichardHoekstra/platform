@@ -1,5 +1,5 @@
 import * as test from '@webhare/test-frontend';
-import * as tt from "@mod-tollium/js/tolliumtest";
+import * as tt from "@webhare/tollium-test";
 
 test.runTests(
   [

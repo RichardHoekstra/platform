@@ -3,7 +3,7 @@ declare module "@webhare/jsonrpc-client" {
 }
 
 import { debugFlags, backendBase } from "@webhare/env";
-import { type StackTrace, parseTrace, prependStackTrace, type PromisifyFunctionReturnType } from "@webhare/js-api-tools";
+import { type StackTrace, parseTrace, prependStackTrace, type PromisifyInterface } from "@webhare/js-api-tools";
 
 //just number RPCs globally instead of per server, makes debug ouput more useful
 let globalseqnr = 0;
@@ -338,10 +338,7 @@ class ServiceProxy<T> {
 /** Creates an async version of the functions in a class
  * @typeParam ServiceType - Type definition of the service class that implements this service.
 */
-type ConvertToRPCInterface<ServiceType> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- using any is needed for this type definition
-  [K in Exclude<keyof ServiceType, `_${string}` | "close" | "emit"> as ServiceType[K] extends (...a: any) => any ? K : never]: ServiceType[K] extends (...a: any[]) => void ? PromisifyFunctionReturnType<ServiceType[K]> : never;
-};
+type ConvertToRPCInterface<ServiceType> = PromisifyInterface<ServiceType, `_${string}` | "close" | "emit">;
 
 /** Get the client interface type as would be returned by createClient */
 export type GetClientInterface<Client> = ConvertToRPCInterface<Client> & ServiceBase<ConvertToRPCInterface<Client>>;

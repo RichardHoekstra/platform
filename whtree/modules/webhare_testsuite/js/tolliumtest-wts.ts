@@ -8,7 +8,7 @@ import * as tt from "@mod-webhare_testsuite/js/tolliumtest-wts";
 
 import { getTolliumDebugVariables } from "@mod-tollium/js/testframework";
 import * as test from "@webhare/test-frontend";
-export * from "@mod-tollium/js/tolliumtest";
+export * from "@webhare/tollium-test";
 
 export const metrics = {
   gridRowHeight: 28,

@@ -2,7 +2,7 @@
 
 import * as test from "@mod-tollium/js/testframework";
 import * as browser from "dompack/extra/browser";
-import * as tt from "@mod-tollium/js/tolliumtest";
+import * as tt from "@webhare/tollium-test";
 
 
 let savefirstwidth;

@@ -1,5 +1,5 @@
 import * as test from "@mod-tollium/js/testframework";
-import * as tt from "@mod-tollium/js/tolliumtest";
+import * as tt from "@webhare/tollium-test";
 import { dispatchDomEvent } from "@webhare/dompack";
 
 

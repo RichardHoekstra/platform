@@ -4,6 +4,7 @@ import ComponentBase from '@mod-tollium/webdesigns/webinterface/components/base/
 import * as $todd from "@mod-tollium/web/ui/js/support";
 import "./text.scss";
 import type { ComponentBaseUpdate, ComponentStandardAttributes, ToddCompBase } from '@mod-tollium/web/ui/js/componentbase';
+import { html } from '@webhare/dompack/src/html';
 
 const linetextTopMargin = 5; //keep in sync with t-text.scss
 
@@ -106,7 +107,16 @@ export class ObjText extends ComponentBase {
   */
 
   buildNode() {
-    const txtnode = <t-text class="t-text__linetext" data-name={this.name} propTodd={this} />;
+    const txtnode = html("t-text",
+      {
+        className: "t-text__linetext",
+        dataset: {
+          name: this.name
+        },
+        propTodd: this,
+        ariaLabel: this.title
+      }
+    );
 
     if (this.isheading)
       txtnode.classList.add("heading");
