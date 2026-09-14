@@ -15,9 +15,8 @@ LOADLIB "mod::system/lib/testfw/runtest.whlib";
 LOADLIB "mod::system/lib/internal/whconfig.whlib";
 LOADLIB "mod::system/lib/internal/cluster/logwriter.whlib";
 
-
-PUBLIC RECORD FUNCTION RPC_SubmitReport(STRING reportid, RECORD data)
-{
+PUBLIC RECORD FUNCTION RPC_SubmitReport(STRING testpagetoken, STRING reportid, RECORD data) {
+  ValidateTestPageToken(testpagetoken);
   BroadcastEvent("system:jstest.report." || (reportid ?? "??"), data);
 
   //LogDebug("jstest-service", "report on " || reportid, data.finished);
@@ -27,8 +26,9 @@ PUBLIC RECORD FUNCTION RPC_SubmitReport(STRING reportid, RECORD data)
       ];
 }
 
-PUBLIC RECORD FUNCTION RPC_SyncDevToolsRequest(STRING reportid, RECORD data)
-{
+PUBLIC RECORD FUNCTION RPC_SyncDevToolsRequest(STRING testpagetoken, STRING reportid, RECORD data) {
+  ValidateTestPageToken(testpagetoken);
+
   OBJECT eventmgr := NEW EventManager;
   eventmgr->RegisterInterest("system:jstest.devresponse." || reportid);
 
@@ -72,10 +72,10 @@ PUBLIC RECORD FUNCTION RPC_JSTestLog(STRING reportid, RECORD ARRAY lines)
   RETURN DEFAULT RECORD;
 }
 
-PUBLIC VARIANT FUNCTION RPC_Invoke(STRING libfunc, VARIANT ARRAY params)
-{
+PUBLIC VARIANT FUNCTION RPC_Invoke(STRING testpagetoken, STRING libfunc, VARIANT ARRAY params) {
   IF(GetDtapStage() != "development")
     THROW NEW Exception(`RPC_Invoke is only available on servers in development mode`);
+  ValidateTestPageToken(testpagetoken);
 
   INTEGER ARRAY intypes;
   FOREVERY(VARIANT param FROM params)

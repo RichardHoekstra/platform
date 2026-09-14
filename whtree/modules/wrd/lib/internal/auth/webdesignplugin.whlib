@@ -1372,8 +1372,8 @@ PUBLIC STATIC OBJECTTYPE WRDAuthPlugin EXTEND WebDesignPluginBase <
 
   PUBLIC MACRO __RemoveAuthReturnedIfNeeded()
   {
-    IF(GetWebVariable("wrdauth_returned") != "")
-      Redirect(UpdateURLVariables(GetClientRequestURL(), [ wrdauth_returned := ""]));
+    IF(GetWebVariable("wrdauth_returned") != "" OR GetWebVariable("wrdauth_proof") != "")
+      Redirect(UpdateURLVariables(GetClientRequestURL(), [ wrdauth_returned := "", wrdauth_proof := ""]));
   }
 
   PUBLIC STRING FUNCTION __GetLoginPageURL()
@@ -1553,6 +1553,7 @@ PUBLIC STATIC OBJECTTYPE WRDAuthPlugin EXTEND WebDesignPluginBase <
 
         RETURN parseresult;
       }
+      Redirect(UpdateURLVariables(GetClientRequestURL(), [ wrdauth_proof := "" ]));
     }
 
     STRING ext_cookie := GetWebCookie(cookiename);

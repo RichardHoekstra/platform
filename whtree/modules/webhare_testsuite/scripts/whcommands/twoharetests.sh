@@ -19,7 +19,7 @@ for two WebHares. I personally use:
 export TH_EXEC1="wh"
 export TH_EXEC2="wh-moe2"
 
-where wh-moe2 is a second WebHare run with freshdbconsole
+where wh-moe2 is a second WebHare run with freshdbconsole (runkit @moe2 freshdbconsole)
 
 You can then run this script with:
 wh webhare_testsuite:twoharetests
@@ -66,10 +66,12 @@ $TH_EXEC2 isrunning || die "Container 2 ($TH_EXEC2) is not running - start it wi
 
 # Make sure the testserver knows it's supposed to be listening here (testfw configures in virtualhosting and assumes you want 127.0.0.1, and TH_WEBINTERFACE2 will often be 172.0.2.2)
 $TH_EXEC2 webserver addbackend "$TH_WEBINTERFACE2"
+TESTTOKEN="$($TH_EXEC2 test generate-token)"
 
 #$TH_EXEC1 run mod::webhare_testsuite/tests/system/twohare/prepare1.whscr
 # debugging may require setting WEBHARE_DEBUG=test-keepopen
 if ! $TH_EXEC1 registry set webhare_testsuite.tests.secondhareinterface "$TH_WEBINTERFACE2" ||
+   ! $TH_EXEC1 registry set webhare_testsuite.tests.secondharetesttoken "$TESTTOKEN" ||
    ! $TH_EXEC2 run mod::webhare_testsuite/tests/system/twohare/prepare-server2.whscr ||
    ! $TH_EXEC1 runtest --outputdir "$OUTPUTDIR" system.twohare.test_peerserver;then
   die "tests failed"

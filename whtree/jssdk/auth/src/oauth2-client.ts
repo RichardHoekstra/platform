@@ -113,19 +113,23 @@ async function getOpenIDConnectMetadata(metadataurl: string) {
   if (crudeMetadataCache[metadataurl]?.expires > Date.now()) //still good
     return crudeMetadataCache[metadataurl];
 
-  const timeout = AbortSignal.timeout(5000);
-  const metadata: OIDCMetadata = {
-    config: await (await fetch(metadataurl, { signal: timeout })).json(),
-    expires: Date.now() + 15 * 60_000 //15 minutes
-  };
+  try {
+    const timeout = AbortSignal.timeout(5000);
+    const metadata: OIDCMetadata = {
+      config: await (await fetch(metadataurl, { signal: timeout })).json(),
+      expires: Date.now() + 15 * 60_000 //15 minutes
+    };
 
-  if (metadata.config.jwks_uri) {
-    const jwksResponse: JWKS = await (await fetch(metadata.config.jwks_uri, { signal: timeout })).json();
-    metadata.jwks = jwksResponse;
+    if (metadata.config.jwks_uri) {
+      const jwksResponse: JWKS = await (await fetch(metadata.config.jwks_uri, { signal: timeout })).json();
+      metadata.jwks = jwksResponse;
+    }
+
+    crudeMetadataCache[metadataurl] = metadata;
+    return metadata;
+  } catch (error) {
+    throw new Error(`Failed to fetch OpenID Connect metadata from ${metadataurl}`, { cause: error });
   }
-
-  crudeMetadataCache[metadataurl] = metadata;
-  return metadata;
 }
 
 type OAuth2ClientInfo = {
