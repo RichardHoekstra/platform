@@ -1346,8 +1346,6 @@ PUBLIC STATIC OBJECTTYPE WRDAuthPlugin EXTEND WebDesignPluginBase <
     OBJECT user := this->GetCurrentWebhareUser();
     IF(NOT ObjectExists(user))
       this->__RedirectToLogin();
-    IF(GetWebVariable("wrdauth_proof") != "")
-      Redirect(UpdateURLVariables(GetClientRequestURL(), [ wrdauth_proof := ""]));
     this->__RemoveAuthReturnedIfNeeded();
     RETURN user;
   }
@@ -1374,8 +1372,8 @@ PUBLIC STATIC OBJECTTYPE WRDAuthPlugin EXTEND WebDesignPluginBase <
 
   PUBLIC MACRO __RemoveAuthReturnedIfNeeded()
   {
-    IF(GetWebVariable("wrdauth_returned") != "")
-      Redirect(UpdateURLVariables(GetClientRequestURL(), [ wrdauth_returned := ""]));
+    IF(GetWebVariable("wrdauth_returned") != "" OR GetWebVariable("wrdauth_proof") != "")
+      Redirect(UpdateURLVariables(GetClientRequestURL(), [ wrdauth_returned := "", wrdauth_proof := ""]));
   }
 
   PUBLIC STRING FUNCTION __GetLoginPageURL()

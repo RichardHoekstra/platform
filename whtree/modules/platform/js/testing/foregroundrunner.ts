@@ -133,7 +133,7 @@ export async function runTest(test: Test) {
     throw new Error("ForegroundRunner not initialized");
 
   const reportid = generateRandomId("hex");
-  const testpagetoken = encryptForThisServer("platform:testpagetoken", { expires: new Date(Date.now() + 60 * 68 * 1000) });
+  const testpagetoken = encryptForThisServer("platform:testpagetoken", { expires: new Date(Date.now() + 60 * 60 * 1000) });
 
   const testurl = new URL(test.baseurl);
   testurl.searchParams.set("mask", test.testname);
