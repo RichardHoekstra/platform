@@ -1,5 +1,6 @@
 <?wh
 
+LOADLIB "mod::system/lib/webserver.whlib";
 LOADLIB "mod::system/lib/whfs.whlib";
 
 
@@ -23,5 +24,12 @@ PUBLIC RECORD FUNCTION HookPublisherIndexPriorities(RECORD data)
           ]
         ];
   }
+  RETURN data;
+}
+
+PUBLIC RECORD FUNCTION HookPublisherForm(RECORD data) {
+  IF(MemberExists(data.form,"^firstname") AND data.form->^firstname->value = "SPAMMER")
+    data.result := "spam";
+
   RETURN data;
 }

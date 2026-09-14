@@ -291,8 +291,28 @@ PUBLIC MACRO CustomForm()
   TestEq(TRUE, RecordExists(lastresult));
   TestEq(RepeatText("x", 8192), GetCell(lastresult, col_textarea));
 
+  // Discard all mail so far
+  testfw->ExtractAllMailFor("mailresult+jstest@beta.webhare.net", [ timeout := 0, count := 1 ]);
+  TestEq(1, webtoolresults->GetResultsCount(), "still one result");
+
+  // Test a spammy result
+  submitrec.firstname := "SPAMMER";
+  submitrec.email := "testfw+spammer@beta.webhare.net";
+
+  res := tester->SubmitForm(submitrec);
+  TestEq(TRUE, res.success);
+
   // Make sure no email tasks are running anymore
   testfw->FlushTasks(["publisher:mailresults", "publisher:mailfeedback"], [ acceptcancel := TRUE ]);
+
+  // Make sure our spammy result is not triggering mail
+  TestEq(0, Length(testfw->ExtractAllMailFor("mailresult+jstest@beta.webhare.net", [ timeout := 0, count := 0, returnallmail := TRUE ])));
+  TestEq(0, Length(testfw->ExtractAllMailFor("testfw+spammer@beta.webhare.net", [ timeout := 0, count := 0, returnallmail := TRUE ])));
+  TestEq(1, webtoolresults->GetResultsCount(), "still one result");
+
+  submitted := webtoolresults->GetSingleResult(res.result.resultsguid);
+  TestEq(TRUE, RecordExists(submitted)); //still queryable by ID
+  TestEq("SPAMMER", submitted.response.firstname);
 
   // Delete all results
   testfw->BeginWork();
@@ -303,10 +323,6 @@ PUBLIC MACRO CustomForm()
 MACRO CustomForm_SuppressMail()
 {
   SnoozeRateLimits();
-
-  // Make sure no email tasks are running anymore
-  testfw->FlushTasks(["publisher:mailresults", "publisher:mailfeedback"], [ acceptcancel := TRUE ]);
-  testfw->ExtractAllMailFor("mailresult+jstest@beta.webhare.net", [ timeout := 0, count := 1 ]);
 
   OBJECT customformfile := OpenTestsuiteSite()->OpenByPath("webtools/customform2");
   TestEq(TRUE, testfw->browser->GotoWebPage(customformfile->url));

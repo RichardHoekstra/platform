@@ -53,6 +53,7 @@ PUBLIC OBJECTTYPE StoreResultsHandler EXTEND FormHandlerBase
                                , idfieldvalue := ""
                                , isedit := FALSE
                                , ispending := FALSE
+                               , isspam := FALSE
                                , __formsubmittype := ""
                                ], options);
 
@@ -132,7 +133,7 @@ PUBLIC OBJECTTYPE StoreResultsHandler EXTEND FormHandlerBase
     RECORD days := GetFormResultsExpirationDays(form_fsobject);
     DATETIME when := GetCurrentDateTime();
 
-    RECORD formdata := [ status := options.ispending ? VAR whconstant_formstatus_pendingconfirmation : VAR whconstant_formstatus_final
+    RECORD formdata := [ status        := options.isspam ? whconstant_formstatus_spam : options.ispending ? VAR whconstant_formstatus_pendingconfirmation : VAR whconstant_formstatus_final
                        , expiration    := AddDaysToDate(days.storeresults, when)
                        , deletion      := AddDaysToDate(days.processresults, when)
                        , results       := store.stringpart
