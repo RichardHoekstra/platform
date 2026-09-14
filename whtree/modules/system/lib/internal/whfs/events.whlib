@@ -650,8 +650,7 @@ PUBLIC OBJECT FUNCTION GetWHFSCommitHandler()
   RETURN handler;
 }
 
-PUBLIC MACRO PerformEmptyWHFSMetadataUpdate(INTEGER fsobj, RECORD options)
-{
+PUBLIC MACRO PerformEmptyWHFSMetadataUpdate(INTEGER fsobj, RECORD options) {
   options := ValidateOptions(
       [ republish :=      FALSE
       ], options);

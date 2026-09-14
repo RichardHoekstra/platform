@@ -19,8 +19,7 @@ PUBLIC MACRO RunAddFileHooks(INTEGER fileid)
   torepub->DoRepublishes();
 }
 
-PUBLIC MACRO RunAddFolderHooks(INTEGER newfolderid)
-{
+PUBLIC MACRO RunAddFolderHooks(INTEGER newfolderid) {
   RECORD newfolder := __FindFolder(newfolderid);
   IF(NOT RecordExists(newfolder))
     RETURN;
@@ -39,8 +38,7 @@ PUBLIC MACRO RunAddFolderHooks(INTEGER newfolderid)
   torepub->DoRepublishes();
 }
 
-PUBLIC MACRO RunEditFileHooks(INTEGER newfileid)
-{
+PUBLIC MACRO RunEditFileHooks(INTEGER newfileid) {
   RECORD newfile := __FindFile(newfileid);
   IF(NOT RecordExists(newfile))
     RETURN;
@@ -58,8 +56,7 @@ PUBLIC MACRO RunEditFileHooks(INTEGER newfileid)
   torepub->DoRepublishes();
 }
 
-PUBLIC MACRO RunEditFolderHooks(RECORD oldfolder, INTEGER newfolderid)
-{
+PUBLIC MACRO RunEditFolderHooks(RECORD oldfolder, INTEGER newfolderid) {
   RECORD target := __FindFolder(newfolderid);
   IF (NOT RecordExists(target)) // inactive?
     RETURN;
@@ -79,12 +76,10 @@ PUBLIC MACRO RunEditFolderHooks(RECORD oldfolder, INTEGER newfolderid)
 }
 
 //generic deleter for fs_objects/tollium use
-PUBLIC MACRO RunAnyDelete(INTEGER ARRAY objids, STRING deletionsource)
-{
+PUBLIC MACRO RunAnyDelete(INTEGER ARRAY objids, STRING deletionsource) {
   //ADDME optimize, or better yet, get enough data to move the repub work to the completions handler
   OBJECT torepub := CreateRepublishState();
-  FOREVERY(INTEGER objid FROM objids)
-  {
+  FOREVERY(INTEGER objid FROM objids) {
     OBJECT todelete := OpenWHFSObject(objid);
     IF(NOT ObjectExists(todelete) OR IsRecycleBinWHFSPath(todelete->whfspath))
       CONTINUE;

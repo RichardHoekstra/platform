@@ -10,8 +10,8 @@ LOADLIB "mod::tollium/lib/screenbase.whlib";
 /////////////////////////////////////////////////////////////////////
 // The file edit component
 
-PUBLIC OBJECTTYPE FileEdit EXTEND TolliumFragmentBase
-< // ---------------------------------------------------------------------------
+PUBLIC OBJECTTYPE FileEdit EXTEND TolliumFragmentBase <
+  // ---------------------------------------------------------------------------
   //
   // Variables
   //
