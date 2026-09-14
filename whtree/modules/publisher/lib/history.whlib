@@ -97,6 +97,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
 
   /** Get the explicit object for a specific version. Returns 0 if this version doesn't exist. But perhaps just replace this with a versions dialog in the editor and inspect there? */
   PUBLIC INTEGER FUNCTION GetObjectIdForInspect(STRING version) {
+    this->EnsureMetadataUpToDate();
     SWITCH(version) {
       CASE "live" {
         RETURN this->baseobject->id;

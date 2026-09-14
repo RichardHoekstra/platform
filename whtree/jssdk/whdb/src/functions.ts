@@ -1,3 +1,4 @@
+import { whconstant_historytype_abandoned_draft, whconstant_historytype_approved, whconstant_historytype_final, whconstant_historytype_import, whconstant_historytype_saved } from "@mod-system/js/internal/webhareconstants";
 import { sql } from "kysely";
 
 export function selectFSLink(table?: string) {
@@ -34,4 +35,14 @@ export function selectSitesWebRoot(table?: string) {
   if (table && !table.match(/^[a-zA-Z_.]+$/)) //sanity check as we'll be injecting it into generated SQL
     throw new Error(`Invalid table name '${table}' for selectSitesWebRoot`);
   return sql<string>`webhare_proc_sites_webroot(${sql.raw(table ? `${table}.` : "")}outputweb, ${sql.raw(table ? `${table}.` : "")}outputfolder)`;
+}
+export function selectFSCurrentFinal(table?: string) {
+  if (table && !table.match(/^[a-zA-Z_.]+$/)) //sanity check as we'll be injecting it into generated SQL
+    throw new Error(`Invalid table name '${table}' for selectFSCurrentFinal`);
+  return sql<string>`(select fs_object from system.fs_history where fs_object = ${sql.raw(table ? `${table}.` : "fs_objects.")}id and (type = ${whconstant_historytype_final} or type = ${whconstant_historytype_import}) order by "when" desc, id desc limit 1)`;
+}
+export function selectFSCurrentDraft(table?: string) {
+  if (table && !table.match(/^[a-zA-Z_.]+$/)) //sanity check as we'll be injecting it into generated SQL
+    throw new Error(`Invalid table name '${table}' for selectFSCurrentDraft`);
+  return sql<string>`(select (case when type = ${whconstant_historytype_saved} then snapshot else null end) as id from system.fs_history where fs_object = ${sql.raw(table ? `${table}.` : "fs_objects.")}id and (type = ${whconstant_historytype_final} or type = ${whconstant_historytype_approved} or type = ${whconstant_historytype_saved} or type = ${whconstant_historytype_abandoned_draft}) order by "when" desc,id desc limit 1)`;
 }

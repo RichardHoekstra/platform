@@ -4,6 +4,10 @@ LOADLIB "wh::files.whlib";
 LOADLIB "wh::filetypes/richdocument.whlib";
 LOADLIB "wh::javascript.whlib";
 
+LOADLIB "mod::publisher/lib/history.whlib";
+
+LOADLIB "mod::system/lib/database.whlib";
+LOADLIB "mod::system/lib/internal/webhareconstants.whlib";
 LOADLIB "mod::system/lib/internal/whfs/drafts.whlib";
 LOADLIB "mod::system/lib/resources.whlib";
 LOADLIB "mod::system/lib/services.whlib";
@@ -105,6 +109,12 @@ VARIANT FUNCTION Ternary(BOOLEAN test, VARIANT iftrue, VARIANT iffalse) {
   RETURN iffalse;
 }
 
+VARIANT FUNCTION Coalesce(VARIANT v, VARIANT v2) {
+  IF(IsValueSet(v))
+    RETURN v;
+  RETURN v2;
+}
+
 PUBLIC MACRO VerifyTSHistory(INTEGER fileid) {
   RECORD ARRAY hs_history;
   FOREVERY(RECORD entry FROM ListObjectHistory(fileid, [ include_autosaves := TRUE ])) {
@@ -123,4 +133,23 @@ PUBLIC MACRO VerifyTSHistory(INTEGER fileid) {
 
   RECORD ARRAY ts_history := CallJS([ camelcase := TRUE ], "mod::webhare_testsuite/js/whfs.ts#listObjHistory", fileid);
   TestEq(hs_history, ts_history);
+
+  RECORD whfs_list := CallJS([ camelcase := TRUE ], "@webhare/whfs#listWHFSObjects", [ "currentFinal", "currentDraft" ], [ "ids" := [ fileid ] ]);
+
+  OBJECT wfm := NEW WorkflowManager(fileid, [ readonly := TRUE ]);
+
+  VARIANT expect_draft := wfm->GetObjectIdForInspect("draft");
+  VARIANT expect_final := RecordExists(SELECT FROM hs_history WHERE type IN [ "final", "import" ]) ? fileid : 0;
+
+  TestEQ(expect_final, Coalesce(whfs_list.current_final, 0));
+  TestEQ(expect_draft, Coalesce(whfs_list.current_draft, 0));
+
+  TestEQ([
+    CELL[
+      fileid,
+      publish := (SELECT AS BOOLEAN publish FROM system.fs_objects WHERE id = fileid),
+      current_final := Coalesce(whfs_list.current_final, 0),
+      current_draft := Coalesce(whfs_list.current_draft, 0),
+    ]
+  ], EnrichWithWHFSVersionInfo([ CELL[ fileid ] ], [ cellname := "fileid" ]));
 }
