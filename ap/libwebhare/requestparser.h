@@ -37,7 +37,11 @@ struct WebVar
 
 typedef std::multimap<std::string, WebVar, Blex::StrCaseLess <std::string> > WebVars;
 
-typedef std::multimap<std::string, std::string, Blex::StrCaseLess <std::string> > WebHeaders;
+// Headers are merged so never intentionally hold duplicate names
+typedef std::map<std::string, std::string, Blex::StrCaseLess <std::string> > WebHeaders;
+
+// Cookies legitimately allow duplicate names (different Path/Domain, or split across multiple Cookie: lines)
+typedef std::multimap<std::string, std::string, Blex::StrCaseLess <std::string> > WebCookies;
 
 
 enum class Methods
@@ -130,7 +134,7 @@ class BLEXLIB_PUBLIC RequestParser : private Blex::Mime::DecodeReceiver
         const WebHeaders& GetHeaders() const { return headers; }
 
         ///Get all received cookies
-        const WebHeaders& GetCookies() const { return webcookies; }
+        const WebCookies& GetCookies() const { return webcookies; }
 
         ///Clear the internal state of the request parser and the reset 'preserve body' flag
         void ClearState();
@@ -348,14 +352,14 @@ class BLEXLIB_PUBLIC RequestParser : private Blex::Mime::DecodeReceiver
         /// x-wh-proxy local address
         Blex::SocketAddress whproxy_local_addr;
 
-        ///Headers passed with the request (ADDME: map instead of multimap would suffice)
+        ///Headers passed with the request
         WebHeaders headers;
 
         ///Variables passed with this request
         WebVars variables;
 
         ///Cookies passed to us
-        WebHeaders webcookies;
+        WebCookies webcookies;
 
         ///Content type of the body
         ContentTypes body_contenttype;
