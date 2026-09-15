@@ -635,6 +635,7 @@ PUBLIC BOOLEAN FUNCTION RunSingleFormResultDialog(OBJECT parentscreen, INTEGER f
                                                   , isfullexport := TRUE
                                                   , showpendingresults := TRUE
                                                   , showexpiredresults := TRUE
+                                                  , showspam := TRUE
                                                   , inlineattachments := TRUE
                                                   ]);
   RECORD data := exporter->ExportAllResults([ resultids := INTEGER[existingresult]]);
