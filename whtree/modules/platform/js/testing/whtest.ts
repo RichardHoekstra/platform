@@ -106,7 +106,7 @@ export async function invoke(libfunc: string, ...params: unknown[]): Promise<any
   // console.log(`test.invoke ${libfunc}`, params);
   const isjs = libfunc.includes('.ts#') || libfunc.includes('.js#');
 
-  const result = await jstestsrpc.invoke(testpagetoken ?? throwError("Cannot find testframework to get testpagetoken from"), libfunc, isjs ? [stringify(params, { typed: true })] : params);
+  const result = await jstestsrpc.invoke(testpagetoken ?? throwError("No testpagetoken. Backend tests, make sure you import @webhare/test-backend !"), libfunc, isjs ? [stringify(params, { typed: true })] : params);
   if (isjs)
     return parseTyped(result as string);
 
