@@ -24,6 +24,8 @@ import bridge from "@mod-system/js/internal/whmanager/bridge";
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import { selectFSPublish, selectFSWHFSPath } from "@webhare/whdb/src/functions";
 import type { EventCompletionLink } from "@webhare/whfs/src/finishhandler";
+import { generateTestPageToken } from "./support";
+import { setTestPageToken } from "@webhare/test-frontend";
 export { profileCPU } from "./profiling";
 
 export const passwordHashes = {
@@ -399,6 +401,9 @@ export async function deleteTestModule(name: string) {
 
   console.log(`Completed deleting module ${name}`);
 }
+
+//Initialize whtest.ts
+setTestPageToken(generateTestPageToken());
 
 //By definition we re-export all of whtest and @webhare/test
 export * from "@mod-platform/js/testing/whtest";
