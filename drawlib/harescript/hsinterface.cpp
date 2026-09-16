@@ -128,11 +128,6 @@ public:
         int32_t ValidateDrawId(DrawID id) const;
         int32_t ValidateFontId(FontID id) const;
 
-        //Path stuff here
-
-        void RGBtoHSV(DrawLib::Pixel32 rgb, double *h, double *s, double *v);
-        void HSVtoRGB(DrawLib::Pixel32 *rgb, double h, double s, double v);
-
         void CalculateKMeansQuantizedPalette(DrawID id, uint32_t clustercount, uint8_t minimum_alpha, int32_t max_iters, float initialpoint, std::vector< Pixel32 > *result);
 
         int32_t RegisterDrawInfo(std::unique_ptr<DrawLib::Bitmap32> &to_adopt);
@@ -1938,30 +1933,24 @@ void  DLv2_MakeCanvasFromCanvas(HSVM *vm, HSVM_VariableId id_set)
 
 void  DLv2_HSVtoRGB(HSVM *vm, HSVM_VariableId id_set)
 {
-        OPEN_WRAPPER
-
         double h = HSVM_FloatGet(vm,HSVM_Arg(0));
         double s = HSVM_FloatGet(vm,HSVM_Arg(1));
         double v = HSVM_FloatGet(vm,HSVM_Arg(2));
 
         Pixel32 rgb;
 
-        context->HSVtoRGB(&rgb, h, s, v);
+        DrawLib::HSVtoRGB(h, s, v, &rgb);
 
         HSVM_IntegerSet(vm, id_set, DrawlibtoHSPixel(rgb));
-
-        CLOSE_WRAPPER
 }
 
 void  DLv2_RGBtoHSV(HSVM *vm, HSVM_VariableId id_set)
 {
-        OPEN_WRAPPER
-
         double h, s, v;
 
         Pixel32 rgb = HStoDrawlibPixel(HSVM_IntegerGet(vm,HSVM_Arg(0)));
 
-        context->RGBtoHSV(rgb, &h, &s, &v);
+        DrawLib::RGBtoHSV(rgb, &h, &s, &v);
 
         HSVM_ColumnId col_h = HSVM_GetColumnId(vm, "H");
         HSVM_ColumnId col_s = HSVM_GetColumnId(vm, "S");
@@ -1971,8 +1960,6 @@ void  DLv2_RGBtoHSV(HSVM *vm, HSVM_VariableId id_set)
         HSVM_FloatSet(vm, HSVM_RecordCreate(vm, id_set, col_h), h);
         HSVM_FloatSet(vm, HSVM_RecordCreate(vm, id_set, col_s), s);
         HSVM_FloatSet(vm, HSVM_RecordCreate(vm, id_set, col_v), v);
-
-        CLOSE_WRAPPER
 }
 
 

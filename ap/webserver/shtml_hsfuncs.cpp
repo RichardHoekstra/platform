@@ -237,10 +237,11 @@ void ShtmlContextData::Variable(HSVM *vm, HSVM_VariableId id_set)
 
         //ADDME: Optimize string search
         WebServer::RequestParser const &reqparser = request->reqparser;
-        WebServer::WebVars::const_iterator var=reqparser.GetVariables().find(searchstring.stl_str());
+        // variables is a multimap (repeated field names), find() would return an unspecified duplicate - take the first inserted one
+        auto varrange = reqparser.GetVariables().equal_range(searchstring.stl_str());
 
-        if (var!=reqparser.GetVariables().end())
-           HSVM_StringSet(vm,id_set,&*var->second.contents.begin(),&*var->second.contents.end());
+        if (varrange.first!=varrange.second)
+           HSVM_StringSet(vm,id_set,&*varrange.first->second.contents.begin(),&*varrange.first->second.contents.end());
         else
            HSVM_StringSet(vm,id_set,NULL,NULL);
 }

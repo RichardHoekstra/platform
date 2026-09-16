@@ -930,15 +930,11 @@ sandwich:
 ## File listings
 ##
 
+install-binaries: $(ALLINSTALLDIRS) | success.blex success.harescript success.drawlib $(addprefix $(PREFIX)/,$(WHAP_INSTALLABLES)) success.ap  success.wasm # install-binaries only but skip postinstall/finalize
+
 # install also cleans up old targets. we didn't really use to care, but it can put people on the wrong track ("appserver is crashing! no, it was removed")
 # we invoke 'wasm' (a PHONY) explicitly to ensure it's always rechecked as the toplevel make cannot check the wasm's sub-make dependencies
-install: $(ALLINSTALLDIRS) postinstall | \
-         success.blex \
-         success.harescript \
-         success.drawlib \
-         $(addprefix $(PREFIX)/,$(WHAP_INSTALLABLES)) \
-         success.ap \
-         success.wasm
+install: install-binaries postinstall # install everything including postinstall steps such as finalize
 	${HIDE}rm $(PREFIX)/bin/{appserver,backup,consilio,dbserver,dumpcomplexfslog,dumprawtable} 2>/dev/null || true #cleanup old bins
 	${HIDE}rm $(PREFIX)/lib/{hsm_parser_office_excel,hsm_parser_office_powerpoint}.* 2>/dev/null || true #cleanup old bins
 
