@@ -7,45 +7,45 @@ import { beginWork, commitWork } from "@webhare/whdb/src/whdb";
 async function testIgnoreMetatabsForOldContent() {
   //watches for global triggers of new metadata screens. we need to avoid that for now, don't surprise existing users
   const richdocfile = await openFile("site::webhare_testsuite.testsite/testpages/staticpage");
-  const applyester = await getApplyTesterForObject(richdocfile);
-  const metatabs = await describeMetaTabs(applyester);
+  const applytester = await getApplyTesterForObject(richdocfile);
+  const metatabs = await describeMetaTabs(applytester, { mode: "editor" });
   test.eqPartial({ types: [] }, metatabs);
 }
 
 async function testMetadataReader() {
   const imgfile = await openFile("site::webhare_testsuite.testsite/testpages/imgeditfile.jpeg");
-  const imgfileMetatabs = await describeMetaTabs(await getApplyTesterForObject(imgfile));
+  const imgfileMetatabs = await describeMetaTabs(await getApplyTesterForObject(imgfile), { mode: "editor" });
   test.eq(null, imgfileMetatabs.workflowEditor);
   test.eqPartial([
     { extension: "mod::webhare_testsuite/webdesigns/basetest/basetest.siteprl.xml#basetestprops", whfsType: "http://www.webhare.net/xmlns/webhare_testsuite/basetestprops" },
     { extension: "mod::webhare_testsuite/webdesigns/basetest/basetest.siteprl.xml#testeditor", whfsType: "http://www.webhare.net/xmlns/beta/test" }
   ], imgfileMetatabs.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
-  const imgfileMetatabsAsMarge = await describeMetaTabs(await getApplyTesterForObject(imgfile), { user: test.getUser("marge").auth });
+  const imgfileMetatabsAsMarge = await describeMetaTabs(await getApplyTesterForObject(imgfile), { user: test.getUser("marge").auth, mode: "editor" });
   test.eqPartial([
     { extension: "mod::webhare_testsuite/webdesigns/basetest/basetest.siteprl.xml#basetestprops", whfsType: "http://www.webhare.net/xmlns/webhare_testsuite/basetestprops" },
     { extension: "mod::webhare_testsuite/webdesigns/basetest/basetest.siteprl.xml#testeditor", whfsType: "http://www.webhare.net/xmlns/beta/test" }
   ], imgfileMetatabsAsMarge.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
-  const imgfileMetatabsAsMargeForObjectProps = await describeMetaTabs(await getApplyTesterForObject(imgfile), { user: test.getUser("marge").auth, isObjectProps: true });
+  const imgfileMetatabsAsMargeForObjectProps = await describeMetaTabs(await getApplyTesterForObject(imgfile), { user: test.getUser("marge").auth, mode: "objectProps" });
   test.eqPartial([
     { extension: "mod::webhare_testsuite/webdesigns/basetest/basetest.siteprl.xml#basetestprops", whfsType: "http://www.webhare.net/xmlns/webhare_testsuite/basetestprops" },
     { extension: 'mod::webhare_testsuite/webdesigns/basetest/basetest.siteprl.xml#nocopyprops', whfsType: 'http://www.webhare.net/xmlns/webhare_testsuite/nocopyprops', },
     { extension: "mod::webhare_testsuite/webdesigns/basetest/basetest.siteprl.xml#testeditor", whfsType: "http://www.webhare.net/xmlns/beta/test" },
   ], imgfileMetatabsAsMargeForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
-  const imgfileMetatabsAsSysop = await describeMetaTabs(await getApplyTesterForObject(imgfile), { user: test.getUser("sysop").auth });
+  const imgfileMetatabsAsSysop = await describeMetaTabs(await getApplyTesterForObject(imgfile), { user: test.getUser("sysop").auth, mode: "editor" });
   test.eqPartial([
     { extension: "mod::webhare_testsuite/webdesigns/basetest/basetest.siteprl.xml#basetestprops", whfsType: "http://www.webhare.net/xmlns/webhare_testsuite/basetestprops" },
     { extension: "mod::webhare_testsuite/webdesigns/basetest/basetest.siteprl.xml#testeditor", whfsType: "http://www.webhare.net/xmlns/beta/test" }
   ], imgfileMetatabsAsSysop.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
-  const imgfileMetatabsAsSysopForObjectProps = await describeMetaTabs(await getApplyTesterForObject(imgfile), { user: test.getUser("sysop").auth, isObjectProps: true });
+  const imgfileMetatabsAsSysopForObjectProps = await describeMetaTabs(await getApplyTesterForObject(imgfile), { user: test.getUser("sysop").auth, mode: "objectProps" });
   test.eqPartial([
     {
       whfsType: 'platform:publisher.lifecycle',
       extension: 'mod::publisher/tolliumapps/objectprops/extensions.xml#lifecycle',
-      title: ':platform:publisher.lifecycle'
+      title: 'publisher:siteprofile.internaltypes.lifecycle'
     },
     {
       whfsType: 'http://www.webhare.net/xmlns/webhare_testsuite/basetestprops',
@@ -65,18 +65,18 @@ async function testMetadataReader() {
   ], imgfileMetatabsAsSysopForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
   const richdocfile = await openFile("site::webhare_testsuite.testsitejs/testpages/staticpage");
-  const applyester = await getApplyTesterForObject(richdocfile);
-  const metatabs = await describeMetaTabs(applyester);
+  const applytester = await getApplyTesterForObject(richdocfile);
+  const metatabs = await describeMetaTabs(applytester, { mode: "editor" });
 
-  const richdocfileMetatabsAsMargeForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfile), { user: test.getUser("marge").auth, isObjectProps: true });
+  const richdocfileMetatabsAsMargeForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfile), { user: test.getUser("marge").auth, mode: "objectProps" });
   test.eqPartial([], richdocfileMetatabsAsMargeForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
-  const richdocfileMetatabsAsSysopForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfile), { user: test.getUser("sysop").auth, isObjectProps: true });
+  const richdocfileMetatabsAsSysopForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfile), { user: test.getUser("sysop").auth, mode: "objectProps" });
   test.eqPartial([
     {
       whfsType: 'platform:publisher.lifecycle',
       extension: 'mod::publisher/tolliumapps/objectprops/extensions.xml#lifecycle',
-      title: ':platform:publisher.lifecycle'
+      title: 'publisher:siteprofile.internaltypes.lifecycle'
     }
   ], richdocfileMetatabsAsSysopForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
@@ -201,8 +201,8 @@ async function testOverrides() {
   await commitWork();
 
   { //metaoverride1
-    const applyester = await getApplyTesterForObject(metaoverride1);
-    const metatabs = await describeMetaTabs(applyester);
+    const applytester = await getApplyTesterForObject(metaoverride1);
+    const metatabs = await describeMetaTabs(applytester, { mode: "editor" });
 
     test.eqPartial({
       types: [
@@ -256,7 +256,7 @@ async function getMockTestApplyTester(name: string) {
 }
 
 async function testAllTypes() {
-  const allpropsTabs = await describeMetaTabs(await getMockTestApplyTester("allprops"), { isObjectProps: true });
+  const allpropsTabs = await describeMetaTabs(await getMockTestApplyTester("allprops"), { mode: "objectProps" });
   test.eq([":WTS base test", ":Folksonomy tags", ":WTS Generic", ":rich"], allpropsTabs?.types.map(t => t.sections.map(s => s.title)).flat());
 
   const wtsgenerictab = allpropsTabs!.types[1].sections[0];
@@ -275,7 +275,7 @@ async function testAllTypes() {
   //TODO can we solve these all? at least prevent more from appearing
   test.eq(["aDoc", "aForm", "aHTMLDoc", "aRecord", "aTypedRecord", "anArray", "anInstance", "anUntypedRecord", "myLink", "strArray"], missingSuggestions.map(_ => _.name).sort());
 
-  const manualTabs = await describeMetaTabs(await getMockTestApplyTester("manualtabs"));
+  const manualTabs = await describeMetaTabs(await getMockTestApplyTester("manualtabs"), { mode: "objectProps" });
   // console.dir(manualTabs, { depth: 10 });
   test.eqPartial([
     { title: ":Tab 1", fields: [{ name: "anyField" }, { name: "numberField" }, { name: "whUser" }] },

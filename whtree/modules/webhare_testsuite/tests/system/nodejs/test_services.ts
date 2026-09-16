@@ -78,7 +78,7 @@ async function testServices() {
     const runoncekey2 = await services.readRegistryKey("webhare_testsuite:tests.runoncetest");
     void runoncekey2;
     test.typeAssert<test.Equals<typeof runoncekey2, string>>();
-    /// @ts-expect-error -- Verify that key string is determined by the key name
+    /// @ts-expect-error -- Verify that value type is determined by the key name
     await services.writeRegistryKey("webhare_testsuite:tests.runoncetest", 10);
     /// The following should just work (unknown key)
     await services.writeRegistryKey("whatever", 10);

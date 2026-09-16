@@ -11,6 +11,7 @@ LOADLIB "mod::tollium/lib/screenbase.whlib";
 
 LOADLIB "mod::system/lib/database.whlib";
 LOADLIB "mod::system/lib/whfs.whlib";
+LOADLIB "mod::system/lib/internal/whfs/drafts.whlib";
 LOADLIB "mod::system/lib/internal/whfs/support.whlib";
 
 LOADLIB "mod::publisher/lib/dialogs.whlib";
@@ -61,12 +62,12 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
   //
   // Init
   //
-  MACRO NEW() : PublisherEditorBase(FALSE) {
+  MACRO NEW() : PublisherEditorBase([ mode := "editor" ]) {
 
   }
 
   MACRO Init(RECORD data) {
-    data := EnforceStructure( [ assumewriteaccess := FALSE, objeditor := DEFAULT RECORD ], data);
+    data := EnforceStructure( [ assumewriteaccess := FALSE, objeditor := DEFAULT RECORD, showversion := 0 ], data);
 
     IF(NOT RecordExists(data.objeditor))
       THROW NEW Exception("EditDocumentApp requires objeditor parameter");
@@ -80,7 +81,7 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
     this->frame->flags.canpublish := FALSE;
 
     this->contexts->editdocumentapi->internallinkroots := data.internallinkroots;
-    this->SetupEditBaseForExistingObject(data.id, CELL[ data.assumewriteaccess ]);
+    this->SetupEditBaseForExistingObject(data.id, CELL[ data.assumewriteaccess, data.showversion ]);
 
     this->sourceitem := OpenWHFSObject(this->itemid);
     this->scheduling_experiment := CellExists(this->experiments, "editdoc_scheduling") AND this->experiments.editdoc_scheduling = TRUE;
@@ -98,14 +99,14 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
 
     //Loads the extensions for the file type and invokes additional editor hooks
     this->SetupForFileEdit(this->itemid, data.objeditor);
-    this->SetupWorkflowManager( CELL[ data.readonly, useworkflow := TRUE, workflowtypes := data.objeditor.types ]);
+    this->SetupWorkflowManager( CELL[ data.readonly, data.showversion, useworkflow := TRUE, workflowtypes := data.objeditor.types ]);
 
     IF(this->workflowmgr->IsReadOnly() AND NOT this->tolliumuser->HasRightOn("system:fs_browse", this->itemid)) //not even browse access?
     {
       this->tolliumresult := "cancel";
       RETURN;
     }
-    IF (NOT this->GetExclusiveAccess([ id := this->itemid ], [ onbeforesteal := PTR this->GotScreenStolen ]))
+    IF (data.showversion = 0 AND NOT this->GetExclusiveAccess([ id := this->itemid ], [ onbeforesteal := PTR this->GotScreenStolen ]))
       RETURN;
 
     ^publicationlistener->masks := [ "system:whfs.folder." || this->sourceitem->parent, "publisher:publish.folder." || this->sourceitem->parent ];
@@ -175,6 +176,11 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
     RegisterTimedCallback(AddTimeToDate(1, GetCurrentDatetime()), PTR this->CalculateInitialDirty);
   }
 
+  UPDATE MACRO RefreshReadonly() {
+    PublisherEditorBase::RefreshReadonly();
+    this->canautosave := this->editable;
+  }
+
   MACRO AddTypesSections() { //Insert metadata sheets as new sections
     FOREVERY(RECORD type FROM this->renderer->metatabsconfig.types) {
       FOREVERY(RECORD section FROM this->renderer->PrepareTypeSections(this->contexts, type)) {
@@ -193,58 +199,10 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
     this->RefreshMetaTabsReadonly();
   }
 
-  MACRO AddLegacyExtensions() {
-    //Legacy extensions expect to be loaded into a tab. Build tabs to make them happy
-    FOREVERY(RECORD ext FROM this->renderer->metatabsconfig.extend_props) {
-      //Build a tabs container and an instance to exchange whfstype data
-      OBJECT tabs := this->CreateTolliumComponent("tabs");
-      OBJECT whfsinstance := this->CreateCustomComponent("http://www.webhare.net/xmlns/publisher/components", "whfsinstance");
-      whfsinstance->type := OpenWHFSType(ext.whfs_type);
-      //TODO setup whfsinstance->basefsobject like objectprops does? but objectprops seems a bit dangerous for New Item and Duplicate Item, where sourceitem does not point to the target
-
-      tabs->extendcomponents := [[ name := "contentdata", component := whfsinstance ]];
-      tabs->width := "1pr";
-
-      //'Dummy' main tab for components which expect an insertpoint to exist there
-      OBJECT maintab := tabs->InsertTabAt(0, GetTid("publisher:tolliumapps.objectprops.objectprops.maintab"));
-      OBJECT insertpoint := this->CreateTolliumComponent("spacer");
-      insertpoint->visible := FALSE;
-      maintab->InsertComponentAfter(insertpoint, DEFAULT OBJECT, TRUE);
-      FOREVERY(STRING name FROM [ "name", "title", "description", "keywords", "publicationsettings", "settings", "properties", "seosettings", "advancesettings" ])
-        INSERT CELL[ name, component := insertpoint ] INTO tabs->insertpoints AT END;
-
-      RECORD loadresult := tabs->LoadTabsExtension(ext.extension);
-      IF(Length(maintab->GetChildComponents()) = 1) //no inserts
-        maintab->visible := FALSE;
-
-      OBJECT ARRAY visiblepages := SELECT AS OBJECT ARRAY page FROM ToRecordArray(tabs->pages,"page") WHERE page->visible;
-      IF(Length(visiblepages) = 1) {
-        tabs->selectedtab := visiblepages[0];
-        visiblepages[0]->spacers := DEFAULT RECORD;
-        tabs->type := "server";
-      }
-
-      //Add the tabs as a section
-      OBJECT newsection := this->CreateTolliumComponent("section");
-      //Copy only tab's title unless its just the General tab
-      newsection->title := tabs->type = "server" AND maintab->visible = FALSE? visiblepages[0]->title : GetTid(ext.title);
-      newsection->open := FALSE;
-      newsection->panel->InsertComponentAfter(tabs, DEFAULT OBJECT, TRUE);
-      ^metadatatab->InsertComponentAfter(newsection, DEFAULT OBJECT, TRUE);
-
-      INSERT CELL[ ext.whfs_type
-                 , loadresult.components
-                 , loadresult.fragment
-                 , whfsinstance
-                 , tabs
-                 ] INTO this->extendprops AT END;
-    }
-  }
-
   MACRO SetupForFileEdit(INTEGER objectid, RECORD objecteditor)
   {
     this->AddTypesSections();
-    this->AddLegacyExtensions();
+    this->extendprops := this->extendprops CONCAT this->renderer->RenderLegacyExtensions(this->contexts, ^metadatatab);
 
     OBJECT filehandler := this->LoadScreen(objecteditor.documenteditor);
 
@@ -427,7 +385,15 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
       (this->frame->flags.canedit AND (this->frame->flags.isdirty OR havesomethingtopublish) AND this->contexts->editdocumentapi->canpublish)
       OR
       status.publish_at != DEFAULT DATETIME;
-    this->frame->title := SELECT AS STRING name FROM system.fs_objects WHERE id = this->itemid;
+
+    STRING title := SELECT AS STRING name FROM system.fs_objects WHERE id = this->itemid;
+    INTEGER showversion := this->workflowmgr->GetCurrentStatus().showversion;
+    IF (showversion != 0) {
+      RECORD history_item := SELECT * FROM ListObjectHistory(this->itemid) WHERE id = showversion;
+      IF (RecordExists(history_item))
+        title := `${title} (${history_item.version})`;
+    }
+    this->frame->title := title;
 
     ^filestatusicon->SetImageSrc(state.icon);
     ^filestatustext->value := state.text;
@@ -524,6 +490,8 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
 
   BOOLEAN FUNCTION UpdateAutosave()
   {
+    IF (NOT this->canautosave)
+      RETURN FALSE;
     IF (NOT this->frame->flags.isdirty AND NOT this->workflowmgr->HaveAutosavedChanges())
       RETURN FALSE; //nothing to do, don't bother the database with work
 
@@ -718,7 +686,7 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
 
   MACRO DoClose()
   {
-    IF (this->frame->flags.isdirty)
+    IF (this->frame->flags.canedit AND this->frame->flags.isdirty)
     {
       STRING res := this->RunSimpleScreen("question", GetTid("publisher:tolliumapps.editdocument.messageboxes.savebeforeclose", OpenWHFSObject(this->itemid)->name), [ buttons := ["yes","no","cancel"]]);
       SWITCH (res)

@@ -158,7 +158,9 @@ types:
 
   publisher.lifecycle:
     namespace: http://www.webhare.net/xmlns/publisher/lifecycle
+    tid: publisher:siteprofile.internaltypes.lifecycle
     comment: Lifecycle management. Designed to be copied/synced so we can't accidentally drop lifetime info after a WHFS sync.
+    clone: onArchive
     workflow: false
     members:
       deletion:

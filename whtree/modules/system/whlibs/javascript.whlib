@@ -233,8 +233,7 @@ PUBLIC VARIANT FUNCTION CallJS(VARIANT ARRAY args) __ATTRIBUTES__(VARARG) {
 
       WHILE(eventmanager->ReceiveEvent(DEFAULT DATETIME).status NOT IN ["timeout","gone"])
         /* Flush any other pending events */;
-
-  }
+    }
   } ELSE {
     eventmanager := NEW EventManager; //RegisterEventCallback won't do, that one waits for microtasks but CallJS avoids running those
     eventmanager->RegisterInterest(`system:webhareservice.${calljsservicename}.start`);

@@ -139,7 +139,7 @@ apply:
       data: "testdata"
   - to:
       type: http://www.webhare.net/xmlns/publisher/richdocumentfile
-    baseProps: [seotitle]
+    baseProps: [seotitle,description]
     editProps:
       - type: base_test_props
         layout: [anyField, numberField, folksonomy, whUser, rtd, multiField, checkIt, extControlledField, aLink]

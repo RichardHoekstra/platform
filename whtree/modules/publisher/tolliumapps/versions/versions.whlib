@@ -43,6 +43,8 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
 
   OBJECT maintabs;
 
+  RECORD ARRAY extendprops;
+
   //OBJECT historyextcomp;
   //OBJECT policy;
 
@@ -51,6 +53,10 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
   RECORD historytypes;
 
   OBJECT renderer;
+
+  BOOLEAN have_properties;
+
+  BOOLEAN have_workflow_editor;
 
   // ---------------------------------------------------------------------------
   //
@@ -69,6 +75,8 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
 
     this->liveobject := OpenWHFSObject(targetinfo.snapshotfor ?? data.id);
     this->frame->title := this->GetTid(".dialogtitle", this->liveobject->name);
+    this->contexts->applytester := GetApplyTesterForObject(this->liveobject->id);
+    this->have_workflow_editor := RecordExists(this->contexts->applytester->GetWorkflowEditor());
 
     ^include_autosaves->visible := this->frame->flags.issupervisor;
 
@@ -85,13 +93,16 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
       "abandoned-draft" :=    [ title := this->GetTid(".event-abandoned-draft"), icon := ^versions->GetIcon("tollium:actions/cancel") ],
       created :=              [ title := this->GetTid(".event-created"), icon := ^versions->GetIcon("tollium:status/new") ],
       approved :=             [ title := this->GetTid(".event-approved"), icon := ^versions->GetIcon("tollium:status/checked") ],
-      autosave :=             [ title := this->GetTid(".event-autosave"), icon := ^versions->GetIcon("tollium:actions/save") ],
+      autosave :=             [ title := this->GetTid(".event-autosave"), icon := ^versions->GetIcon("tollium:actions/save+tollium:overlays/filetypes/clock") ],
       import :=               [ title := this->GetTid(".event-import"), icon := ^versions->GetIcon("tollium:status/new") ],
       final :=                [ title := this->GetTid(".event-final"), icon := ^versions->GetIcon("tollium:status/checked") ],
     ];
     FOREVERY (STRING type FROM whconstant_historytypes)
       IF(NOT CellExists(this->historytypes, type))
         THROW NEW Exception("History types mismatch, missing: " || type);
+
+    this->RenderMetadataComponents();
+    this->ApplyBaseSettings();
 
     this->Refresh();
     ^versions->SetValueIfValid(data.id);
@@ -126,6 +137,7 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
 
     RECORD ARRAY rows :=
         SELECT rowkey :=          id
+             , type
              , historytype_icon:= CellExists(this->historytypes, type) ? GetCell(this->historytypes, type).icon : 0
              , historytype :=     CellExists(this->historytypes, type) ? GetCell(this->historytypes, type).title : type
              , when
@@ -139,6 +151,8 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
              , versionsort :=     VersionToLong(version)
              , isactive
              , snapshot
+             , cancopy :=         snapshot != 0
+             , canview :=         snapshot != 0 AND this->have_workflow_editor
           FROM historyitems;
 
     ^versions->rows := rows;
@@ -146,8 +160,8 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
 
   MACRO LoadBaseData(RECORD sel) {
     OBJECT sourceobject := OpenWHFSObject(sel.snapshot);
-    ^maintab->visible := ObjectExists(sourceobject);
-    IF(NOT ^maintab->visible)
+    ^metadatacontent->visible := ObjectExists(sourceobject);
+    IF(NOT ^metadatacontent->visible)
       RETURN;
 
     RECORD draftmeta := sourceobject->GetInstanceData("http://www.webhare.net/xmlns/publisher/draftmetadata");
@@ -173,6 +187,54 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
     ^page_heading->visible := this->renderer->metatabsconfig.base_properties.page_heading OR IsValueSet(^page_heading->value);
   }
 
+  MACRO RenderMetadataComponents() {
+    this->renderer := CreateMetatabsRenderer([
+      objectid := this->liveobject->id,
+      parent := this->liveobject->parent,
+      isfolder := this->liveobject->isfolder,
+      type := this->liveobject->type,
+      mode := "versions"
+    ]);
+
+    this->renderer->RegisterMetaController(^webmetadata->type, ^webmetadata, TRUE);
+
+    RECORD ARRAY extendprops;
+
+    INTEGER insertpos := 1;
+    IF(RecordExists(this->renderer->metatabsconfig)) {
+      FOREVERY(RECORD type FROM this->renderer->metatabsconfig.types) {
+        FOREVERY(RECORD section FROM this->renderer->PrepareTypeSections(this->contexts, type)) {
+          OBJECT newsection := this->CreateTolliumComponent("section");
+          newsection->title := section.title;
+          newsection->open := FALSE;
+
+          FOREVERY(RECORD line FROM section.lines) {
+            newsection->panel->layout := line.layout;
+            newsection->panel->InsertComponentAfter(line.line, DEFAULT OBJECT, TRUE);
+          }
+          IF (type.workflow)
+            ^metadatacontent->InsertComponentAfter(newsection, DEFAULT OBJECT, TRUE);
+          ELSE {
+            ^properties->InsertComponentAfter(newsection, DEFAULT OBJECT, TRUE);
+            this->have_properties := TRUE;
+          }
+
+        }
+      }
+      extendprops := this->renderer->RenderLegacyExtensions(this->contexts, ^metadatacontent, [ propertiescontainer := ^properties ]);
+      FOREVERY (RECORD rec FROM extendprops)
+        IF (rec.workflow)
+          this->have_properties := TRUE;
+    }
+
+    //make sure the rest of the UI is initialized. ensure eg. toolbar buttons are visible when asking about restoring draft/autosave or the formeditor would look half-done
+    FOREVERY(RECORD extendprop FROM extendprops)
+      extendprop.tabs->RunExtensionsPostInit();
+
+    // Disable all metacontrollers so the fields are disabled too
+    this->renderer->SetControllersEnabled(FALSE);
+  }
+
   MACRO OnSelectRequest() {
     RECORD sel := ^versions->selection;
     STRING previewlink;
@@ -184,75 +246,32 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
       ^previewbrowser->SetPreviewURL(link);
 
       // Assumption: sel.snapshot is 0 only for the document creation version.
-      ^previewcontenttabs->selectedtab := sel.snapshot = 0 ? ^previewnewdocument : ^previewcontent;
-
-      // Ensure maintab won't be destroyed
-      ^maintab->RemoveFromParent();
-
-      // tabs can't call RunExtensionsPostInit twice, so we need to recreate it
-      IF (ObjectExists(this->maintabs)) {
-        this->maintabs->RemoveFromParent();
-        this->maintabs->DeleteComponent();
-        this->maintabs := DEFAULT OBJECT;
-      }
-
-      this->maintabs := this->CreateTolliumComponent("tabs");
-      this->maintabs->type := "stacked";
-      this->maintabs->height := "1pr";
-      ^metadata->InsertComponentBefore(this->maintabs, DEFAULT OBJECT, TRUE);
-
-      // Insert and fill the main tab first
-      this->maintabs->InsertPanelAsTab(0, ^maintab);
-      this->LoadBaseData(sel);
-
-      // Now load meta tabs
-      this->renderer := CreateMetatabsRenderer([
-        objectid := this->liveobject->id,
-        parent := this->liveobject->parent,
-        isfolder := this->liveobject->isfolder,
-        type := this->liveobject->type,
-        isobjectprops := FALSE
-      ]);
-
-      this->renderer->RegisterMetaController(^webmetadata->type, ^webmetadata);
-
-      RECORD ARRAY instances := ListInstances(sel.snapshot);
-
-      RECORD ARRAY metacontrollers;
-
-      INTEGER insertpos := 1;
-      IF(RecordExists(this->renderer->metatabsconfig)) {
-        FOREVERY(RECORD type FROM this->renderer->metatabsconfig.types) {
-          RECORD instance :=
-              SELECT *
-                FROM instances
-               WHERE namespace = type.namespace
-                 AND workflow = TRUE;
-
-          IF (NOT RecordExists(instance))
-            CONTINUE;
-
-          RECORD renderresult := this->renderer->RenderTypeIntoTabs(this->contexts, type, this->maintabs, insertpos);
-          insertpos := renderresult.insertpos;
-        }
-      }
-
-      // Disable all metacontrollers so the fields are disabled too
-      this->renderer->SetControllersEnabled(FALSE);
+      ^nosnapshot->visible := sel.snapshot = 0;
+      ^proptabs->visible := sel.snapshot != 0;
 
       // Load the data
-      FOREVERY (RECORD controller FROM this->renderer->metacontrollers)
-        controller.fsinstance->value := controller.type->GetInstanceData(sel.snapshot);
+      this->LoadBaseData(sel);
 
-      this->maintabs->RunExtensionsPostInit();
-      this->ApplyBaseSettings();
+      RECORD ARRAY instances := ListInstances(sel.snapshot);
+      FOREVERY (RECORD controller FROM this->renderer->metacontrollers) {
+        // Show all data for final versions, and all workflow items from drafts/autosaves
+        BOOLEAN show := sel.type = "final" OR RecordExists(SELECT FROM instances WHERE namespace = controller.type->namespace AND workflow);
+
+        controller.fsinstance->value := controller.type->GetInstanceData(sel.snapshot);
+        FOREVERY (OBJECT comp FROM controller.components)
+          comp->visible := show;
+      }
+
+      this->^properties->visible := sel.type = "final" AND this->have_properties;
     }
     ELSE
     {
       ^previewbrowser->SetPreviewURL("");
-      ^previewcontenttabs->selectedtab := ^previewcontent;
+      ^nosnapshot->visible := FALSE;
+      ^proptabs->visible := TRUE;
       ^modifications->rows := DEFAULT RECORD ARRAY;
-      this->maintabs->visible := FALSE;
+      ^metadatacontent->visible := FALSE;
+      ^properties->visible := FALSE;
     }
   }
 
@@ -267,6 +286,10 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
 
   MACRO DoInspect() {
     RunFSObjectInspectDialog(this, ^versions->selection.snapshot);
+  }
+
+  MACRO DoView() {
+    RunFSObjectEditApplication(this, this->liveobject->id, [ showversion := ^versions->value ]);
   }
 
 /*

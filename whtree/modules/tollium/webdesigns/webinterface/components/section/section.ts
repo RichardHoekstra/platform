@@ -61,6 +61,7 @@ export default class ObjSection extends ToddCompBase {
 
         )
       ]);
+    this.node.propTodd = this;
   }
 
   onMouseEnter(): void {

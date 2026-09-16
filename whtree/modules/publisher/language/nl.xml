@@ -1458,6 +1458,9 @@
       <text tid="contentsnippets">Content snippets</text>
       <text tid="slots">Slots map</text>
     </textgroup>
+    <textgroup gid="internaltypes">   <!-- siteprofile.internaltypes -->
+      <text tid="lifecycle">Levenscyclus</text>
+    </textgroup>
     <textgroup gid="widgets">   <!-- siteprofile.widgets -->
       <text tid="embedhtml">HTML blok</text>
       <text tid="embedvideo">Ingebedde video</text>
@@ -1908,6 +1911,7 @@
           <text tid="include_autosaves">Toon autosaves</text>
           <text tid="metadata">Metadata</text>
           <text tid="newdocumentnopreview">Deze versie (aanmaken van het document) heeft geen preview</text>
+          <text tid="previewisnothistoricsnapshot">Deze voorbeeldweergave is geen historische momentopname, maar de inhoud van deze versie zoals weergegeven op de huidige site.</text>
           <text tid="previewtab">Voorbeeldweergave</text>
           <text tid="unknownuser">Onbekende gebruiker</text>
           <text tid="versionnumber">Contentversie</text>

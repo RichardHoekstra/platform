@@ -15,10 +15,13 @@
           title="">
     <actions>
       <action name="createcopy" ellipsis="true" tid="~copyto">
-        <enableon source="versions" min="1" max="1" onexecute="DoCopy" />
+        <enableon source="versions" min="1" max="1" checkflags="cancopy" onexecute="DoCopy" />
       </action>
       <action name="inspect" frameflags="issupervisor" tid="~inspect">
         <enableon source="versions" min="1" max="1" onexecute="DoInspect" />
+      </action>
+      <action name="view" tid="~view">
+        <enableon source="versions" min="1" max="1" checkflags="canview" onexecute="DoView" />
       </action>
 
       <!--
@@ -30,6 +33,7 @@
 
     <menus>
       <menu name="context">
+        <item action="view" />
         <item action="createcopy" />
 
         <!-- <item action="restorecontent" /> -->
@@ -48,7 +52,7 @@
         <part width="1pr" spacers="all">
           <list name="versions"
                 borders="all"
-                flags="isactive"
+                flags="isactive cancopy canview"
                 highlightname="isactive"
                 icons="tollium:actions/accept
                        tollium:objects/meredians
@@ -101,15 +105,16 @@
               </row>
             </rowlayout>
           </list>
-          <panel backgroundcolor="#e5e5e5" borders="left right bottom" layout="right" spacers="right">
+          <panel backgroundcolor="#e5e5e5" borders="left right bottom" spacers="left right">
             <line>
+              <checkbox name="include_autosaves" labeltid=".include_autosaves" onchange="onfilterchange" title="" />
+              <spacer width="1pr" />
+
 <!-- <button action="restorecontent" /> -->
+              <button action="view" />
               <button action="createcopy" />
             </line>
           </panel>
-          <line layout="left">
-            <checkbox name="include_autosaves" labeltid=".include_autosaves" onchange="onfilterchange" title="" />
-          </line>
         </part>
         <part width="2pr" spacers="none">
           <tabs name="proptabs" height="1pr">
@@ -128,22 +133,14 @@
               </list>
             </tab>
             <tab spacers="none" tid=".previewtab">
-              <tabs name="previewcontenttabs" type="server" height="1pr">
-                <tab name="previewcontent" title="">
-                  <publisher:previewbrowser name="previewbrowser" urlbarvisible="false" />
-                </tab>
-                <tab name="previewnewdocument" width="1pr" title="">
-                  <spacer height="1pr" />
-                  <line layout="center">
-                    <text title="" valuetid=".newdocumentnopreview" />
-                  </line>
-                  <spacer height="1pr" />
-                </tab>
-              </tabs>
+              <statuspanel>
+                <text title="" valuetid=".previewisnothistoricsnapshot" wordwrap="true" />
+              </statuspanel>
+              <publisher:previewbrowser name="previewbrowser" urlbarvisible="false" />
             </tab>
             <tab name="metadata" width="1pr" vscroll="true">
-              <tabs name="templatetabs" type="stacked" height="1pr" visible="false">
-                <tab name="maintab" tid="tolliumapps.objectprops.objectprops.maintab">
+              <panel name="metadatacontent" height="1pr">
+                <section name="generalsection" open="true" tid="tolliumapps.objectprops.objectprops.maintab">
                   <heading name="maintab_heading" tid="tolliumapps.objectprops.objectprops.nametitle" />  <!-- doclink="publisher:objectprops/nametitle" -->
                   <textedit name="title" width="1pr" maxlength="256" enabled="false" tid="~title" />
                   <textedit name="name" width="1pr" maxlength="256" enabled="false" tid="~name" />
@@ -171,10 +168,18 @@
                             tid="~description" />
                   <textarea name="keywords" height="1gr" enabled="false" maxlength="1024" showcounter="true" tid="~keywords" />
                   <checkbox name="pinobject" enabled="false" title="" visible="false" />
-                </tab>
-              </tabs>
+                </section>
+              </panel>
             </tab>
+            <tab name="properties" width="1pr" tid="~properties" vscroll="true" />
           </tabs>
+          <panel name="nosnapshot" height="1pr" visible="false">
+            <spacer height="1pr" />
+            <line layout="center">
+              <text title="" valuetid=".newdocumentnopreview" />
+            </line>
+            <spacer height="1pr" />
+          </panel>
         </part>
       </split>
     </body>

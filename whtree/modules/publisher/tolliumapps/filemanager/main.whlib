@@ -2162,7 +2162,7 @@ PUBLIC MACRO RunDirectEdit(OBJECT controller, RECORD data)
       THROW NEW Exception("Invalid parameters");
 
     INTEGER fileid;
-    RECORD options := [ forceintegrated := TRUE ];
+    RECORD options := [ forceintegrated := TRUE, showversion := 0 ];
     IF(RecordExists(data.target))
     {
       fileid := data.target.id;
@@ -2182,6 +2182,7 @@ PUBLIC MACRO RunDirectEdit(OBJECT controller, RECORD data)
                        , appoptions.assumewriteaccess
                        , appoptions.internallinkroots
                        , appoptions.readonly
+                       , appoptions.showversion
                        ];
       }
     }
