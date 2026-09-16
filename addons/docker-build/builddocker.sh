@@ -86,6 +86,14 @@ wh_getemscriptenversion
 get_finaltag "${FINALTAGARGS[@]}"
 list_finaltag
 
+if [ -n "$USEPODMAN" ]; then
+  DOCKERBUILDARGS+=(--layers)
+  if [ -n "$CI_REGISTRY_IMAGE" ]; then
+    DOCKERBUILDARGS+=(--cache-from "$CI_REGISTRY_IMAGE")
+    DOCKERBUILDARGS+=(--cache-to "$CI_REGISTRY_IMAGE")
+  fi
+fi
+
 if [ "$DOCKERSUDO" == "1" ]; then
   SUDO=sudo
 else
