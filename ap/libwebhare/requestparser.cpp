@@ -915,8 +915,10 @@ Blex::RandomStream * RequestParser::OpenFile(std::string const &name) const
 {
         /* FIXME What prevents harescripts from keeping files open while the
                  request data (eg a SRH) is gone?! */
-        WebVars::const_iterator itr=variables.find(name);
-        if (itr==variables.end() || itr->second.contents.empty())
+        // variables is a multimap (repeated field names), find() would return an unspecified duplicate - take the first inserted one
+        auto range = variables.equal_range(name);
+        WebVars::const_iterator itr=range.first;
+        if (itr==range.second || itr->second.contents.empty())
             return NULL;
         else if (itr->second.bodystart == itr->second.bodylimit) // it was URLencoded (FIXME make sure the data stays in memory!)
             return new Blex::MemoryReadStream(itr->second.contents.data(),itr->second.contents.size());
@@ -973,11 +975,12 @@ void RequestParser::ParseEncodedVars(const char* variable_start, const char* var
 std::string const* RequestParser::GetVariable(const char *varname) const
 {
         std::string search(varname,varname+strlen(varname));
-        WebVars::const_iterator itr=variables.find(search);
-        if (itr==variables.end())
+        // variables is a multimap (repeated field names), find() would return an unspecified duplicate - take the first inserted one
+        auto range = variables.equal_range(search);
+        if (range.first==range.second)
             return NULL;
         else
-            return &itr->second.contents;
+            return &range.first->second.contents;
 }
 
 std::string RequestParser::GetVariableValue(const char *varname) const

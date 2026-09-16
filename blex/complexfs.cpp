@@ -293,11 +293,14 @@ void CFS_FreeRanges::RemoveRange(StartLimitMap::iterator it)
         CFS_BlockCount len = it->second - it->first;
 
         // Find and erase entry in len-size map
-        LengthStartMap::iterator lsit = length_start_map.find(len);
-        assert(lsit != length_start_map.end());
+        auto range = length_start_map.equal_range(len);
+        LengthStartMap::iterator lsit = range.first;
+        for (; lsit != range.second && lsit->second != it->first; ++lsit)
+                ;
 
-        for (; lsit->second != it->first; ++lsit)
-            assert(lsit != length_start_map.end() && lsit->first == len);
+        if(lsit == range.second)
+            throw std::runtime_error("Failed to find range in length_start_map");
+
         length_start_map.erase(lsit);
 
         start_limit_ranges.erase(it);
