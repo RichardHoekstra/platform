@@ -86,7 +86,7 @@ async function remapLocation(loc: Puppeteer.ConsoleMessageLocation): Promise<Pup
 }
 
 async function reportFailure(testinfo: Test, message: string | null, log: LogEntry[], page: Puppeteer.Page | null) {
-  const outbase = `/tmp/jstests/${testinfo.testname}.${new Date().toISOString()}`;
+  const outbase = `/tmp/jstests/${testinfo.testname}.${new Date().toISOString().replaceAll(/[:-]/g, "")}`;
   const logfile = `${outbase}.txt`;
   const jsonlogfile = `${outbase}.json`;
   const screenshotfile = `${outbase}.png` as const;
