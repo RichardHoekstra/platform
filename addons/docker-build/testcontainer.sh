@@ -708,6 +708,14 @@ elif [ -n "$ISMODULETEST" ]; then
   echo "Tested module branch: $TESTINGMODULEBRANCH"
 fi
 
+# Create a network if we're running two hares so they can communicate
+if [ -n "$TESTFW_TWOHARES" ] &&  [ "$USEPODMAN" == "1" ]; then
+  if ! podman network create webhare-ci-network && ! podman network exists webhare-ci-network ; then
+    die "Failed to create or verify podman network webhare-ci-network"
+  fi
+  DOCKERARGS+=(--network webhare-ci-network)
+fi
+
 create_container 1 #once a container is created, we have the version number
 echo "Container 1: $TESTENV_CONTAINER1"
 
