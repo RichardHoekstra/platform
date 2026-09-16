@@ -20,6 +20,9 @@
       <action name="inspect" frameflags="issupervisor" tid="~inspect">
         <enableon source="versions" min="1" max="1" onexecute="DoInspect" />
       </action>
+      <action name="view" tid="~view">
+        <enableon source="versions" min="1" max="1" checkflags="canview" onexecute="DoView" />
+      </action>
 
       <!--
       <action name="restorecontent" onexecute="dorestorecontent" tid=".restore">
@@ -30,6 +33,7 @@
 
     <menus>
       <menu name="context">
+        <item action="view" />
         <item action="createcopy" />
 
         <!-- <item action="restorecontent" /> -->
@@ -48,7 +52,7 @@
         <part width="1pr" spacers="all">
           <list name="versions"
                 borders="all"
-                flags="isactive cancopy"
+                flags="isactive cancopy canview"
                 highlightname="isactive"
                 icons="tollium:actions/accept
                        tollium:objects/meredians
@@ -101,15 +105,16 @@
               </row>
             </rowlayout>
           </list>
-          <panel backgroundcolor="#e5e5e5" borders="left right bottom" layout="right" spacers="right">
+          <panel backgroundcolor="#e5e5e5" borders="left right bottom" spacers="left right">
             <line>
+              <checkbox name="include_autosaves" labeltid=".include_autosaves" onchange="onfilterchange" title="" />
+              <spacer width="1pr" />
+
 <!-- <button action="restorecontent" /> -->
+              <button action="view" />
               <button action="createcopy" />
             </line>
           </panel>
-          <line layout="left">
-            <checkbox name="include_autosaves" labeltid=".include_autosaves" onchange="onfilterchange" title="" />
-          </line>
         </part>
         <part width="2pr" spacers="none">
           <tabs name="proptabs" height="1pr">

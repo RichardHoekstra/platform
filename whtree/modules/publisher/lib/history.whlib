@@ -53,6 +53,9 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
   /// The original object, outside draft/autosave namespace
   OBJECT baseobject;
 
+  /// Live object (may be a snapshot when viewing history)
+  OBJECT liveobject;
+
   /// Current autosave object
   OBJECT currentautosave;
 
@@ -74,13 +77,18 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
   /** @param options.readonly - force read only access
       @param options.assumewriteaccess - assume the user has system:fs_write access, don't check rights
       @param options.user User to hold responsible
+      @param options.showversion Show this version (implies readonly access when set)
    */
   MACRO NEW(INTEGER objid, RECORD options DEFAULTSTO DEFAULT RECORD) {
     this->options := ValidateOptions(CELL[ readonly := FALSE
                                          , assumewriteaccess := FALSE
                                          , user := DEFAULT OBJECT
                                          , workflowtypes := STRING[]
+                                         , showversion := 0
                                          ], options);
+
+    IF (this->options.showversion != 0)
+     this->options.readonly := TRUE;
 
     this->AddTypes(this->options.workflowtypes);
     this->baseobject := OpenWHFSObject(objid);
@@ -91,7 +99,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
   }
 
   PUBLIC BOOLEAN FUNCTION IsReadOnly() { //DEPRECATED, use GetCurrentStatus()
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(FALSE);
     RETURN this->read_only OR NOT this->editable;
   }
 
@@ -99,7 +107,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
   PUBLIC INTEGER FUNCTION GetObjectIdForInspect(STRING version) {
     SWITCH(version) {
       CASE "live" {
-        RETURN this->baseobject->id;
+        RETURN this->liveobject->id;
       }
       CASE "draft" {
         RETURN ObjectExists(this->currentdraft) ? this->currentdraft->id : 0;
@@ -115,15 +123,16 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
 
   /** Get the object to use for a specific version. Mostly useful for a preview depending on the Save button that wants to show either draft or live, but not autosave - it would request GetContentObject("draft") */
   PUBLIC INTEGER FUNCTION GetContentObject(STRING version) {
+    this->EnsureMetadataUpToDate(FALSE);
     SWITCH(version) {
       CASE "live" {
-        RETURN this->baseobject->id;
+        RETURN this->liveobject->id;
       }
       CASE "draft" {
-        RETURN (this->currentdraft ?? this->baseobject)->id;
+        RETURN (this->currentdraft ?? this->liveobject)->id;
       }
       CASE "autosave" {
-        RETURN (this->currentautosave ?? this->currentdraft ?? this->baseobject)->id;
+        RETURN (this->currentautosave ?? this->currentdraft ?? this->liveobject)->id;
       }
       DEFAULT {
         THROW NEW Exception("Invalid version, must be one of 'live', 'draft' or 'autosave'");
@@ -137,13 +146,13 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
 
   //exported for some legacy preview code, but GetPreview should be used
   PUBLIC OBJECT FUNCTION __GetAutosavedObject() {
-    this->EnsureMetadataUpToDate();
-    RETURN this->currentautosave ?? this->currentdraft ?? this->baseobject;
+    this->EnsureMetadataUpToDate(FALSE);
+    RETURN this->currentautosave ?? this->currentdraft ?? this->liveobject;
   }
 
   PUBLIC OBJECT FUNCTION __GetDraftObject() {
-    this->EnsureMetadataUpToDate();
-    RETURN this->currentdraft ?? this->baseobject;
+    this->EnsureMetadataUpToDate(FALSE);
+    RETURN this->currentdraft ?? this->liveobject;
   }
 
   MACRO AddTypes(STRING ARRAY types) {
@@ -168,23 +177,23 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
     }
   }
   PUBLIC RECORD FUNCTION GetInstanceData(STRING whfstype) {
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(FALSE);
 
     RECORD match := SELECT * FROM this->workflowtypes WHERE namespace = VAR whfstype OR scopedtype = VAR whfstype;
     IF(NOT RecordExists(match))
       THROW NEW Exception(`Type '${whfstype}' is not setup to be tracked in the workflow`);
 
     BOOLEAN hasworkflow := SELECT AS BOOLEAN workflow FROM system_internal.fs_instances WHERE fs_object = this->__GetAutosavedObject()->id AND fs_type = match.id;
-    RETURN hasworkflow ? this->__GetAutosavedObject()->GetInstanceData(whfstype) : this->baseobject->GetInstanceData(whfstype);
+    RETURN hasworkflow ? this->__GetAutosavedObject()->GetInstanceData(whfstype) : this->liveobject->GetInstanceData(whfstype);
   }
   MACRO EnsureStartOfHistory() {
     IF(Length(this->history) = 0) {
       ImportCurrentState(this->baseobject->id);  //Import the current final state
-      this->EnsureMetadataUpToDate();
+      this->EnsureMetadataUpToDate(TRUE);
     }
   }
   MACRO EnsureAutosave() {
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(TRUE);
     IF(ObjectExists(this->currentautosave))
       RETURN;
 
@@ -195,7 +204,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
           this->GetMetadata(),
           [ user := this->options.user, workflowtypes := SELECT AS INTEGER ARRAY id FROM this->workflowtypes ]);
 
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(FALSE);
     IF(NOT ObjectExists(this->currentautosave) OR this->currentautosave->id != autosave)
       THROW NEW Exception("Failed to properly create an autosave object");
   }
@@ -212,7 +221,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
     this->currentautosave->SetInstanceData(whfstype, data, [ ifreadonly := "update", workflow := TRUE ]);
   }
   PUBLIC RECORD FUNCTION GetMetadata() {
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(FALSE);
 
     RECORD activeversion := this->currentautosave_version ?? this->currentdraft_version ?? this->relevant_created_version;
 
@@ -245,7 +254,10 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
       this->currentautosave->UpdateMetadata(CELL[...directupdates, modificationdate := now ], [ ifreadonly := "update" ] );
   }
 
-  MACRO EnsureMetadataUpToDate() {
+  MACRO EnsureMetadataUpToDate(BOOLEAN forwriteaccess) {
+    IF (forwriteaccess AND this->options.readonly)
+      THROW NEW Exception("Workflowmanager is in read-only mode");
+
     //TODO skip if our cached info should be up to date.
     BOOLEAN file_readonly :=
         this->options.readonly
@@ -259,24 +271,47 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
                  WHERE fs_object = this->baseobject->id
               ORDER BY when, id;
 
-    RECORD scheduleinfo := GetScheduleInfo(this->baseobject);
-    this->publish_at := scheduleinfo.publish_at;
+    RECORD lastautosave, last_cancel_autosave, lastdraftpublish;
+    IF (this->options.showversion = 0) {
+      this->liveobject := this->baseobject;
 
-    RECORD lastautosave := SELECT * FROM this->history WHERE type = whconstant_historytype_autosave ORDER BY when DESC LIMIT 1;
-    //The last version superseding any autosave
-    RECORD last_cancel_autosave := SELECT * FROM this->history WHERE type IN [ whconstant_historytype_saved, whconstant_historytype_approved, whconstant_historytype_final, whconstant_historytype_abandoned_autosave, whconstant_historytype_abandoned_draft] ORDER BY when DESC LIMIT 1;
-    //The last version superseding any draft
-    RECORD lastdraftpublish := SELECT * FROM this->history WHERE type IN [ whconstant_historytype_saved, whconstant_historytype_approved, whconstant_historytype_final, whconstant_historytype_abandoned_draft] ORDER BY when DESC LIMIT 1;
+      RECORD scheduleinfo := GetScheduleInfo(this->baseobject);
+      this->publish_at := scheduleinfo.publish_at;
 
-    //TODO ReplaceWith tasks trigger autosaves without an owner/user. (see test-lifecycle). Should we optimize that path?
-    INTEGER currentuser := ObjectExists(this->options.user) ? this->options.user->authobjectid : 0;
-    this->currentdraft_version := RecordExists(lastdraftpublish) AND lastdraftpublish.type = whconstant_historytype_saved ? lastdraftpublish : DEFAULT RECORD;
-    //only take an autosave if it was created by the current user and is newer than the last draft or published version
-    this->currentautosave_version := RecordExists(lastautosave) AND lastautosave.user = currentuser AND (NOT RecordExists(last_cancel_autosave) OR lastautosave.when > last_cancel_autosave.when) ? lastautosave : DEFAULT RECORD;
+      //TODO ReplaceWith tasks trigger autosaves without an owner/user. (see test-lifecycle). Should we optimize that path?
+      INTEGER currentuser := ObjectExists(this->options.user) ? this->options.user->authobjectid : 0;
+
+      lastautosave := SELECT * FROM this->history WHERE type = whconstant_historytype_autosave ORDER BY when DESC LIMIT 1;
+      //The last version superseding any autosave
+      last_cancel_autosave := SELECT * FROM this->history WHERE type IN [ whconstant_historytype_saved, whconstant_historytype_approved, whconstant_historytype_final, whconstant_historytype_abandoned_autosave, whconstant_historytype_abandoned_draft] ORDER BY when DESC LIMIT 1;
+      //The last version superseding any draft
+      lastdraftpublish := SELECT * FROM this->history WHERE type IN [ whconstant_historytype_saved, whconstant_historytype_approved, whconstant_historytype_final, whconstant_historytype_abandoned_draft] ORDER BY when DESC LIMIT 1;
+
+      //only take an autosave if it was created by the current user and is newer than the last draft or published version
+      this->currentautosave_version := RecordExists(lastautosave) AND lastautosave.user = currentuser AND (NOT RecordExists(last_cancel_autosave) OR lastautosave.when > last_cancel_autosave.when) ? lastautosave : DEFAULT RECORD;
+
+      this->currentdraft_version := RecordExists(lastdraftpublish) AND lastdraftpublish.type = whconstant_historytype_saved ? lastdraftpublish : DEFAULT RECORD;
+      this->relevant_created_version := Length(this->history) = 1 AND this->history[0].type = whconstant_historytype_created ? this->history[0] : DEFAULT RECORD;
+    } ELSE {
+      RECORD showversion := SELECT * FROM this->history WHERE id = this->options.showversion;
+      IF (NOT RecordExists(showversion))
+        THROW NEW Exception("Specified version does not exist");
+
+      this->currentautosave_version := DEFAULT RECORD;
+
+      IF (showversion.type IN [ whconstant_historytype_final, whconstant_historytype_import ]) {
+        this->liveobject := OpenWHFSObject(showversion.snapshot);
+        this->currentdraft_version := DEFAULT RECORD;
+        this->relevant_created_version := showversion;
+      } ELSE {
+        this->liveobject := this->baseobject;
+        this->currentdraft_version := showversion;
+        this->relevant_created_version := DEFAULT RECORD;
+      }
+    }
 
     this->currentautosave := RecordExists(this->currentautosave_version) ? OpenWHFSObject(this->currentautosave_version.snapshot) : DEFAULT OBJECT;
     this->currentdraft := RecordExists(this->currentdraft_version) ? OpenWHFSObject(this->currentdraft_version.snapshot) : DEFAULT OBJECT;
-    this->relevant_created_version := Length(this->history) = 1 AND this->history[0].type = whconstant_historytype_created ? this->history[0] : DEFAULT RECORD;
 
      //a scheduled publish makes the document readonly until it is published
     this->read_only := file_readonly;
@@ -284,7 +319,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
   }
 
   PUBLIC RECORD FUNCTION GetCurrentStatus() {
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(FALSE);
     INTEGER draft_owner_authobject := RecordExists(this->currentdraft_version) ? this->currentdraft_version.user : 0;
     RECORD status := CELL[
       autosave_mine := RecordExists(this->currentautosave_version),
@@ -296,13 +331,14 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
       this->publish_at,
       this->read_only,
       this->editable,
-      publish := this->baseobject->publish
+      publish := this->baseobject->publish,
+      this->options.showversion,
     ];
     RETURN status;
   }
 
   PUBLIC RECORD FUNCTION GetCurrentDraft() {
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(FALSE);
     IF(RecordExists(this->currentdraft_version))
       RETURN CELL[ user_auth_object := this->currentdraft_version.user
                  , draft_saved := this->currentdraft_version.when
@@ -312,7 +348,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
   }
 
   PUBLIC RECORD FUNCTION GetResumableAutosave() {
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(FALSE);
     IF(RecordExists(this->currentautosave_version))
       RETURN CELL[ saved := this->currentautosave_version.when
                  ];
@@ -321,6 +357,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
   }
 
   MACRO DoDiscardAutosavedChanges(BOOLEAN revert_draft) {
+    this->EnsureMetadataUpToDate(TRUE);
     IF((RecordExists(this->currentdraft_version) AND revert_draft) OR RecordExists(this->currentautosave_version)) { //do we have something to discard?
       RECORD userinfo := ObjectExists(this->options.user) ? this->options.user->GetUserDataForLogging() : DEFAULT RECORD;
       INSERT CELL [ fs_object := this->baseobject->id
@@ -345,7 +382,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
       commithandler->ObjectUpdate(this->baseobject->parentsite, this->baseobject->parent, this->baseobject->id, this->baseobject->isfolder);
     }
 
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(FALSE);
   }
 
   PUBLIC MACRO DiscardAutosavedChanges() {
@@ -357,6 +394,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
   }
 
   PUBLIC RECORD FUNCTION GetObjectMetadata() {
+    this->EnsureMetadataUpToDate(FALSE);
     IF(ObjectExists(this->currentautosave ?? this->currentdraft)) {
       RECORD meta := (this->currentautosave ?? this->currentdraft)->GetMetadata();
       RETURN CELL [ name := meta.name
@@ -380,10 +418,12 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
   }
 
   PUBLIC BOOLEAN FUNCTION HaveAutosavedChanges() {
+    this->EnsureMetadataUpToDate(FALSE);
     RETURN ObjectExists(this->currentautosave);
   }
 
   PUBLIC BOOLEAN FUNCTION HaveDraftOrAutosavedChanged() { //ie 'there may be something to revert
+    this->EnsureMetadataUpToDate(FALSE);
     RETURN ObjectExists(this->currentautosave ?? this->currentdraft);
   }
 
@@ -401,7 +441,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
     IF(CellExists(options,'publish') AND CellExists(options, "publish_at"))
       THROW NEW Exception("Cannot set both publish and publish_at");
 
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(TRUE);
     this->EnsureStartOfHistory(); //create an import if needed
 
     IF(NOT options.finalize) {
@@ -409,7 +449,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
         RETURN; //nothing to save
 
       this->SaveAsNewPublicDraft();
-      this->EnsureMetadataUpToDate();
+      this->EnsureMetadataUpToDate(FALSE);
       RETURN;
     }
 
@@ -445,7 +485,7 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
     }
 
     this->SaveAsFinal(options);
-    this->EnsureMetadataUpToDate();
+    this->EnsureMetadataUpToDate(FALSE);
   }
 
   //Finish an autosave - move it to a snapshot and patch its history

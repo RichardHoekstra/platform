@@ -168,11 +168,102 @@ ASYNC MACRO AssumeWriteAccess()
   AWAIT ExpectScreenChange(-1, PTR topscreen->TolliumExecuteCancel());
 }
 
+ASYNC MACRO ShowVersion() {
+    // Setup the document with a lot of history
+  testfw->BeginWork();
+  OBJECT testfile := GetTestsuiteTempFolder()->CreateFile(
+    [ name := "showversiontest-0.1"
+    , title := "0.1"
+    , data := StringToBlob("0.1")
+    , typens := "http://www.webhare.net/xmlns/publisher/htmlfile"
+    ],[ createdby := testfw->GetUserObject("lisa")
+      , instances := [[ whfstype := "http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", any_field := "0.1" ]]
+      ]
+    );
+
+  //Start editing this document. Create a private draft (autosave)
+  OBJECT workflowmgr := NEW WorkflowManager(testfile->id,
+    [ user := GetEffectiveUser(),
+      workflowtypes := ["http://www.webhare.net/xmlns/webhare_testsuite/basetestprops"]
+    ]);
+
+  workflowmgr->UpdateData(StringToBlob("0.2"));
+  workflowmgr->UpdateMetadata([ name := "showversiontest-0.2", title := "0.2" ]);
+  workflowmgr->SetInstanceData("http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", [ any_field := "0.2" ]);
+  workflowmgr->Save(); //commits the autosave changes to the draft
+  workflowmgr->UpdateData(StringToBlob("1.0"));
+  workflowmgr->UpdateMetadata([ name := "showversiontest-1.0", title := "1.0" ]);
+  workflowmgr->SetInstanceData("http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", [ any_field := "1.0" ]);
+  workflowmgr->Save([ finalize := TRUE ]);
+  workflowmgr->UpdateData(StringToBlob("1.1"));
+  workflowmgr->UpdateMetadata([ name := "showversiontest-1.1", title := "1.1" ]);
+  workflowmgr->SetInstanceData("http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", [ any_field := "1.1" ]);
+  workflowmgr->Save(); //commits the autosave changes to the draft
+  workflowmgr->UpdateData(StringToBlob("2.0"));
+  workflowmgr->UpdateMetadata([ name := "showversiontest-2.0", title := "2.0" ]);
+  workflowmgr->SetInstanceData("http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", [ any_field := "2.0" ]);
+  workflowmgr->Save([ finalize := TRUE, publish := TRUE ]);
+  testfw->CommitWork();
+
+  // Open the versions dialog for the test file
+  testfw->SetTestUser("sysop");
+  AWAIT ExpectScreenChange(+1, PTR RunFSObjectVersionsDialog(GetTestController(), testfile->id));
+  {
+    // test version 0.2 (draft)
+    TT("versions")->selection := SELECT * FROM TT("versions")->rows WHERE versionnumber="0.2";
+
+    AWAIT ExpectNoScreenChange(PTR TTClick(":View"));
+
+    AWAIT ExpectScreenChange(+1, PTR TTLaunchStartedApp());
+    {
+      TestEQ("showversiontest-2.0 (0.2)", TT("frame")->title);
+      TestEQ("showversiontest-0.2", TT(":File name")->value);
+      TestEQ("0.2", TT(":Title")->value);
+      TestEQ("0.2", TT(":anyfield")->value);
+      TestEQ("0.2", TT("{codeedit}:*")->value);
+
+      // Ensure workflow fields are disabled
+      TestEQ(FALSE, TT(":File name")->enabled);
+      TestEQ(FALSE, TT(":Title")->enabled);
+      TestEQ(FALSE, TT(":anyfield")->enabled);
+      TestEQ(TRUE, TT("{codeedit}:*")->readonly);
+
+      // ObjectLibrary is enabled (bug?), but it hooks the dirty mechanism and triggered an save warning on close. Don't want that
+      TTFillByTitle(":ObjectLibrary", "testparent");
+
+      TestEQ(FALSE, TTIsActionEnabled(":Publish"));
+      TestEQ(FALSE, TTIsActionEnabled(":Save"));
+
+      // No 'are you sure messages' because of readonly status
+      AWAIT ExpectScreenChange(-1, PTR TTClick(":Exit[menuitem]"));
+    }
+
+    // test version 1.0 (final)
+    TT("versions")->selection := SELECT * FROM TT("versions")->rows WHERE versionnumber="1.0";
+
+    AWAIT ExpectNoScreenChange(PTR TTClick(":View"));
+
+    AWAIT ExpectScreenChange(+1, PTR TTLaunchStartedApp());
+    {
+      TestEQ("showversiontest-2.0 (1.0)", TT("frame")->title);
+      TestEQ("showversiontest-1.0", TT(":File name")->value);
+      TestEQ("1.0", TT(":Title")->value);
+      TestEQ("1.0", TT(":anyfield")->value);
+      TestEQ("1.0", TT("{codeedit}:*")->value);
+      AWAIT ExpectScreenChange(-1, PTR TTClick(":Exit[menuitem]"));
+    }
+
+    AWAIT ExpectScreenChange(-1, PTR TTEscape);
+  }
+}
+
 RunTestframework([ PTR PrepIt
                  , PTR TestAutoSave
                  , PTR TestPasswordPreview
                  , PTR AssumeWriteAccess
+                 , PTR ShowVersion
                  ], [ testusers := [[ login := "lisa" ]
+                                   ,[ login := "sysop", grantrights := ["system:sysop"] ]
                                    ]
                     , profile := TRUE
                     ]);

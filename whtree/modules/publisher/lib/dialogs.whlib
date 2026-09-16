@@ -432,6 +432,7 @@ PUBLIC MACRO RunPublisherFileManager(OBJECT parentscreen, INTEGER objectid, RECO
     @cell(boolean) options.assumereadaccess Assume the user has read access
     @cell(boolean) options.assumewriteaccess Assume the user has write access
     @cell(integer array) options.internallinkroots Limit RTE internal links to these subfolders
+    @cell(integer) options.showversion Version of the file to open in the editor
 */
 PUBLIC MACRO RunFSObjectEditApplication(OBJECT parentscreen, INTEGER objectid, RECORD options DEFAULTSTO DEFAULT RECORD)
 {
@@ -440,6 +441,7 @@ PUBLIC MACRO RunFSObjectEditApplication(OBJECT parentscreen, INTEGER objectid, R
                              , assumereadaccess := FALSE
                              , assumewriteaccess := FALSE
                              , internallinkroots := INTEGER[]
+                             , showversion := 0
                              ], options);
 
   OBJECT fileobj := OpenWHFSObject(objectid);
@@ -492,7 +494,7 @@ PUBLIC MACRO RunFSObjectEditApplication(OBJECT parentscreen, INTEGER objectid, R
        a safe messaging channel.*/
 
     STRING appoptions;
-    IF(options.assumereadaccess OR options.assumewriteaccess OR Length(options.internallinkroots) > 0)
+    IF(options.assumereadaccess OR options.assumewriteaccess OR Length(options.internallinkroots) > 0 OR options.showversion != 0)
     {
       appoptions := EncryptForThisServer("publisher:runfsobjecteditapplication",
                                           CELL[ //verification
@@ -504,6 +506,7 @@ PUBLIC MACRO RunFSObjectEditApplication(OBJECT parentscreen, INTEGER objectid, R
                                               , options.assumewriteaccess
                                               , options.internallinkroots
                                               , options.readonly
+                                              , options.showversion
                                               ]);
     }
 

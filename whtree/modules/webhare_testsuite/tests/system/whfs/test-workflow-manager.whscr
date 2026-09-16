@@ -874,6 +874,65 @@ ASYNC MACRO ImportTest() {
   VerifyTSHistory(importfile->id);
 }
 
+ASYNC MACRO ShowVersion() {
+  // Setup the document with a lot of history
+  testfw->BeginWork();
+  OBJECT testfile := GetTestsuiteTempFolder()->CreateFile(
+    [ name := "showversiontest-0.1"
+    , title := "0.1"
+    , data := StringToBlob("0.1")
+    , typens := "http://www.webhare.net/xmlns/publisher/htmlfile"
+    ],[ createdby := testfw->GetUserObject("marge")
+      , instances := [[ whfstype := "http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", any_field := "0.1" ]]
+      ]
+    );
+
+  //Start editing this document. Create a private draft (autosave)
+  OBJECT workflowmgr := NEW WorkflowManager(testfile->id,
+    [ user := GetEffectiveUser(),
+      workflowtypes := ["http://www.webhare.net/xmlns/webhare_testsuite/basetestprops"]
+    ]);
+
+  workflowmgr->UpdateData(StringToBlob("0.2"));
+  workflowmgr->UpdateMetadata([ name := "showversiontest-0.2", title := "0.2" ]);
+  workflowmgr->SetInstanceData("http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", [ any_field := "0.2" ]);
+  workflowmgr->Save(); //commits the autosave changes to the draft
+  workflowmgr->UpdateData(StringToBlob("1.0"));
+  workflowmgr->UpdateMetadata([ name := "showversiontest-1.0", title := "1.0" ]);
+  workflowmgr->SetInstanceData("http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", [ any_field := "1.0" ]);
+  workflowmgr->Save([ finalize := TRUE ]);
+  workflowmgr->UpdateData(StringToBlob("1.1"));
+  workflowmgr->UpdateMetadata([ name := "showversiontest-1.1", title := "1.1" ]);
+  workflowmgr->SetInstanceData("http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", [ any_field := "1.1" ]);
+  workflowmgr->Save(); //commits the autosave changes to the draft
+  workflowmgr->UpdateData(StringToBlob("2.0"));
+  workflowmgr->UpdateMetadata([ name := "showversiontest-2.0", title := "2.0" ]);
+  workflowmgr->SetInstanceData("http://www.webhare.net/xmlns/webhare_testsuite/basetestprops", [ any_field := "2.0" ]);
+  workflowmgr->Save([ finalize := TRUE, publish := TRUE ]);
+  testfw->CommitWork();
+
+  RECORD ARRAY hs_history := ListObjectHistory(testfile->id);
+
+  FOREVERY (RECORD historyrec FROM hs_history) {
+    OBJECT sub_workflowmgr := NEW WorkflowManager(testfile->id, [
+      showversion := historyrec.id,
+      workflowtypes := ["http://www.webhare.net/xmlns/webhare_testsuite/basetestprops"],
+    ]);
+
+    TestEqMembers([
+      editable := FALSE,
+      read_only := TRUE,
+    ], sub_workflowmgr->GetCurrentStatus(), "*");
+
+    TestEQ(`showversiontest-${historyrec.version}`, sub_workflowmgr->GetMetadata().name);
+    IF (historyrec.type != "created") {
+      // type "created" doesn't have a snapshot
+      TestEQ(historyrec.version, sub_workflowmgr->GetMetadata().title);
+      TestEQ(historyrec.version, BlobToString(sub_workflowmgr->GetMetadata().data));
+      TestEQ(historyrec.version, sub_workflowmgr->GetInstanceData("http://www.webhare.net/xmlns/webhare_testsuite/basetestprops").any_field);
+    }
+  }
+}
 
 ASYNC MACRO ViewHistory() {
   DATETIME startcopy := GetCurrentDatetime();
@@ -909,6 +968,7 @@ RunTestframework([ PTR Prep
                  , PTR NamingTest
                  , PTR UnpublishedSavesTest
                  , PTR ImportTest
+                 , PTR ShowVersion
                  , PTR ViewHistory
                  ], [ testusers := [[ login := "sysop", grantrights := ["system:sysop"] ]
                                    ,[ login := "marge" ]

@@ -69,6 +69,8 @@ PUBLIC STATIC OBJECTTYPE FieldScope EXTEND YamlScope
 PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
   /// Id of edited object, 0 for new or duplicate objects
   INTEGER itemid;
+  /// Show version (0 for current)
+  INTEGER showversion;
 
   // Active experiments
   RECORD experiments;
@@ -195,7 +197,8 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
     this->isnew := objectid = 0;
 
     options := ValidateOptions(CELL[ assumewriteaccess := FALSE
-                                  ], options);
+                                   , showversion := 0
+                                   ], options);
 
     this->renderer := CreateMetatabsRenderer(CELL[ objectid, parent, isfolder, type, this->mode ]);
     this->metatabsconfig := this->renderer->metatabsconfig;
@@ -207,9 +210,8 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
     //We currently need this->parentfolder to be set so we can run UpdatePinned which will be triggered below by ^pinobject->value :=
     this->parentfolder := this->contexts->applytester->objparent = 0 ? OpenWHFSRootObject() : OpenWHFSObject(this->contexts->applytester->objparent);
 
-    RECORD objinfo;
     IF(objectid != 0) {
-      objinfo := SELECT COLUMN type, ispinned FROM system.fs_objects WHERE id = VAR objectid;
+      RECORD objinfo := SELECT COLUMN type, ispinned FROM system.fs_objects WHERE id = VAR objectid;
       ^pinobject->value := objinfo.ispinned;
       type := objinfo.type;
     }
@@ -218,7 +220,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
 
     this->itemid := objectid;
     this->SetupBaseSettings();
-    this->assumewriteaccess := options.assumewriteaccess;
+    this->assumewriteaccess := options.assumewriteaccess AND options.showversion = 0;
   }
 
   MACRO SetupWorkflowManager(RECORD options) {
@@ -227,6 +229,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
     options := ValidateOptions(CELL[ readonly := FALSE
                                    , useworkflow := FALSE
                                    , workflowtypes := STRING[]
+                                   , showversion := 0
                                   ], options);
 
     IF(RecordExists(this->renderer->metatabsconfig)) {
@@ -242,6 +245,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
           , options.readonly
           , this->assumewriteaccess
           , workflowtypes
+          , options.showversion
           ]);
   }
 
