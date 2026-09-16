@@ -367,14 +367,14 @@ runCli({
       description: "Write a mark with optional text to all primary logfiles",
       arguments: [{ name: "<text>", description: "Text to write" }],
       main: async ({ args }) => {
-        return spawnSync("wh", ["harescript-debug", "mark", args.text], { stdio: "inherit" }).status || 250;
+        return spawnSync("wh", ["harescript-debug", "mark", args.text], { stdio: "inherit" }).status ?? 250;
       }
     },
     "get-secret": {
       description: "Get a secret",
       arguments: [{ name: "<name>", description: "Name of the secret" }],
       main: async ({ args }) => {
-        return spawnSync("wh", ["harescript-debug", "getsecret", args.name], { stdio: "inherit" }).status || 250;
+        return spawnSync("wh", ["harescript-debug", "getsecret", args.name], { stdio: "inherit" }).status ?? 250;
       }
     },
     "set-secret": {
@@ -384,7 +384,7 @@ runCli({
         { name: "<value>", description: "Value of the secret" }
       ],
       main: async ({ args }) => {
-        return spawnSync("wh", ["harescript-debug", "setsecret", args.name + "=" + args.value], { stdio: "inherit" }).status || 250;
+        return spawnSync("wh", ["harescript-debug", "setsecret", args.name + "=" + args.value], { stdio: "inherit" }).status ?? 250;
       }
     },
   }
