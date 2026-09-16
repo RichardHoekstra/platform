@@ -255,7 +255,8 @@ function getServerClientOptions() {
       { scheme: "file", language: "xml" },
       { scheme: "file", language: "webhare-siteprofile-xml" },
       { scheme: "file", language: "webhare-screens-xml" },
-      { scheme: "file", language: "witty-template" }
+      { scheme: "file", language: "witty-template" },
+      { scheme: "file", language: "yaml" }
     ],
     synchronize: {
       // Notify the server about file changes to '.clientrc' files contained in the workspace
