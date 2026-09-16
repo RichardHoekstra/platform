@@ -87,6 +87,8 @@ get_finaltag "${FINALTAGARGS[@]}"
 list_finaltag
 
 if [ -n "$USEPODMAN" ]; then
+  podman -v
+  buildah -v
   DOCKERBUILDARGS+=(--layers)
   if [ -n "$CI_REGISTRY_IMAGE" ]; then
     DOCKERBUILDARGS+=(--cache-from "$CI_REGISTRY_IMAGE")
