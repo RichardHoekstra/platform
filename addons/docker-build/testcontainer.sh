@@ -246,6 +246,8 @@ finalize_tests()
   if [ -z "$ARTIFACTS" ]; then
     if [ -n "$CI_PROJECT_DIR" ]; then
       ARTIFACTS="$CI_PROJECT_DIR/artifacts"
+    elif [ -n "$GITHUB_WORKSPACE" ]; then
+      ARTIFACTS="$GITHUB_WORKSPACE/artifacts"
     else
       mkdir -p /tmp/whtest/
       ARTIFACTS="$(mktemp -d /tmp/whtest/test.XXXXXXXXX)"
