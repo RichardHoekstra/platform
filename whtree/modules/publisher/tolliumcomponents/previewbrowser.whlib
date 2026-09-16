@@ -162,7 +162,7 @@ PUBLIC STATIC OBJECTTYPE PreviewBrowser EXTEND TolliumFragmentBase <
     BOOLEAN isfilelink := selectedfile.type IN [ whconstant_whfstype_internallink, whconstant_whfstype_contentlink ];
     RECORD targetfile := isfilelink ? RECORD(SELECT id, name, type, published, filelink, parentsite FROM system.fs_objects WHERE id = selectedfile.filelink AND isactive) ?? selectedfile : selectedfile;
     RECORD typeinfo := DescribeContentTypeById(targetfile.type, [ isfolder := FALSE, mockifmissing := TRUE ]);
-    BOOLEAN ishtml := typeinfo.needstemplate OR (targetfile.type = whconstant_whfstype_imagefile AND ToUppercase(GetExtensionFromPath(selectedfile.name)) IN [".HTM", ".HTML", ".SHTML"]);
+    BOOLEAN ishtml := typeinfo.needstemplate;
 
     //Figure out how to show the file
     STRING url;
