@@ -446,6 +446,8 @@ if [ -z "$USEPODMAN" ] && ! which docker > /dev/null && which podman > /dev/null
   USEPODMAN="1"
 fi
 
+export USEPODMAN
+
 IMPLICITARGS=()
 if [ -n "$ISMODULETEST" ]; then
   [ -z "$ISPACKAGETEST" ] || die "Cannot specify both --jspackage and --m"
