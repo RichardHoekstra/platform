@@ -112,11 +112,7 @@ fi
 
 if ! wh run mod::platform/scripts/bootstrap/test-puppeteer.ts ; then
   echo "Screenshot failed. The browser may be broken? (architecture = $(uname -m))"
-  if [ "$(uname -m)" == "aarch64" ]; then
-    echo "Ignoring on linux ARM (aarch64) - puppeteer and thus WebHare is unsupported there. See also https://github.com/puppeteer/puppeteer/issues/7740"
-  else
-    exit 1
-  fi
+  exit 1
 fi
 
 export WEBHARE_HARESCRIPT_OFF= # Re-enable HS
