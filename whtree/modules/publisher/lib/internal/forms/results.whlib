@@ -926,7 +926,7 @@ PUBLIC RECORD FUNCTION ExportFormResults(INTEGER formid, RECORD options DEFAULTS
     archive->AddFile(blobfile.name, blobfile.data, now);
   BLOB data := archive->MakeBlob();
   archive->Close();
-  RETURN WrapBlob(data, `formexport-${formid}-${FormatDatetime("%Y%m%d", now)}.zip`);
+  RETURN WrapBlob(data, `formexport-${formid}-${FormatDatetime("%Y%m%d", now)}.whformresults`);
 }
 
 PUBLIC RECORD FUNCTION ImportFormResults(BLOB data, RECORD options DEFAULTSTO DEFAULT RECORD)
