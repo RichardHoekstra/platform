@@ -27,7 +27,7 @@ test.runTests(
 
     "Start forgot password sequence",
     async function () {
-      await test.clickToLoad('.wh-wrdauth-login__forgotpasswordlink');
+      await test.expectLoad(() => test.click('.wh-wrdauth-login__forgotpasswordlink'));
 
       const resetpwd = await testwrd.openResetPassword({ email: 'pietje-authpages-js@beta.webhare.net' });
 
@@ -115,13 +115,13 @@ test.runTests(
 
     "verify whether the new password works",
     async function () {
-      await test.clickToLoad('#logoutlink');
+      await test.expectLoad(() => test.click('#logoutlink'));
 
       await testwrd.tryLogin('pietje-authpages-js@beta.webhare.net', 'mylittlesecret$');
 
       test.assert(test.hasFocus(test.qR('[name="password"]')));
       test.fill(test.qR('[name="password"]'), 'secret3$');
-      await test.clickToLoad('.wh-wrdauth-login__loginbutton');
+      await test.expectLoad(() => test.click('.wh-wrdauth-login__loginbutton'));
     },
 
     async function () {
@@ -206,7 +206,7 @@ test.runTests(
     "Verify new email works",
     async function () {
       test.fill(test.qR('[name="login"]'), 'pietjenieuw-authpages-js@beta.webhare.net');
-      await test.clickToLoad('.wh-wrdauth-login__loginbutton');
+      await test.expectLoad(() => test.click('.wh-wrdauth-login__loginbutton'));
 
       test.assert(test.qR('#isloggedin').checked);
     },
@@ -241,7 +241,7 @@ test.runTests(
 
     "logincontrol test",
     async function () {
-      await test.clickToLoad('#logoutlink');
+      await test.expectLoad(() => test.click('#logoutlink'));
 
       await test.invoke('mod::webhare_testsuite/lib/internal/testsite.whlib#ClearLoginsForURL', test.getTestSiteRoot() + "testpages/wrdauthtest-router-protected/accessruleprotected/");
 
@@ -255,7 +255,7 @@ test.runTests(
       test.eq(/THE CODE PROTECTED CONTENT/, test.qR("#content").textContent);
 
       await test.load(test.getTestSiteRoot() + "testpages/wrdauthtest-router/");
-      await test.clickToLoad('#logoutlink');
+      await test.expectLoad(() => test.click('#logoutlink'));
 
       await test.load(test.getTestSiteRoot() + "testpages/wrdauthtest-router-protected/accessruleprotected/");
       console.log('frame url', test.getWin().location.href);
@@ -264,12 +264,12 @@ test.runTests(
       // login with (new) email and password
       test.fill(test.qR('[name="login"]'), 'pietjenieuw-authpages-js@beta.webhare.net');
       test.fill(test.qR('[name="password"]'), newPasswordAfterHIBP);
-      await test.clickToLoad('.wh-wrdauth-login__loginbutton');
+      await test.expectLoad(() => test.click('.wh-wrdauth-login__loginbutton'));
 
       test.assert(test.getWin().location.href.startsWith(test.getTestSiteRoot() + "testpages/wrdauthtest-router-protected/accessruleprotected/"));
       test.eq(/THE ACCESSRULE PROTECTED CONTENT/, test.qR("#content").textContent);
 
-      await test.clickToLoad('#logoutlink');
+      await test.expectLoad(() => test.click('#logoutlink'));
     },
 
     "Test login widget with totp",

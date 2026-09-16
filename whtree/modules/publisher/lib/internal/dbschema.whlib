@@ -58,7 +58,6 @@ PUBLIC SCHEMA
     < INTEGER "id" NULL := 0
     , INTEGER "status"
     , INTEGER "form_fsobject" NULL := 0
-    , STRING "form_name"
     , STRING "guid"
     , INTEGER "replacedby" NULL := 0
     , STRING "url"

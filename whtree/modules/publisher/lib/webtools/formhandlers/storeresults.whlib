@@ -114,7 +114,7 @@ PUBLIC OBJECTTYPE StoreResultsHandler EXTEND FormHandlerBase <
     }
 
     // Broadcast an event on successful commit, so the results list can be updated
-    GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${ObjectExists(formobject) ? formobject->id : 0}.${form->__form.name}`, DEFAULT RECORD);
+    GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${ObjectExists(formobject) ? formobject->id : 0}.`, DEFAULT RECORD);
 
     //First get the old result... so we don't see our new result when scanning for the old one
     INTEGER oldresultid;
@@ -123,7 +123,6 @@ PUBLIC OBJECTTYPE StoreResultsHandler EXTEND FormHandlerBase <
                        FROM publisher.formresults
                       WHERE formresults.form_fsobject = (ObjectExists(formobject) ? formobject->id : 0)
                             AND formresults.guid = options.guid
-                            AND formresults.form_name = form->__form.name
                             AND status = VAR whconstant_formstatus_final;
 
     // Store the results
@@ -166,7 +165,6 @@ PUBLIC OBJECTTYPE StoreResultsHandler EXTEND FormHandlerBase <
       INSERT CELL [...formdata
                   , id            := resultid
                   , form_fsobject
-                  , form_name     := form->__form.name
                   , result.result.guid
                   , url           := Left(form->formurl, 1024)
                   , when

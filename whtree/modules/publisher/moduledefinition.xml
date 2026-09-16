@@ -241,9 +241,7 @@
       <d:integer name="form_fsobject" nullable="false" ondelete="cascade" references="system.fs_objects">
         <d:documentation>The fs_object which is the form file.</d:documentation>
       </d:integer>
-      <d:varchar name="form_name" maxlength="64">
-        <d:documentation>The name of the form within the form file.</d:documentation>
-      </d:varchar>
+      <d:obsoletecolumn name="form_name" />
       <d:varchar name="guid" maxlength="22" nullable="false">
         <d:documentation>GUID of this result, unique within all form results.</d:documentation>
       </d:varchar>

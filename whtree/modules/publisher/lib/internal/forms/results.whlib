@@ -64,7 +64,6 @@ RECORD ARRAY FUNCTION GetAllRows(INTEGER fsobjectid, STRING formname, BOOLEAN sh
               , __spam := status = VAR whconstant_formstatus_spam
           FROM publisher.formresults
          WHERE form_fsobject = VAR fsobjectid
-               AND form_name = VAR formname
                AND (Length(limitresultids) > 0 ? id IN limitresultids : TRUE)
                AND (showexpiredresults OR expiration > now)
                AND (status = VAR whconstant_formstatus_final
@@ -86,7 +85,6 @@ PUBLIC INTEGER FUNCTION GetFinalResultId(INTEGER objectid, STRING formname, STRI
                             FROM publisher.formresults
                            WHERE form_fsobject = VAR objectid
                                  AND COLUMN guid = VAR guid
-                                 AND form_name = VAR formname
                                  AND (options.showexpiredresults OR expiration > GetCurrentDatetime());
 
   WHILE (RecordExists(storedresults) AND storedresults.status = whconstant_formstatus_nolongervalid) //chase 4=replacedby - note that replaceby is deprecated!
@@ -319,7 +317,6 @@ STATIC OBJECTTYPE WHFSForm <
   PUBLIC BOOLEAN FUNCTION HasSpam() {
     RETURN RecordExists(SELECT FROM publisher.formresults
                               WHERE formresults.form_fsobject = this->whfsobject->id
-                                    AND formresults.form_name = this->formname
                                     AND status = VAR whconstant_formstatus_spam);
   }
 
@@ -339,7 +336,6 @@ STATIC OBJECTTYPE WHFSForm <
         SELECT AS INTEGER Count(*)
           FROM publisher.formresults
          WHERE formresults.form_fsobject = this->whfsobject->id
-               AND formresults.form_name = this->formname
                AND (options.showspam OR status != VAR whconstant_formstatus_spam)
                AND (options.showexpiredresults OR expiration > GetCurrentDatetime())
                AND (status = VAR whconstant_formstatus_final OR (options.showpendingresults AND status = VAR whconstant_formstatus_pendingconfirmation));
@@ -520,14 +516,14 @@ STATIC OBJECTTYPE WHFSForm <
   PUBLIC MACRO DeleteResultsById(INTEGER ARRAY deleteids)
   {
     DELETE FROM publisher.formresults
-           WHERE id IN deleteids AND form_fsobject = this->whfsobject->id AND form_name = this->formname;
-    GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${this->whfsobject->id}.${this->formname}`, DEFAULT RECORD);
+           WHERE id IN deleteids AND form_fsobject = this->whfsobject->id;
+    GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${this->whfsobject->id}`, DEFAULT RECORD);
   }
   PUBLIC MACRO DeleteAllResults()
   {
     DELETE FROM publisher.formresults
-           WHERE form_fsobject = this->whfsobject->id AND form_name = this->formname;
-    GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${this->whfsobject->id}.${this->formname}`, DEFAULT RECORD);
+           WHERE form_fsobject = this->whfsobject->id;
+    GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${this->whfsobject->id}`, DEFAULT RECORD);
   }
 
   PUBLIC RECORD FUNCTION MatchFormCondition(RECORD condition, RECORD result)
@@ -541,7 +537,7 @@ STATIC OBJECTTYPE WHFSForm <
   */
   PUBLIC STRING ARRAY FUNCTION GetEventMasks()
   {
-    RETURN [ `publisher:formwebtoolresult.${this->whfsobject->id}.${this->formname}` ];
+    RETURN [ `publisher:formwebtoolresult.${this->whfsobject->id}` ];
   }
 
   /** Export form results
@@ -871,14 +867,13 @@ PUBLIC MACRO RecalculateFormResultsExpirationDates(INTEGER formid)
        , deletion :=   AddDaysToDate(days.processresults, when)
    WHERE form_fsobject = formid;
 
-  FOREVERY (STRING formname FROM SELECT AS STRING ARRAY DISTINCT form_name FROM publisher.formresults WHERE form_fsobject = formid)
-    GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${formid}.${formname}`, DEFAULT RECORD);
+  GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${formid}`, DEFAULT RECORD);
 }
 
 PUBLIC RECORD ARRAY FUNCTION DeleteExpiredFormResults(INTEGER formid)
 {
   RECORD ARRAY todelete :=
-      SELECT id, form_fsobject, form_name
+      SELECT id, form_fsobject
         FROM publisher.formresults
    WHERE deletion != DEFAULT DATETIME
          AND deletion < GetCurrentDatetime()
@@ -888,13 +883,12 @@ PUBLIC RECORD ARRAY FUNCTION DeleteExpiredFormResults(INTEGER formid)
 
   todelete :=
       SELECT id := form_fsobject
-           , name := form_name
            , deleted := Length(GroupedValues(todelete))
         FROM todelete
-       GROUP BY form_fsobject, form_name;
+       GROUP BY form_fsobject;
 
   FOREVERY (RECORD form FROM todelete)
-    GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${form.id}.${form.name}`, DEFAULT RECORD);
+    GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${form.id}`, DEFAULT RECORD);
 
   RETURN todelete;
 }
@@ -903,7 +897,7 @@ PUBLIC RECORD FUNCTION ExportFormResults(INTEGER formid, RECORD options DEFAULTS
 {
   options := ValidateOptions(
       [ formname := "webtoolform" ], options);
-  RECORD ARRAY results := SELECT * FROM publisher.formresults WHERE form_fsobject = formid AND form_name = options.formname;
+  RECORD ARRAY results := SELECT * FROM publisher.formresults WHERE form_fsobject = formid;
   IF (NOT RecordExists(results))
     RETURN DEFAULT RECORD;
 
@@ -1027,6 +1021,6 @@ PUBLIC RECORD FUNCTION ImportFormResults(BLOB data, RECORD options DEFAULTSTO DE
     }
   }
 
-  GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${status.formid}.${result.formname}`, DEFAULT RECORD);
+  GetPrimary()->BroadcastOnCommit(`publisher:formwebtoolresult.${status.formid}`, DEFAULT RECORD);
   RETURN CELL[ ...status, success := TRUE ];
 }

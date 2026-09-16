@@ -274,8 +274,7 @@ PUBLIC STATIC OBJECTTYPE WebtoolFormBase EXTEND FormBase <
              , results := ReadAnyFromDatabase(results, blobresults)
           FROM publisher.formresults
          WHERE form_fsobject = this->__form.webtoolformid
-               AND COLUMN guid = confirmguid
-               AND form_name = "webtoolform";
+               AND COLUMN guid = confirmguid;
 
     IF(NOT RecordExists(match))
       THROW NEW Exception(`Cannot find entry '${confirmguid}' to confirm`);

@@ -10,6 +10,11 @@ fi
 
 cd "${BASH_SOURCE%/*}" || exit 1
 
+CONTAINERENGINE=docker
+if [ "$USEPODMAN" == "1" ]; then
+  CONTAINERENGINE=podman
+fi
+
 get_finaltag
 list_finaltag
 
@@ -23,15 +28,15 @@ echo "-----------------------------------------------------------------------"
 # branch images
 for P in $BRANCH_IMAGES; do
   # we can't tag an image without pulling it first, even though we really don't care about the image data..
-  if ! $SUDO docker pull $BUILD_IMAGE ; then
+  if ! $SUDO "$CONTAINERENGINE" pull "$BUILD_IMAGE" ; then
     echo "Pulling $P failed"
     exit 1
   fi
-  if ! $SUDO docker tag $BUILD_IMAGE $P ; then
+  if ! $SUDO "$CONTAINERENGINE" tag "$BUILD_IMAGE" "$P" ; then
     echo "Tagging $P failed"
     exit 1
   fi
-  if ! $SUDO docker push "$P" ; then
+  if ! $SUDO "$CONTAINERENGINE" push "$P" ; then
     echo Push of $P failed
     exit 1
   fi
@@ -39,8 +44,8 @@ done
 
 function logout()
 {
-  [ -n "$DOCKERHUB_REGISTRY_USER" ] && docker logout
-  [ -n "$FALLBACK_REGISTRY_IMAGE" ] && docker logout $FALLBACK_REGISTRY_IMAGE
+  [ -n "$DOCKERHUB_REGISTRY_USER" ] && "$CONTAINERENGINE" logout
+  [ -n "$FALLBACK_REGISTRY_IMAGE" ] && "$CONTAINERENGINE" logout "$FALLBACK_REGISTRY_IMAGE"
 }
 
 trap logout exit INT TERM
@@ -48,13 +53,13 @@ trap logout exit INT TERM
 if [ -n "$PUBLIC_IMAGES" ]; then
   echo "-----------------------------------------------------------------------"
   echo "Tagging and pushing external images"
-  if ! echo $DOCKERHUB_REGISTRY_PASSWORD | docker login -u $DOCKERHUB_REGISTRY_USER --password-stdin ; then
+  if ! echo "$DOCKERHUB_REGISTRY_PASSWORD" | "$CONTAINERENGINE" login -u "$DOCKERHUB_REGISTRY_USER" --password-stdin ; then
     echo "Failed to log in to the registry"
     exit 1
   fi
 
   if [ -n "$FALLBACK_REGISTRY_IMAGE" ] && [ -n "$FALLBACK_REGISTRY_PASSWORD" ]; then
-    if ! echo $FALLBACK_REGISTRY_PASSWORD | docker login -u $FALLBACK_REGISTRY_USER --password-stdin $FALLBACK_REGISTRY_IMAGE ; then
+    if ! echo "$FALLBACK_REGISTRY_PASSWORD" | "$CONTAINERENGINE" login -u "$FALLBACK_REGISTRY_USER" --password-stdin "$FALLBACK_REGISTRY_IMAGE" ; then
       echo "Failed to log in to the fallback registry"
       exit 1
     fi
@@ -63,11 +68,11 @@ if [ -n "$PUBLIC_IMAGES" ]; then
   for P in $PUBLIC_IMAGES ; do
     echo Tagging BUILD_IMAGE as public $P
 
-    if ! docker tag "$BUILD_IMAGE" "$P" ; then
+    if ! "$CONTAINERENGINE" tag "$BUILD_IMAGE" "$P" ; then
       echo Tag for external registry failed
       exit 1
     fi
-    if ! docker push "$P" ; then
+    if ! "$CONTAINERENGINE" push "$P" ; then
       echo Push to external registry failed
       exit 1
     fi

@@ -1,7 +1,12 @@
 .wh-hserror__resourceref
 {
   cursor: pointer;
+  color: blueviolet;
 
+  &::before {
+    // make it more clear you can jump. we can probably come up with something better?
+    content: "↠ ";
+  }
   &:hover
   {
     text-decoration:underline;
