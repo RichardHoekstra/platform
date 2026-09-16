@@ -22,3 +22,6 @@ declare global {
 export function getAssetPackBase(assetpack: string) {
   return `/.wh/ea/ap/${assetpack.replace(':', '.')}/`;
 }
+
+/** The path to devkit's debug package */
+export const devkitDebugPath = `/.wh/mod/devkit/public/debug.mjs`;
