@@ -2156,6 +2156,7 @@
         <text tid="results">Results</text>
         <text tid="showexpiredresults">Show expired results</text>
         <text tid="showpendingresults">Show unconfirmed results</text>
+        <text tid="showspam">Show spam</text>
         <text tid="singleresult">Result</text>
         <text tid="test">Test result</text>
         <text tid="url">Form location</text>

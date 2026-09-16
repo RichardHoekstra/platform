@@ -149,7 +149,7 @@ export async function getDefinitions(docs: DocumentsLike, e: TextDocumentPositio
   console.log("Got definitionRequest for", keyword);
 
   //Does this look like a resource path?
-  if (keyword.includes('.ts') || keyword.includes('.tsx') || keyword.includes('.whlib')) {
+  if (keyword.includes('.ts') || keyword.includes('.tsx') || keyword.includes('.whlib') || keyword.includes('.witty')) {
     const [, file, symbol] = keyword.match(/^([^#]+)(?:[#](.*))?$/) || [];
     let finallocation;
     if (isAbsoluteResource(file)) {

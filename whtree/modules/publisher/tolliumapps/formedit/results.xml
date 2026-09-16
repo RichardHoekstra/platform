@@ -45,9 +45,6 @@
                 selectmode="multiple"
                 sortascending="false"
                 sortcolumn="when">
-            <style name="pending" textcolor="#888888" />
-            <style name="expired" textcolor="#888888" />
-
             <!-- Columns are inserted dynamically -->
           </list>
         </cell>
@@ -82,6 +79,8 @@
             <checkbox name="showpendingresults" labeltid=".showpendingresults" onchange="onshowpendingresults" title="" />
             <spacer name="showpendingspacer" width="1x" />
             <checkbox name="showexpiredresults" labeltid=".showexpiredresults" onchange="onshowexpiredresults" title="" />
+            <spacer name="showspamspacer" width="1x" />
+            <checkbox name="showspam" labeltid=".showspam" onchange="onshowspam" title="" />
           </line>
         </cell>
         <cell>

@@ -46,7 +46,7 @@ RECORD ARRAY FUNCTION GatherToConvertList(RECORD ARRAY rows, RECORD field)
   RETURN conversionlist;
 }
 
-RECORD ARRAY FUNCTION GetAllRows(INTEGER fsobjectid, STRING formname, BOOLEAN showpendingresults, BOOLEAN showexpiredresults, INTEGER ARRAY limitresultids)
+RECORD ARRAY FUNCTION GetAllRows(INTEGER fsobjectid, STRING formname, BOOLEAN showpendingresults, BOOLEAN showexpiredresults, BOOLEAN showspam, INTEGER ARRAY limitresultids)
 {
   DATETIME now := GetCurrentDateTime();
   RETURN SELECT id
@@ -61,12 +61,15 @@ RECORD ARRAY FUNCTION GetAllRows(INTEGER fsobjectid, STRING formname, BOOLEAN sh
               , __resultrow := ReadAnyFromDatabase(results, blobresults)
               , __expired := expiration <= now
               , __pending := status = VAR whconstant_formstatus_pendingconfirmation
+              , __spam := status = VAR whconstant_formstatus_spam
           FROM publisher.formresults
          WHERE form_fsobject = VAR fsobjectid
                AND form_name = VAR formname
                AND (Length(limitresultids) > 0 ? id IN limitresultids : TRUE)
                AND (showexpiredresults OR expiration > now)
-               AND (status = VAR whconstant_formstatus_final OR (showpendingresults AND status = VAR whconstant_formstatus_pendingconfirmation))
+               AND (status = VAR whconstant_formstatus_final
+                    OR (showpendingresults AND status = VAR whconstant_formstatus_pendingconfirmation)
+                    OR (showspam AND status = VAR whconstant_formstatus_spam))
          ORDER BY when;
 }
 
@@ -106,8 +109,7 @@ PUBLIC INTEGER FUNCTION GetFinalResultId(INTEGER objectid, STRING formname, STRI
   RETURN 0;
 }
 
-STATIC OBJECTTYPE FormResultExporter
-<
+STATIC OBJECTTYPE FormResultExporter <
   RECORD ARRAY formfields;
   RECORD ARRAY pvt_columns;
   RECORD exportoptions;
@@ -117,10 +119,11 @@ STATIC OBJECTTYPE FormResultExporter
 
   PUBLIC BOOLEAN showpendingresults;
   PUBLIC BOOLEAN showexpiredresults;
+  PUBLIC BOOLEAN showspam;
 
   PUBLIC PROPERTY columns(GetColumns, -);
 
-  MACRO NEW(OBJECT whfsform, RECORD ARRAY formfields, RECORD ARRAY cols, RECORD exportoptions, INTEGER fsobjectid, STRING formname, BOOLEAN showpendingresults, BOOLEAN showexpiredresults)
+  MACRO NEW(OBJECT whfsform, RECORD ARRAY formfields, RECORD ARRAY cols, RECORD exportoptions, INTEGER fsobjectid, STRING formname, BOOLEAN showpendingresults, BOOLEAN showexpiredresults, BOOLEAN showspam)
   {
     this->whfsform := whfsform;
     this->formfields := formfields;
@@ -130,6 +133,7 @@ STATIC OBJECTTYPE FormResultExporter
     this->formname := formname;
     this->showpendingresults := showpendingresults;
     this->showexpiredresults := showexpiredresults;
+    this->showspam := showspam;
   }
 
   RECORD ARRAY FUNCTION GetColumns()
@@ -168,7 +172,7 @@ STATIC OBJECTTYPE FormResultExporter
   PUBLIC RECORD ARRAY FUNCTION ExportAllResults(RECORD options DEFAULTSTO DEFAULT RECORD)
   {
     options := ValidateOptions([ resultids := INTEGER[] ], options);
-    RECORD ARRAY rows := GetAllRows(this->fsobjectid, this->formname, this->showpendingresults, this->showexpiredresults, options.resultids);
+    RECORD ARRAY rows := GetAllRows(this->fsobjectid, this->formname, this->showpendingresults, this->showexpiredresults, this->showspam, options.resultids);
     IF (Length(rows) = 0)
       RETURN DEFAULT RECORD ARRAY;
 
@@ -283,8 +287,7 @@ STATIC OBJECTTYPE FormResultExporter
   }
 >;
 
-STATIC OBJECTTYPE WHFSForm
-<
+STATIC OBJECTTYPE WHFSForm <
   OBJECT whfsobject;
   STRING formname;
   //RECORD ARRAY formfields;
@@ -295,6 +298,7 @@ STATIC OBJECTTYPE WHFSForm
 
   PUBLIC BOOLEAN showpendingresults;
   PUBLIC BOOLEAN showexpiredresults;
+  PUBLIC BOOLEAN showspam;
 
   PUBLIC PROPERTY __formname(formname, -); // Used by DoExportResultsForMigration
   PUBLIC PROPERTY __formdef(formdef, -); // Used by RunFormResultsDialog
@@ -312,6 +316,13 @@ STATIC OBJECTTYPE WHFSForm
     this->initcustomform := initcustomform;
   }
 
+  PUBLIC BOOLEAN FUNCTION HasSpam() {
+    RETURN RecordExists(SELECT FROM publisher.formresults
+                              WHERE formresults.form_fsobject = this->whfsobject->id
+                                    AND formresults.form_name = this->formname
+                                    AND status = VAR whconstant_formstatus_spam);
+  }
+
   PUBLIC OBJECT FUNCTION GetStorageObject()
   {
     RETURN this->whfsobject;
@@ -322,13 +333,14 @@ STATIC OBJECTTYPE WHFSForm
     options := ValidateOptions(
         [ showpendingresults := this->showpendingresults
         , showexpiredresults := this->showexpiredresults
+        , showspam := this->showspam
         ], options);
     RETURN
         SELECT AS INTEGER Count(*)
           FROM publisher.formresults
          WHERE formresults.form_fsobject = this->whfsobject->id
                AND formresults.form_name = this->formname
-               AND status != VAR whconstant_formstatus_spam
+               AND (options.showspam OR status != VAR whconstant_formstatus_spam)
                AND (options.showexpiredresults OR expiration > GetCurrentDatetime())
                AND (status = VAR whconstant_formstatus_final OR (options.showpendingresults AND status = VAR whconstant_formstatus_pendingconfirmation));
   }
@@ -536,8 +548,7 @@ STATIC OBJECTTYPE WHFSForm
       @cell options.fsobjectid ID of whfsobject containing results, needed if this formdef is based on eg a draft form
       @return(object #FormResultExporter) Form result exporter
   */
-  PUBLIC OBJECT FUNCTION CreateExporter(RECORD options DEFAULTSTO DEFAULT RECORD)
-  {
+  PUBLIC OBJECT FUNCTION CreateExporter(RECORD options DEFAULTSTO DEFAULT RECORD) {
     options := ValidateOptions([ language := GetTidLanguage()
                                , isfullexport := TRUE
                                , formfields := RECORD[]
@@ -545,6 +556,7 @@ STATIC OBJECTTYPE WHFSForm
                                , inlineattachments := FALSE
                                , showpendingresults := this->showpendingresults
                                , showexpiredresults := this->showexpiredresults
+                               , showspam := this->showspam
                                , showsensitivefields := TRUE
                                ], options, [ optional := ["formfields"]]);
 
@@ -593,8 +605,7 @@ STATIC OBJECTTYPE WHFSForm
       DELETE FROM columns WHERE name IN ["ipaddress","useragent","url"];
 
     RECORD ARRAY resultcolumns;
-    FOREVERY (RECORD field FROM formfields)
-    {
+    FOREVERY (RECORD field FROM formfields) {
       STRING storename := field.guid ?? field.name;
       RECORD exportoptions := CELL[...options, storename ];
       RECORD ARRAY outcolumns := field.obj->GetResultColumns(exportoptions);
@@ -618,7 +629,7 @@ STATIC OBJECTTYPE WHFSForm
     }
 
     columns := columns CONCAT resultcolumns;
-    RETURN NEW FormResultExporter(this, formfields, columns, options, this->whfsobject->id, this->formname, options.showpendingresults, options.showexpiredresults);
+    RETURN NEW FormResultExporter(this, formfields, columns, options, this->whfsobject->id, this->formname, options.showpendingresults, options.showexpiredresults, options.showspam);
   }
 
   PUBLIC RECORD ARRAY FUNCTION ListResults(RECORD options DEFAULTSTO DEFAULT RECORD)
@@ -627,6 +638,7 @@ STATIC OBJECTTYPE WHFSForm
                                , isfullexport := TRUE
                                , showpendingresults := this->showpendingresults
                                , showexpiredresults := this->showexpiredresults
+                               , showspam := this->showspam
                                , language := GetTidLanguage()
                                ], options);
 
@@ -644,7 +656,7 @@ STATIC OBJECTTYPE WHFSForm
       INSERT matchfield INTO getfields AT END;
     }
 
-    RECORD ARRAY rows := GetAllRows(this->whfsobject->id, this->formname, options.showpendingresults, options.showexpiredresults, INTEGER[]);
+    RECORD ARRAY rows := GetAllRows(this->whfsobject->id, this->formname, options.showpendingresults, options.showexpiredresults, options.showspam, INTEGER[]);
     IF (Length(rows) = 0)
       RETURN DEFAULT RECORD ARRAY;
 

@@ -16,8 +16,8 @@ LOADLIB "mod::publisher/lib/database.whlib";
 LOADLIB "mod::publisher/lib/internal/forms/results.whlib";
 
 
-PUBLIC STATIC OBJECTTYPE Results EXTEND TolliumScreenBase
-< // ---------------------------------------------------------------------------
+PUBLIC STATIC OBJECTTYPE Results EXTEND TolliumScreenBase <
+  // ---------------------------------------------------------------------------
   //
   // Variables
   //
@@ -42,16 +42,17 @@ PUBLIC STATIC OBJECTTYPE Results EXTEND TolliumScreenBase
     this->fsobjid := data.fsobjid;
     this->form := data.formobj;
     this->language := data.uselanguage;
+    this->formresults := CellExists(data, "formresults") ? data.formresults : OpenWebtoolFormResultsForFormdef(OpenWHFSObject(this->fsobjid), data.formname, this->form, CELL[ data.initcustomform ]);
     //Note current formfields. Ignore any changes to the form as long as we're open
     //ADDME allow user to pick columns?
 
     ^showpendingresults->visible := data.showpending AND this->frame->flags.issupervisor;
     ^showpendingspacer->visible := data.showpending AND this->frame->flags.issupervisor;
     ^showexpiredresults->visible := this->frame->flags.issupervisor;
+    ^showspam->visible := this->frame->flags.issupervisor AND this->formresults->HasSpam();
     ^migrationexportbutton->visible := this->frame->flags.issupervisor;
     ^migrationimportbutton->visible := this->frame->flags.issupervisor;
 
-    this->formresults := CellExists(data, "formresults") ? data.formresults : OpenWebtoolFormResultsForFormdef(OpenWHFSObject(this->fsobjid), data.formname, this->form, CELL[ data.initcustomform ]);
     this->exporter := this->formresults->CreateExporter( [ language := data.uselanguage
                                                          , isfullexport := FALSE //don't need extended data
                                                          , formfields := SELECT *, title := DecodeHTML(GetHTMLTid(title)) FROM this->form->ListFields([ applytester := this->contexts->applytester, languagecode := data.uselanguage ]) LIMIT 5
@@ -158,6 +159,7 @@ PUBLIC STATIC OBJECTTYPE Results EXTEND TolliumScreenBase
                                                           , isfullexport := TRUE
                                                           , showpendingresults := TRUE
                                                           , showexpiredresults := TRUE
+                                                          , showspam := TRUE
                                                           , inlineattachments := TRUE
                                                           ]);
     RECORD data := exporter->ExportAllResults([ resultids := INTEGER[^results->selection.id]]);
@@ -329,6 +331,12 @@ PUBLIC STATIC OBJECTTYPE Results EXTEND TolliumScreenBase
     this->ReloadResults();
   }
 
+  MACRO OnShowSpam() {
+    this->formresults->showspam := ^showspam->value;
+    this->exporter->showspam := ^showspam->value;
+    this->ReloadResults();
+  }
+
   // ---------------------------------------------------------------------------
   //
   // Helper functions
@@ -340,7 +348,7 @@ PUBLIC STATIC OBJECTTYPE Results EXTEND TolliumScreenBase
     RECORD ARRAY rows :=
         SELECT *
              , rowkey := id
-             , style := CellExists(results, "__expired") AND __expired ? "expired" : CellExists(results, "__pending") AND __pending ? "pending" : ""
+             , listrowclasses := (CellExists(results, "__expired") AND __expired) OR (CellExists(results, "__pending") AND results.__pending) OR __spam ? ["grayedout"] : STRING[]
              , canrerun := results.__rowmeta.submittype != "" // Rerun is only possible if the form submit type is stored with the result
           FROM this->exporter->ExportAllResults() AS results;
     FOREVERY (STRING col FROM this->boolean_columns)

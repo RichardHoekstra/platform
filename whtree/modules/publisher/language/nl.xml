@@ -2154,6 +2154,7 @@
         <text tid="results">Resultaten</text>
         <text tid="showexpiredresults">Verlopen resultaten tonen</text>
         <text tid="showpendingresults">Onbevestigde resultaten tonen</text>
+        <text tid="showspam">Toon spam</text>
         <text tid="singleresult">Resultaat</text>
         <text tid="test">Resultaat testen</text>
         <text tid="url">Formulierlocatie</text>
