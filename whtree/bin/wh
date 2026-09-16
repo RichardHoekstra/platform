@@ -266,16 +266,16 @@ if [ "$INSTR" == "umic" ]; then # umic attempts to update WebHare from git. do t
 
       # Rename local master to main if it still exists.
       if git -C "$WEBHARE_CHECKEDOUT_TO" show-ref --verify --quiet "refs/heads/master"; then
-        git branch -m master main
+        git -C "$WEBHARE_CHECKEDOUT_TO" branch -m master main
       fi
 
       # Re-link local main to remote main.
       if git -C "$WEBHARE_CHECKEDOUT_TO" show-ref --verify --quiet "refs/heads/main"; then
-        git branch -u origin/main main
+        git -C "$WEBHARE_CHECKEDOUT_TO" branch -u origin/main main
       fi
 
       # Update local HEAD reference.
-      git remote set-head origin -a || true
+      git -C "$WEBHARE_CHECKEDOUT_TO" remote set-head origin -a || true
     fi
   fi
 
