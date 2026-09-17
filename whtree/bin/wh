@@ -252,10 +252,35 @@ setup_for_console()
 
 if [ "$INSTR" == "umic" ]; then # umic attempts to update WebHare from git. do this ASAP - we might be pulling in important bugfixes to the rest of the process
   [ -d "${WEBHARE_CHECKEDOUT_TO}/.git" ] || die "No .git folder in $WEBHARE_CHECKEDOUT_TO, cannot update WebHare"
+
   WEBHARE_BRANCH="$(git -C "$WEBHARE_CHECKEDOUT_TO" symbolic-ref --short HEAD)"
 
-  # Update automatically only when current branch is 'master' or 'release/*'
-  if [[ "$WEBHARE_BRANCH" =~ ^master$|^release/ ]]; then
+  # Prepare us for a switchover to branch 'main'
+  if [[ "$WEBHARE_BRANCH" == "master" ]]; then
+    # Ensure remote refs are fresh before deciding whether origin/main exists.
+    git -C "$WEBHARE_CHECKEDOUT_TO" fetch --all --prune || true
+
+    # Check if origin has a branch named 'main'
+    if git -C "$WEBHARE_CHECKEDOUT_TO" show-ref --verify --quiet "refs/remotes/origin/main"; then
+      WEBHARE_BRANCH="main"
+
+      # Rename local master to main if it still exists.
+      if git -C "$WEBHARE_CHECKEDOUT_TO" show-ref --verify --quiet "refs/heads/master"; then
+        git -C "$WEBHARE_CHECKEDOUT_TO" branch -m master main
+      fi
+
+      # Re-link local main to remote main.
+      if git -C "$WEBHARE_CHECKEDOUT_TO" show-ref --verify --quiet "refs/heads/main"; then
+        git -C "$WEBHARE_CHECKEDOUT_TO" branch -u origin/main main
+      fi
+
+      # Update local HEAD reference.
+      git -C "$WEBHARE_CHECKEDOUT_TO" remote set-head origin -a || true
+    fi
+  fi
+
+  # Update automatically only when current branch is main, master, or release/*
+  if [[ "$WEBHARE_BRANCH" == "main" || "$WEBHARE_BRANCH" == "master" || "$WEBHARE_BRANCH" =~ ^release/ ]]; then
     echo "Update $WEBHARE_CHECKEDOUT_TO"
     git -C "$WEBHARE_CHECKEDOUT_TO" pull --rebase
   fi
