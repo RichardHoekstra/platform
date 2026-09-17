@@ -230,6 +230,10 @@
       <d:integer name="accountlogin" ondelete="set default" references="wrd.attrs">
         <d:documentation>The attribute containing login names for the accounttype</d:documentation>
       </d:integer>
+      <d:integer name="historyhead">
+        <d:documentation>History head: the historyseqnr of the last committed changeset in this schema. Only advances when a
+          transaction that created a changeset commits, so a reader that saw head H has seen every changeset with historyseqnr &lt;= H</d:documentation>
+      </d:integer>
       <d:index name="uniquename" columns="name" unique="true" uppercase="true" />
     </d:table>
 
@@ -372,6 +376,9 @@
       <d:varchar name="userdata" maxlength="2048">
         <d:documentation>Data describing user making these changes (GetUserDataForLogging)</d:documentation>
       </d:varchar>
+      <d:integer name="historyseqnr">
+        <d:documentation>Position of this changeset in the commit order of its schema (see schemas.historyhead). Assigned just before commit</d:documentation>
+      </d:integer>
     </d:table>
 
     <d:table name="changes" parentlinkcolumn="changeset" primarykey="id">
@@ -393,6 +400,10 @@
       <d:varchar name="summary" maxlength="4096">
         <d:documentation>Comma-separated list of changed attributes</d:documentation>
       </d:varchar>
+      <d:integer name="cause" ondelete="set default" references="wrd.changes">
+        <d:documentation>The change that caused this change, if this change is the cascading effect of another change (eg. an entity that
+          was deleted because the entity it was attached to was deleted, or a reference that was dropped because its target was deleted)</d:documentation>
+      </d:integer>
       <d:varchar name="oldsettings" maxlength="4096">
         <d:documentation>Old entity settings, HSON-encoded</d:documentation>
       </d:varchar>

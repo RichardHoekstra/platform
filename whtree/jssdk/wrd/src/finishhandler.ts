@@ -1,6 +1,6 @@
 import { getTypedArray, HareScriptType } from "@webhare/hscompat/src/hson";
 import { emplace } from "@webhare/std";
-import { type FinishHandler, broadcastOnCommit } from "@webhare/whdb";
+import { type FinishHandler, broadcastOnCommit, db, sql } from "@webhare/whdb";
 import { finishHandlerFactory } from "@webhare/whdb/src/impl";
 
 
@@ -8,6 +8,8 @@ class WRDFinishHandler implements FinishHandler {
   linkCheckedSettings = new Set<number>;
   /// Map from wrdschema id to changeset id
   autoChangeSets = new Map<number, number>;
+  /// All changesets created in this work, to be numbered in commit order
+  changeSets: Array<{ wrdSchemaId: number; changeSetId: number }> = [];
   typeChanges = new Map<number, {
     type: number;
     created?: Set<number>;
@@ -21,7 +23,14 @@ class WRDFinishHandler implements FinishHandler {
     name?: boolean;
   }>;
 
-  onBeforeCommit() {
+  async onBeforeCommit() {
+    /* Advance the history head of every schema we created a changeset for, and number the changeset with the new head.
+       This is done as late as possible: the update locks the schema row until commit, which is what serializes the
+       numbering in commit order, so we want to hold that lock only for the duration of the actual commit */
+    for (const { wrdSchemaId, changeSetId } of this.changeSets)
+      await sql`WITH head AS (UPDATE wrd.schemas SET historyhead = historyhead + 1 WHERE id = ${wrdSchemaId} RETURNING historyhead)
+                UPDATE wrd.changesets SET historyseqnr = head.historyhead FROM head WHERE wrd.changesets.id = ${changeSetId}`.execute(db());
+    this.changeSets = [];
     this.autoChangeSets.clear();
 
     // schedule the broadcasts to take place before the commit handlers
@@ -104,6 +113,10 @@ class WRDFinishHandler implements FinishHandler {
 
   setAutoChangeSet(wrdSchemaId: number, changeSetId: number): void {
     this.autoChangeSets.set(wrdSchemaId, changeSetId);
+  }
+
+  changeSetCreated(wrdSchemaId: number, changeSetId: number): void {
+    this.changeSets.push({ wrdSchemaId, changeSetId });
   }
 }
 

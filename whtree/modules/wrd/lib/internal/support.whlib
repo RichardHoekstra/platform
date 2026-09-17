@@ -762,6 +762,9 @@ STATIC OBJECTTYPE WRDEntityCommitHandler EXTEND TransactionFinishHandlerBase <
 
   RECORD ARRAY auto_changesets;
 
+  /// All changesets created in this transaction, to be numbered in commit order
+  RECORD ARRAY changesets;
+
   PUBLIC BOOLEAN metadatachanges;
 
   PUBLIC INTEGER ARRAY datachanges;
@@ -812,6 +815,17 @@ STATIC OBJECTTYPE WRDEntityCommitHandler EXTEND TransactionFinishHandlerBase <
           THROW NEW Exception(issues[0]);
       }
     }
+
+    /* Advance the history head of every schema we created a changeset for, and number the changeset with the new head.
+       This is done as late as possible: the update locks the schema row until commit, which is what serializes the
+       numbering in commit order, so we want to hold that lock only for the duration of the actual commit */
+    FOREVERY (RECORD cs FROM this->changesets)
+    {
+      UPDATE wrd.schemas SET historyhead := historyhead + 1 WHERE id = cs.wrdschema;
+      INTEGER head := SELECT AS INTEGER historyhead FROM wrd.schemas WHERE id = cs.wrdschema;
+      UPDATE wrd.changesets SET historyseqnr := head WHERE id = cs.changeset;
+    }
+    this->changesets := RECORD[];
   }
 
   /** Called when the transaction has committed
@@ -956,6 +970,12 @@ STATIC OBJECTTYPE WRDEntityCommitHandler EXTEND TransactionFinishHandlerBase <
     IF (pos.found)
       DELETE FROM this->auto_changesets AT pos.position;
     INSERT CELL[ wrdschema, changeset ] INTO this->auto_changesets AT pos.position;
+  }
+
+  /// Register a changeset created in this transaction, so it will be numbered in commit order
+  PUBLIC MACRO RegisterChangeSet(INTEGER wrdschema, INTEGER changeset)
+  {
+    INSERT CELL[ wrdschema, changeset ] INTO this->changesets AT END;
   }
 
 >;

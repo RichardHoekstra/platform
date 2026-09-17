@@ -94,6 +94,7 @@ MACRO TestChanges()
     RECORD ARRAY changes := persontype->GetChanges(changesets[1].id);
     TestEQ(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           intfields.wrd_modificationdate
@@ -105,6 +106,7 @@ MACRO TestChanges()
     changes := persontype->GetChanges(changesets[2].id);
     TestEQ(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           postfields.wrd_modificationdate
@@ -214,6 +216,7 @@ MACRO TestChanges()
 
     TestEQ(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           intfields.wrd_modificationdate
@@ -221,6 +224,7 @@ MACRO TestChanges()
           , modifications :=  RemoveIrrelevantColumns(MakeReplacedRecord(prefields, intfields))
           ]
         , [ id :=             changes[1].id
+          , cause :=          0
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           postfields.wrd_modificationdate
@@ -232,6 +236,7 @@ MACRO TestChanges()
     // Test merging changes for the same entity
     TestEQ(
         [ [ id :=             changes[0].id // same id as first change of changeset
+          , cause :=          0
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           intfields.wrd_modificationdate
@@ -268,6 +273,7 @@ MACRO TestChanges()
     RECORD ARRAY changes := schemaobj->^payprov->GetChanges(changesets[0].id);
     TestEQ(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         pm1->id
           , changetype :=     "new"
           , when :=           initfields.wrd_modificationdate
@@ -275,6 +281,7 @@ MACRO TestChanges()
           , modifications :=  RemoveIrrelevantColumns(initfields)
           ]
         , [ id :=             changes[1].id
+          , cause :=          0
           , entity :=         pm1->id
           , changetype :=     "edit"
           , when :=           postfields.wrd_modificationdate
@@ -329,6 +336,7 @@ MACRO TestChanges()
     RECORD ARRAY changes := persontype->GetChanges(changesets[END-1].id, [ mergechanges := TRUE ]);
     TestEQ(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           postfields.wrd_modificationdate
@@ -383,6 +391,7 @@ MACRO TestChanges()
     RECORD ARRAY changes := schemaobj->^wrd_person->GetChanges(changesets[0].id);
     TestEQ(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         tempperson->id
           , changetype :=     "new"
           , when :=           postfields.wrd_modificationdate
@@ -403,6 +412,7 @@ MACRO TestChanges()
     changes := schemaobj->^wrd_person->GetChanges(changesets[1].id);
     TestEQ(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         tempperson->id
           , changetype :=     "close"
           , when :=           postclosefields.wrd_modificationdate
@@ -426,6 +436,7 @@ MACRO TestChanges()
     RECORD ARRAY changes := schemaobj->^wrd_person->GetChanges(changesets[0].id);
     TestEQ(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         immclose->id
           , changetype :=     "newclose"
           , when :=           postimmclosefields.wrd_modificationdate
@@ -450,11 +461,13 @@ MACRO TestChanges()
     RECORD ARRAY changes := schemaobj->^wrd_person->GetChanges(changesets[0].id);
     TestEQMembers(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         p1->id
           , changetype :=     "newclose"
           , oldsettings :=    DEFAULT RECORD
           ]
         , [ id :=             changes[1].id
+          , cause :=          0
           , entity :=         p2->id
           , changetype :=     "newclose"
           , oldsettings :=    DEFAULT RECORD
@@ -464,6 +477,7 @@ MACRO TestChanges()
     RECORD ARRAY fchanges := schemaobj->^wrd_person->GetChanges(changesets[0].id, [ filterentities := INTEGER[ p1->id ] ]);
     TestEQMembers(
         [ [ id :=             changes[0].id
+          , cause :=          0
           , entity :=         p1->id
           , changetype :=     "newclose"
           , oldsettings :=    DEFAULT RECORD

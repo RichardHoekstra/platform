@@ -11,7 +11,7 @@ import { appendToArray, compare, generateRandomId, isPromise, omit } from "@webh
 import { debugFlags } from "@webhare/env/src/envbackend";
 import { isDefaultHareScriptValue, recordRangeIterator } from "@webhare/hscompat/src/algorithms";
 import { getBestMatch, getStackTrace } from "@webhare/js-api-tools";
-import { type Changes, type ChangesWHFSLinks, getWHFSLinksForChanges, mapChangesIdsToRefs, saveEntitySettingAttachments } from "./changes";
+import { type Changes, type ChangesWHFSLinks, getAutoChangeSet, getWHFSLinksForChanges, mapChangesIdsToRefs, saveEntitySettingAttachments, serializeChangeEntity } from "./changes";
 import { wrdFinishHandler } from "./finishhandler";
 import { wrdSettingsGuid } from "./settings";
 import { ValueQueryChecker } from "./checker";
@@ -448,21 +448,6 @@ function isSame(lhs: unknown, rhs: unknown) {
   return false;
 }
 
-async function createChangeSet(wrdSchemaId: number, now: Date): Promise<number> {
-  //OBJECT user := GetEffectiveUser();
-  const retval = await db<PlatformDB>()
-    .insertInto("wrd.changesets")
-    .values({
-      creationdate: now,
-      wrdschema: wrdSchemaId,
-      entity: null, //       ObjectExists(user) ? EncodeHSON(user->GetUserDataForLogging()) : ""
-      userdata: "", //       ObjectExists(user) ? EncodeHSON(user->GetUserDataForLogging()) : ""
-    })
-    .returning(["id"])
-    .execute();
-  return retval[0].id;
-}
-
 /*
 async function validateSettings<
   S extends SchemaTypeDefinition,
@@ -584,16 +569,6 @@ async function validateSettings<
   RETURN NOT anyerror;
 }
 */
-
-function serializeChangeEntity<T>(entity: T & { guid: Buffer }): Omit<T, "guid"> & { guid: string };
-function serializeChangeEntity<T>(entity: T & { guid?: Buffer }): Omit<T, "guid"> & { guid?: string };
-
-function serializeChangeEntity<T>(entity: T & { guid?: Buffer }): Omit<T, "guid"> & { guid?: string } {
-  if ("guid" in entity)
-    return { ...entity, guid: encodeWRDGuid(entity.guid!) };
-  else //@ts-expect-error We know guid is not in entity
-    return entity;
-}
 
 export async function __internalUpdEntity<S extends SchemaTypeDefinition, T extends keyof S & string>(
   type: WRDType<S, T>,
@@ -1082,11 +1057,7 @@ export async function __internalUpdEntity<S extends SchemaTypeDefinition, T exte
         const { data: modifications, datablob: modifications_blob } = await prepareAnyForDatabase(mappedChanges.modifications);
         const { data: source, datablob: source_blob } = await prepareAnyForDatabase(historyDebugging ? { stacktrace: getStackTrace() } : null);
 
-        let changeset = options.changeset ?? wrdFinishHandler().getAutoChangeSet(schemadata.schema.id);
-        if (!changeset) {
-          changeset = await createChangeSet(schemadata.schema.id, now);
-          wrdFinishHandler().setAutoChangeSet(schemadata.schema.id, changeset);
-        }
+        const changeset = options.changeset || await getAutoChangeSet(schemadata.schema.id, now);
 
         await db<PlatformDB>()
           .insertInto("wrd.changes")

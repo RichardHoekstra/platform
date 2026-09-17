@@ -11,6 +11,7 @@ import { generateRandomId, isTemporalInstant, isTruthy, omit, pick, stringify, t
 import { type EnrichmentResult, executeEnrichment, type RequiredKeys } from "@mod-system/js/internal/util/algorithms";
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import { __internalUpdEntity } from "./updates";
+import { recordEntityDeletion } from "./changes";
 import whbridge from "@mod-system/js/internal/whmanager/bridge";
 import { nameToCamelCase } from "@webhare/std/src/types";
 import { wrdFinishHandler } from "./finishhandler";
@@ -457,6 +458,14 @@ export class WRDSchemaType<S extends SchemaTypeDefinition = AnySchemaType> {
   }
 
   /** Test whether this schema actually exists in the database */
+  /** Get the history head of this schema: the historyseqnr of the last committed changeset (0 if none).
+      Every changeset with a historyseqnr up to and including the head has been committed, and only a
+      successful commit advances the head, so a reader can use it to say "I observed the schema at head H" */
+  async getHistoryHead(): Promise<number> {
+    const schema = await db<PlatformDB>().selectFrom("wrd.schemas").select("historyhead").where("id", "=", await this.getId()).executeTakeFirst();
+    return schema?.historyhead ?? 0;
+  }
+
   async exists(): Promise<boolean> {
     return schemaExists(this.tag);
   }
@@ -907,6 +916,7 @@ export class WRDType<S extends SchemaTypeDefinition, T extends keyof S & string>
     if (!typeRec)
       throw new Error(`No such type ${JSON.stringify(this.tag)}`);
 
+    await recordEntityDeletion(schemadata, ids, new Date);
     await db<PlatformDB>().deleteFrom("wrd.entities").where("id", "in", ids).execute();
     for (const id of ids)
       wrdFinishHandler().entityDeleted(schemadata.schema.id, typeRec.id, id);

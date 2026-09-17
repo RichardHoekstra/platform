@@ -245,7 +245,7 @@ PUBLIC STATIC OBJECTTYPE EntityChanges EXTEND TolliumScreenBase
                , entity
                , typesortkey :=   `${type}\n${sortkey ?? title}`
                , expandable :=    FALSE
-               , icon :=          SearchElement([ "new", "edit", "close", "newclose" ], changetype) + 1
+               , icon :=          changetype = "delete" ? 3 : SearchElement([ "new", "edit", "close", "newclose" ], changetype) + 1
             FROM changes;
 
       rows := rows CONCAT changes;

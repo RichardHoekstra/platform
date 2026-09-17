@@ -134,6 +134,7 @@ async function testChanges() { //  tests
     test.eq([
       {
         id: change0[0].id,
+        cause: 0,
         entity: testPersonId,
         changetype: "new",
         when: prefields.wrdModificationDate,
@@ -229,6 +230,7 @@ async function testChanges() { //  tests
     test.eqPartial([
       {
         id: change0[0].id,
+        cause: 0,
         entity: testPersonId,
         changetype: "new",
         when: prefields.wrdModificationDate,
@@ -622,6 +624,7 @@ async function testChanges() { //  tests
     test.eq([
       {
         id: changes[0].id,
+        cause: 0,
         changetype: 'new',
         entity: tempperson,
         when: postfields.wrdModificationDate,

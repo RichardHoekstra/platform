@@ -913,6 +913,7 @@ PUBLIC STATIC OBJECTTYPE WRDSchemaBase
         , entity :=         ObjectExists(user) ? user->entityid : 0
         , userdata :=       ObjectExists(user) ? EncodeHSON(user->GetUserDataForLogging()) : ""
         ] INTO wrd.changesets;
+    GetWRDCommitHandler()->RegisterChangeSet(this->id, id);
     RETURN id;
   }
 >;

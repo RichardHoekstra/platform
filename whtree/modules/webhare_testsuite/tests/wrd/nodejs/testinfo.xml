@@ -7,6 +7,7 @@
   <test script="test_wrd_metadata.ts" />
   <test script="test_wrd_errors.ts" />
   <test script="test_wrd_history.ts" />
+  <test script="test_wrd_history_deletes.ts" />
   <test script="test_wrd_eximport.ts" />
   <test script="test_password_policy.ts" />
   <test script="test_wrd_authapi.ts" />

@@ -1,9 +1,13 @@
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import { db, nextVal } from "@webhare/whdb";
-import { type EntityPartialRec, type EntityRec, type EntitySettingsRec, type TypeRec, selectEntitySettingWHFSLinkColumns } from "./db";
+import { type EntityPartialRec, type EntityRec, type EntitySettingsRec, type SchemaData, type TypeRec, selectEntitySettingColumns, selectEntitySettingWHFSLinkColumns } from "./db";
 import { omit } from "@webhare/std";
-import { setHareScriptType, type IPCMarshallableData, HareScriptType } from "@webhare/hscompat/src/hson";
-import { getIdToGuidMap } from "./accessors";
+import { setHareScriptType, type IPCMarshallableData, HareScriptType, getTypedArray } from "@webhare/hscompat/src/hson";
+import { encodeWRDGuid, getIdToGuidMap } from "./accessors";
+import { wrdFinishHandler } from "./finishhandler";
+import { prepareAnyForDatabase } from "@webhare/whdb/src/formats";
+import { debugFlags } from "@webhare/env/src/envbackend";
+import { getStackTrace } from "@webhare/js-api-tools";
 
 
 export type ChangesSettings<T extends string | number | null> = Array<Omit<EntitySettingsRec, "blobdata" | "entity" | "setting" | "attribute"> & { blobseqnr: number; setting: T; attribute: T }>;
@@ -20,8 +24,47 @@ export type Changes<T extends string | number | null> = {
     settings: ChangesSettings<T>;
     whfslinks: ChangesWHFSLinks;
     deletedsettings: number[];
+    /** Set if this change records the deletion of the entity. All settings in oldsettings are then in deletedsettings */
+    deleted?: true;
   };
 };
+
+export function serializeChangeEntity<T>(entity: T & { guid: Buffer }): Omit<T, "guid"> & { guid: string };
+export function serializeChangeEntity<T>(entity: T & { guid?: Buffer }): Omit<T, "guid"> & { guid?: string };
+
+export function serializeChangeEntity<T>(entity: T & { guid?: Buffer }): Omit<T, "guid"> & { guid?: string } {
+  if ("guid" in entity)
+    return { ...entity, guid: encodeWRDGuid(entity.guid!) };
+  else //@ts-expect-error We know guid is not in entity
+    return entity;
+}
+
+export async function createChangeSet(wrdSchemaId: number, now: Date): Promise<number> {
+  //OBJECT user := GetEffectiveUser();
+  const retval = await db<PlatformDB>()
+    .insertInto("wrd.changesets")
+    .values({
+      creationdate: now,
+      wrdschema: wrdSchemaId,
+      entity: null, //       ObjectExists(user) ? EncodeHSON(user->GetUserDataForLogging()) : ""
+      userdata: "", //       ObjectExists(user) ? EncodeHSON(user->GetUserDataForLogging()) : ""
+      historyseqnr: 0, // numbered just before commit
+    })
+    .returning(["id"])
+    .execute();
+  wrdFinishHandler().changeSetCreated(wrdSchemaId, retval[0].id);
+  return retval[0].id;
+}
+
+/** Get the changeset to record changes in: the changeset automatically created for this schema in the current work, creating it if needed */
+export async function getAutoChangeSet(wrdSchemaId: number, now: Date): Promise<number> {
+  let changeset = wrdFinishHandler().getAutoChangeSet(wrdSchemaId);
+  if (!changeset) {
+    changeset = await createChangeSet(wrdSchemaId, now);
+    wrdFinishHandler().setAutoChangeSet(wrdSchemaId, changeset);
+  }
+  return changeset;
+}
 
 export async function saveEntitySettingAttachments(changeid: number, settings: EntitySettingsRec[]): Promise<ChangesSettings<number | null>> {
   const retval: ChangesSettings<number | null> = [];
@@ -141,6 +184,7 @@ function mapChangesRefs<A extends number | string | null, B extends number | str
       })),
       whfslinks: changes.modifications.whfslinks,
       deletedsettings: changes.modifications.deletedsettings,
+      ...(changes.modifications.deleted ? { deleted: true } : null),
     }
   };
 
@@ -158,4 +202,151 @@ export async function mapChangesIdsToRefs(typeRec: TypeRec, changes: Changes<num
   const ids = gatherEntitiesFromChanges(changes);
   const settingsMapping = await getIdToGuidMap(ids);
   return mapChangesRefs(changes, typeRec.attrHSNameMap, settingsMapping, "");
+}
+
+/** Record a change that only removes data from an entity: the deletion of the entity itself or the loss of settings
+    @param cause - The change causing this change, if any
+    @returns The id of the recorded change
+*/
+async function recordRemovalChange(typeRec: TypeRec, entityrec: EntityRec, settings: EntitySettingsRec[], removedSettingIds: number[], deleted: boolean, cause: number | null, now: Date): Promise<number> {
+  const changeId = await nextVal("wrd.changes.id");
+  const changes: Changes<number | null> = {
+    oldsettings: {
+      entityrec: serializeChangeEntity(entityrec),
+      settings: await saveEntitySettingAttachments(changeId, settings),
+      whfslinks: [], //FIXME recording WHFS links is not supported yet (see getWHFSLinksForChanges), but that shouldn't block deletes
+    },
+    modifications: {
+      entityrec: {},
+      settings: [],
+      whfslinks: [],
+      deletedsettings: getTypedArray(HareScriptType.IntegerArray, removedSettingIds),
+      ...(deleted ? { deleted: true } : null),
+    }
+  };
+
+  const changedAttrs = new Set<string>;
+  for (const setting of settings)
+    if (removedSettingIds.includes(setting.id)) {
+      const rootAttr = typeRec.attrRootAttrMap.get(setting.attribute);
+      if (rootAttr)
+        changedAttrs.add(rootAttr.tag);
+    }
+
+  const mappedChanges = await mapChangesIdsToRefs(typeRec, changes); //Convert ids to guids / attribute tags
+  const { data: oldsettings, datablob: oldsettings_blob } = await prepareAnyForDatabase(mappedChanges.oldsettings);
+  const { data: modifications, datablob: modifications_blob } = await prepareAnyForDatabase(mappedChanges.modifications);
+  const { data: source, datablob: source_blob } = await prepareAnyForDatabase(debugFlags["wrd:forcehistory"] ? { stacktrace: getStackTrace() } : null);
+  const changeset = await getAutoChangeSet(typeRec.schemaId, now);
+
+  await db<PlatformDB>()
+    .insertInto("wrd.changes")
+    .values({
+      id: changeId,
+      creationdate: now,
+      changeset,
+      type: typeRec.id,
+      entity: entityrec.guid,
+      cause,
+      oldsettings,
+      oldsettings_blob,
+      modifications,
+      modifications_blob,
+      source,
+      source_blob,
+      summary: [...changedAttrs].sort().join(","),
+    })
+    .execute();
+  return changeId;
+}
+
+/** Record the deletion of entities in the history of the types that keep history, including the effects the database
+    will cascade from it: attachments and links to the deleted entities are deleted too, and settings of other entities
+    referring to the deleted entities are dropped. Every recorded effect refers to the recorded deletion that caused it.
+
+    Must be called before the entities are actually deleted, inside the work that deletes them. Does nothing (and
+    doesn't touch the database) if no type in the schema keeps history.
+
+    The HareScript WRD API has its own copy of this logic (WRDTypeBase::__RecordEntityDeletion), keep them in sync.
+
+    @param schemadata - Schema data of the schema being modified
+    @param ids - Entities that are about to be deleted
+    @param now - Timestamp for the recorded changes
+*/
+export async function recordEntityDeletion(schemadata: SchemaData, ids: number[], now: Date): Promise<void> {
+  const historyDebugging = debugFlags["wrd:forcehistory"];
+  const keepsHistory = (typeRec: TypeRec | undefined) => Boolean(typeRec && (typeRec.keephistorydays > 0 || historyDebugging));
+  if (!ids.length || ![...schemadata.typeIdMap.values()].some(keepsHistory))
+    return;
+
+  /* Gather all entities that will disappear: the requested ones plus, transitively, the links and attachments pointing
+     to them. Insertion order is the causal order: every entity follows the entity whose deletion cascades to it */
+  const doomed = new Map<number, { rec: EntityRec; parent: number | null }>;
+  for (const rec of await db<PlatformDB>().selectFrom("wrd.entities").selectAll().where("id", "in", ids).orderBy("id").execute())
+    doomed.set(rec.id, { rec, parent: null });
+
+  for (let frontier = [...doomed.keys()]; frontier.length;) {
+    const cascaded = await db<PlatformDB>()
+      .selectFrom("wrd.entities")
+      .selectAll()
+      .where(eb => eb.or([eb("leftentity", "in", frontier), eb("rightentity", "in", frontier)]))
+      .where("id", "not in", [...doomed.keys()])
+      .orderBy("id")
+      .execute();
+    for (const rec of cascaded)
+      doomed.set(rec.id, { rec, parent: rec.leftentity && frontier.includes(rec.leftentity) ? rec.leftentity : rec.rightentity });
+    frontier = cascaded.map(rec => rec.id);
+  }
+  if (!doomed.size)
+    return;
+
+  // Settings of surviving entities that refer to a doomed entity. The database will drop these (and their subsettings)
+  const doomedIds = [...doomed.keys()];
+  const droppedRefs = await db<PlatformDB>()
+    .selectFrom("wrd.entity_settings")
+    .select(["id", "entity", "setting"])
+    .where("setting", "in", doomedIds)
+    .where("entity", "not in", doomedIds)
+    .orderBy("id")
+    .execute();
+
+  // The change recording the deletion of an entity, if its type keeps history. The cause of a cascaded effect is the nearest recorded deletion up the chain
+  const deletionChanges = new Map<number, number>;
+  const getCause = (entityId: number | null): number | null => {
+    for (let id = entityId; id;) {
+      const change = deletionChanges.get(id);
+      if (change)
+        return change;
+      id = doomed.get(id)?.parent ?? null;
+    }
+    return null;
+  };
+
+  for (const [id, { rec, parent }] of doomed) {
+    const typeRec = schemadata.typeIdMap.get(rec.type);
+    if (!keepsHistory(typeRec))
+      continue;
+    const settings = await db<PlatformDB>().selectFrom("wrd.entity_settings").select(selectEntitySettingColumns).where("entity", "=", id).orderBy("id").execute();
+    deletionChanges.set(id, await recordRemovalChange(typeRec!, rec, settings, settings.map(s => s.id), true, getCause(parent), now));
+  }
+
+  for (const [entityId, refs] of Map.groupBy(droppedRefs, ref => ref.entity)) {
+    const rec = await db<PlatformDB>().selectFrom("wrd.entities").selectAll().where("id", "=", entityId).executeTakeFirst();
+    const typeRec = rec && schemadata.typeIdMap.get(rec.type);
+    if (!rec || !keepsHistory(typeRec))
+      continue;
+
+    const settings = await db<PlatformDB>().selectFrom("wrd.entity_settings").select(selectEntitySettingColumns).where("entity", "=", entityId).orderBy("id").execute();
+    // The dropped settings and, transitively, their subsettings
+    const removed = new Set(refs.map(ref => ref.id));
+    for (let added = true; added;) {
+      added = false;
+      for (const setting of settings)
+        if (setting.parentsetting && removed.has(setting.parentsetting) && !removed.has(setting.id)) {
+          removed.add(setting.id);
+          added = true;
+        }
+    }
+    await recordRemovalChange(typeRec!, rec, settings, [...removed].sort((a, b) => a - b), false, getCause(refs[0].setting), now);
+  }
 }

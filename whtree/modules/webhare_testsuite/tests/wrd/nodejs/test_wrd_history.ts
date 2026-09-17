@@ -134,6 +134,7 @@ async function testChanges() { //  tests
     test.eq([
       {
         id: change0[0].id,
+        cause: 0,
         entity: testPersonId,
         changetype: "new",
         when: new Date(prefields.wrdModified.epochMilliseconds), //as we're invoking HS APIs .. we'll be getting dates for now
@@ -229,6 +230,7 @@ async function testChanges() { //  tests
     test.eqPartial([
       {
         id: change0[0].id,
+        cause: 0,
         entity: testPersonId,
         changetype: "new",
         when: new Date(prefields.wrdModified.epochMilliseconds),
@@ -622,6 +624,7 @@ async function testChanges() { //  tests
     test.eq([
       {
         id: changes[0].id,
+        cause: 0,
         changetype: 'new',
         entity: tempperson,
         when: new Date(postfields.wrdModified.epochMilliseconds),

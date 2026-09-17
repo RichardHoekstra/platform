@@ -19,6 +19,7 @@ PUBLIC SCHEMA
     , INTEGER "accountlogin" NULL := 0
     , INTEGER "accountpassword" NULL := 0
     , DATETIME "creationdate"
+    , INTEGER "historyhead" NULL := 0
     ; KEY id
     > schemas
   , TABLE
@@ -146,6 +147,7 @@ PUBLIC SCHEMA
     , INTEGER "wrdschema" NULL := 0
     , INTEGER "entity" NULL := 0
     , STRING "userdata"
+    , INTEGER "historyseqnr" NULL := 0
     ; KEY id
     > changesets
 
@@ -162,6 +164,7 @@ PUBLIC SCHEMA
     , BLOB "modifications_blob"
     , STRING "source"
     , BLOB "source_blob"
+    , INTEGER "cause" NULL := 0
     ; KEY id
     > changes
 

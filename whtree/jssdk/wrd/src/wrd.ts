@@ -169,6 +169,7 @@ export async function createSchema(tag: string, options?: CreateSchemaOptions): 
     creationdate: new Date(),
     protected: false,
     usermgmt: options?.userManagement ?? false,
+    historyhead: 0,
   }).returning("id").executeTakeFirstOrThrow();
 
   //apply schemadefinition

@@ -2881,6 +2881,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
       @cell(integer) return.entity Id of the entity that created the changeset
       @cell(record) return.userdata Userdata Userdata of the user that created the changeset @includecelldef %Tolliumuser::GetUserDataForLogging.return
       @cell(string array) return.summaries List of summaries for the changes in the changeset
+      @cell(integer) return.historyseqnr Position of the changeset in the commit order of the schema
   */
   PUBLIC RECORD ARRAY FUNCTION ListChangesets(INTEGER entityid)
   {
@@ -2892,6 +2893,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
              , entity :=        Any(changesets.entity)
              , userdata :=      VAR userdata = "" ? DEFAULT RECORD : DecodeHSON(VAR userdata)
              , summaries :=     GroupedValues(summary)
+             , historyseqnr :=  Any(changesets.historyseqnr)
           FROM wrd.changesets
              , wrd.changes
              , wrd.entities
@@ -2914,7 +2916,8 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
       @cell return.oldsettings Contents of old entity, reconstructed as much as possible
       @cell return.modifications Modified values, reconstructed as much as possible
       @cell(record) return.source Optional source data
-      @cell(string) return.changetype Type of change: 'new': new entity, 'edit': modification, 'close': closing of entity, 'newclose': new entity that was closed in the same change
+      @cell(string) return.changetype Type of change: 'new': new entity, 'edit': modification, 'close': closing of entity, 'newclose': new entity that was closed in the same change, 'delete': deletion of the entity
+      @cell(integer) return.cause Id of the change that caused this change (0 if this change was not the cascading effect of another change)
   */
   PUBLIC RECORD ARRAY FUNCTION GetChanges(INTEGER changesetid, RECORD options DEFAULTSTO DEFAULT RECORD)
   {
@@ -2976,6 +2979,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
       RECORD oldentityrec := change.oldsettings.entityrec;
       RECORD entityrecmods := change.modifications.entityrec;
       RECORD modentityrec := CELL[ ...oldentityrec, ...entityrecmods ];
+      BOOLEAN isdelete := CellExists(change.modifications, "deleted") AND change.modifications.deleted;
 
       INTEGER64 ARRAY expiredsettings :=
           (SELECT AS INTEGER64 ARRAY id FROM change.modifications.settings) CONCAT
@@ -3022,7 +3026,8 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
           }
       }
 
-      RECORD ARRAY org_attrs := options.allfieldsinoriginal ? acc.fields : modified_attrs;
+      // A delete loses the complete entity, so report all its original fields
+      RECORD ARRAY org_attrs := options.allfieldsinoriginal OR isdelete ? acc.fields : modified_attrs;
 
       newsettings := EnforceStructure([[parentsetting := 0i64, attribute := 0, ordering := 0]], newsettings);
       // rebuild modified attributes
@@ -3034,7 +3039,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
       RECORD oldsettings;
       IF (RecordExists(oldentityrec))
       {
-        RECORD ARRAY org_basefields := options.allfieldsinoriginal ? acc.base_fields : modified_basefields;
+        RECORD ARRAY org_basefields := options.allfieldsinoriginal OR isdelete ? acc.base_fields : modified_basefields;
         RECORD ARRAY inoldsettings := EnforceStructure([[parentsetting := 0i64, attribute := 0, ordering := 0]], change.oldsettings.settings);
         oldsettings := CELL
             [ ...this->ParseSettings(org_attrs, inoldsettings, orgwhfslinks, linkgetter, [ rowdata := oldentityrec ])
@@ -3048,13 +3053,16 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
           , when :=       change.creationdate
           , oldsettings
           , modifications
-          , changetype := CellExists(modifications, "wrd_limitdate") AND modifications.wrd_limitdate != MAX_DATETIME AND modifications.wrd_limitdate != DEFAULT DATETIME
+          , changetype := isdelete
+                              ? "delete"
+                              : CellExists(modifications, "wrd_limitdate") AND modifications.wrd_limitdate != MAX_DATETIME AND modifications.wrd_limitdate != DEFAULT DATETIME
                               ? CellExists(modifications, "wrd_id")
                                   ? "newclose"
                                   : "close"
                               : CellExists(modifications, "wrd_id")
                                   ? "new"
                                   : "edit"
+          , change.cause
           , ...(options.__debug ? [ __debug := change.source ] : DEFAULT RECORD)
           ];
     }
@@ -3066,13 +3074,16 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
                , id :=              Any(id)
                , entity
                , when :=            Any(when)
-               , changetype :=      CellExists(merged.modifications, "wrd_limitdate") AND merged.modifications.wrd_limitdate != MAX_DATETIME
+               , changetype :=      "delete" IN GroupedValues(changetype)
+                                        ? "delete"
+                                        : CellExists(merged.modifications, "wrd_limitdate") AND merged.modifications.wrd_limitdate != MAX_DATETIME
                                         ? CellExists(merged.modifications, "wrd_id")
                                             ? "newclose"
                                             : "close"
                                         : CellExists(merged.modifications, "wrd_id")
                                             ? "new"
                                             : "edit"
+               , cause :=           Any(cause)
                , oldsettings :=     merged.oldsettings
                , modifications :=   merged.modifications
             FROM changes
@@ -3937,12 +3948,174 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
     this->DeleteEntities([entityid]);
   }
 
+  /** Record a change that only removes data from an entity of this type: the deletion of the entity itself or the loss of settings
+      @param entityrec Current wrd.entities record of the entity
+      @param settings Current wrd.entity_settings records of the entity
+      @param removedsettingids Ids of the settings that are lost
+      @param isdelete Whether the entity itself is deleted
+      @param cause Id of the change causing this change, 0 if none
+      @param now Timestamp for the change
+      @return Id of the recorded change
+  */
+  PUBLIC INTEGER FUNCTION __RecordRemovalChange(RECORD entityrec, RECORD ARRAY settings, INTEGER64 ARRAY removedsettingids, BOOLEAN isdelete, INTEGER cause, DATETIME now)
+  {
+    this->EnsureTypeInfoLoaded();
+    INTEGER changeid := MakeAutoNumber(wrd.changes, "id");
+
+    RECORD changes :=
+        [ oldsettings :=
+              [ entityrec :=        entityrec
+              , settings :=         this->SaveEntitySettingAttachments(changeid, settings)
+              , whfslinks :=        RECORD[] //FIXME recording WHFS links is not supported yet (see the JS implementation), but that shouldn't block deletes
+              ]
+        , modifications :=
+              [ entityrec :=        DEFAULT RECORD
+              , settings :=         RECORD[]
+              , whfslinks :=        RECORD[]
+              , deletedsettings :=  removedsettingids
+              , ...(isdelete ? [ deleted := TRUE ] : DEFAULT RECORD)
+              ]
+        ];
+
+    // Summarize by root attribute: walk up the parent chain of the removed settings' attributes
+    INTEGER ARRAY removedattrs := GetSortedSet(SELECT AS INTEGER ARRAY attribute FROM settings WHERE id IN removedsettingids);
+    INTEGER ARRAY rootattrs;
+    WHILE (Length(removedattrs) > 0)
+    {
+      RECORD ARRAY attrs := SELECT id, parent FROM wrd.attrs WHERE id IN removedattrs;
+      rootattrs := rootattrs CONCAT (SELECT AS INTEGER ARRAY id FROM attrs WHERE parent = 0);
+      removedattrs := GetSortedSet(SELECT AS INTEGER ARRAY parent FROM attrs WHERE parent != 0);
+    }
+    STRING ARRAY changed_attrs := SELECT AS STRING ARRAY tag FROM this->__final_attrs WHERE id IN rootattrs;
+
+    changes := this->MapChangesIdsToRefs(changes);
+
+    RECORD encoded_oldsettings := PrepareAnyForDatabase(changes.oldsettings);
+    RECORD encoded_modifications := PrepareAnyForDatabase(changes.modifications);
+    RECORD encoded_source := PrepareAnyForDatabase(IsDebugTagEnabled("wrd:forcehistory") ? [ stacktrace := GetAsyncStackTrace() ] : DEFAULT RECORD);
+
+    INTEGER changeset := GetWRDCommitHandler()->GetAutoChangeSet(this->typerec.wrd_schema);
+    IF (changeset = 0)
+    {
+      changeset := this->CreateChangeSet();
+      GetWRDCommitHandler()->SetAutoChangeSet(this->typerec.wrd_schema, changeset);
+    }
+
+    INSERT CELL
+        [ id :=                 changeid
+        , creationdate :=       now
+        , changeset
+        , entity :=             entityrec.guid
+        , type :=               this->typerec.id
+        , cause
+        , oldsettings :=        encoded_oldsettings.stringpart
+        , oldsettings_blob :=   encoded_oldsettings.blobpart
+        , modifications :=      encoded_modifications.stringpart
+        , modifications_blob := encoded_modifications.blobpart
+        , source :=             encoded_source.stringpart
+        , source_blob :=        encoded_source.blobpart
+        , summary :=            Detokenize(GetSortedSet(changed_attrs), ",")
+        ] INTO wrd.changes;
+
+    RETURN changeid;
+  }
+
+  /** Record the deletion of entities in the history of the types that keep history, including the effects the database
+      will cascade from it: attachments and links to the deleted entities are deleted too, and settings of other entities
+      referring to the deleted entities are dropped. Every recorded effect refers to the recorded deletion that caused it.
+
+      Must be called before the entities are actually deleted. Does nothing if no type in the schema keeps history.
+      The JS WRD API has its own copy of this logic (recordEntityDeletion in \@webhare/wrd), keep them in sync.
+
+      @param entityids Entities that are about to be deleted
+      @param validtypes Only entities of these types will be deleted
+  */
+  MACRO __RecordEntityDeletion(INTEGER ARRAY entityids, INTEGER ARRAY validtypes)
+  {
+    BOOLEAN historydebugging := IsDebugTagEnabled("wrd:forcehistory");
+    IF (Length(entityids) = 0)
+      RETURN;
+    IF (NOT historydebugging AND NOT RecordExists(SELECT FROM wrd.types WHERE wrd_schema = this->typerec.wrd_schema AND keephistorydays > 0))
+      RETURN;
+
+    DATETIME now := GetCurrentDateTime();
+
+    /* Gather all entities that will disappear: the requested ones plus, transitively, the links and attachments pointing
+       to them. Array order is the causal order: every entity follows the entity whose deletion cascades to it */
+    RECORD ARRAY doomed;
+    FOREVERY (RECORD rec FROM SELECT * FROM wrd.entities WHERE id IN entityids AND type IN validtypes ORDER BY id)
+      INSERT [ id := rec.id, parent := 0, rec := rec ] INTO doomed AT END;
+
+    INTEGER ARRAY frontier := SELECT AS INTEGER ARRAY id FROM doomed;
+    WHILE (Length(frontier) > 0)
+    {
+      INTEGER ARRAY doomedids := SELECT AS INTEGER ARRAY id FROM doomed;
+      RECORD ARRAY cascaded :=
+          SELECT *
+            FROM wrd.entities
+           WHERE (leftentity IN frontier OR rightentity IN frontier)
+                 AND id NOT IN doomedids
+        ORDER BY id;
+      FOREVERY (RECORD rec FROM cascaded)
+        INSERT [ id := rec.id, parent := rec.leftentity IN frontier ? rec.leftentity : rec.rightentity, rec := rec ] INTO doomed AT END;
+      frontier := SELECT AS INTEGER ARRAY id FROM cascaded;
+    }
+    IF (Length(doomed) = 0)
+      RETURN;
+
+    // Settings of surviving entities that refer to a doomed entity. The database will drop these (and their subsettings)
+    INTEGER ARRAY doomedids := SELECT AS INTEGER ARRAY id FROM doomed;
+    RECORD ARRAY droppedrefs :=
+        SELECT id, entity, setting
+          FROM wrd.entity_settings
+         WHERE setting IN doomedids
+               AND entity NOT IN doomedids
+      ORDER BY id;
+
+    // The change recording the deletion of an entity, if its type keeps history. The cause of a cascaded effect is the nearest recorded deletion up the chain
+    RECORD ARRAY deletionchanges;
+    FOREVERY (RECORD victim FROM doomed)
+    {
+      OBJECT typeobj := this->pvt_wrdschema->GetTypeById(victim.rec.type);
+      IF (NOT ObjectExists(typeobj) OR (typeobj->keephistorydays <= 0 AND NOT historydebugging))
+        CONTINUE;
+
+      RECORD ARRAY settings := SELECT * FROM wrd.entity_settings WHERE entity = victim.id ORDER BY id;
+      INTEGER64 ARRAY allsettingids := SELECT AS INTEGER64 ARRAY id FROM settings;
+      INTEGER cause := GetDeletionCause(doomed, deletionchanges, victim.parent);
+      INTEGER changeid := typeobj->__RecordRemovalChange(victim.rec, settings, allsettingids, TRUE, cause, now);
+      INSERT [ entity := victim.id, change := changeid ] INTO deletionchanges AT END;
+    }
+
+    FOREVERY (RECORD affected FROM SELECT entity, refs := GroupedValues(id), firstsetting := Any(setting) FROM droppedrefs GROUP BY entity)
+    {
+      RECORD rec := SELECT * FROM wrd.entities WHERE id = affected.entity;
+      OBJECT typeobj := RecordExists(rec) ? this->pvt_wrdschema->GetTypeById(rec.type) : DEFAULT OBJECT;
+      IF (NOT ObjectExists(typeobj) OR (typeobj->keephistorydays <= 0 AND NOT historydebugging))
+        CONTINUE;
+
+      RECORD ARRAY settings := SELECT * FROM wrd.entity_settings WHERE entity = affected.entity ORDER BY id;
+      // The dropped settings and, transitively, their subsettings
+      INTEGER64 ARRAY removed := affected.refs;
+      WHILE (TRUE)
+      {
+        INTEGER64 ARRAY subs := SELECT AS INTEGER64 ARRAY id FROM settings WHERE parentsetting IN removed AND id NOT IN removed;
+        IF (Length(subs) = 0)
+          BREAK;
+        removed := removed CONCAT subs;
+      }
+      typeobj->__RecordRemovalChange(rec, settings, GetSortedSet(removed), FALSE, GetDeletionCause(doomed, deletionchanges, affected.firstsetting), now);
+    }
+  }
+
   /** Delete multiple entities by their id
       @param entityids IDs of entities to delete */
   PUBLIC MACRO DeleteEntities(INTEGER ARRAY entityids)
   {
     INTEGER ARRAY validtypes := this->GetValidTypeIDs();
     this->domainvalues_cached := FALSE;
+
+    this->__RecordEntityDeletion(entityids, validtypes);
 
     INTEGER batchsize := 250;
     FOR (INTEGER idx := 0; idx < LENGTH(entityids); idx := idx + batchsize)
@@ -4157,6 +4330,20 @@ PUBLIC STATIC OBJECTTYPE WRDType2017 EXTEND WRDTypeBase <
       ORDER BY guid;
   }
 >;
+
+/// Find the recorded deletion causing the deletion of an entity (or of settings referring to it): the nearest recorded deletion up the cascade chain
+INTEGER FUNCTION GetDeletionCause(RECORD ARRAY doomed, RECORD ARRAY deletionchanges, INTEGER entityid)
+{
+  WHILE (entityid != 0)
+  {
+    RECORD change := SELECT * FROM deletionchanges WHERE entity = entityid;
+    IF (RecordExists(change))
+      RETURN change.change;
+    RECORD victim := SELECT * FROM doomed WHERE id = entityid;
+    entityid := RecordExists(victim) ? victim.parent : 0;
+  }
+  RETURN 0;
+}
 
 RECORD FUNCTION MergeChanges(RECORD ARRAY changes)
 {
