@@ -19,7 +19,7 @@ test.runTests(
 
       //take the RHS, slide it maximally to the right
       await test.sendMouseGesture([
-        { el: col4, x: "100%", down: 0, validateTarget: false },
+        { el: col4, x: "100%", down: 0 },
         { relx: 200, up: 0 }, //maxize the size
       ]);
 
