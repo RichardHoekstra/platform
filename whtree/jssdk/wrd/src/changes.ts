@@ -2,7 +2,9 @@ import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import { db, nextVal } from "@webhare/whdb";
 import { type EntityPartialRec, type EntityRec, type EntitySettingsRec, type SchemaData, type TypeRec, selectEntitySettingColumns, selectEntitySettingWHFSLinkColumns } from "./db";
 import { omit } from "@webhare/std";
-import { setHareScriptType, type IPCMarshallableData, HareScriptType, getTypedArray } from "@webhare/hscompat/src/hson";
+import { setHareScriptType, type IPCMarshallableData, HareScriptType, getTypedArray, encodeHSON } from "@webhare/hscompat/src/hson";
+import { getScopedResource } from "@webhare/services/src/codecontexts";
+import type { AuthAuditContext } from "@webhare/auth";
 import { encodeWRDGuid, getIdToGuidMap } from "./accessors";
 import { wrdFinishHandler } from "./finishhandler";
 import { prepareAnyForDatabase } from "@webhare/whdb/src/formats";
@@ -39,15 +41,37 @@ export function serializeChangeEntity<T>(entity: T & { guid?: Buffer }): Omit<T,
     return entity;
 }
 
+/** Describe the user making the changes, like the HareScript API records GetUserDataForLogging() */
+function getActingUser(): { entity: number | null; userdata: string } {
+  // The audit context is maintained by @webhare/auth (which depends on us, so we read its scoped resource directly)
+  const context = getScopedResource<AuthAuditContext>("platform:authcontext");
+  if (!context?.actionBy)
+    return { entity: null, userdata: "" };
+  return {
+    entity: context.actionBy,
+    userdata: encodeHSON({
+      entityid: context.actionBy,
+      ...(context.actionByLogin ? { login: context.actionByLogin } : null),
+      ...(context.impersonatedBy ? { impersonator_entityid: context.impersonatedBy } : null),
+      ...(context.impersonatedByLogin ? { impersonator_login: context.impersonatedByLogin } : null),
+    })
+  };
+}
+
+/** Get the source data to record with a change: the source set for this work, plus a stack trace when debugging history */
+export function getChangeSourceData(): Record<string, unknown> | null {
+  const source = wrdFinishHandler().getChangeSource();
+  const stacktrace = debugFlags["wrd:forcehistory"] ? { stacktrace: getStackTrace() } : null;
+  return source || stacktrace ? { ...stacktrace, ...source } : null;
+}
+
 export async function createChangeSet(wrdSchemaId: number, now: Date): Promise<number> {
-  //OBJECT user := GetEffectiveUser();
   const retval = await db<PlatformDB>()
     .insertInto("wrd.changesets")
     .values({
       creationdate: now,
       wrdschema: wrdSchemaId,
-      entity: null, //       ObjectExists(user) ? EncodeHSON(user->GetUserDataForLogging()) : ""
-      userdata: "", //       ObjectExists(user) ? EncodeHSON(user->GetUserDataForLogging()) : ""
+      ...getActingUser(),
       historyseqnr: 0, // numbered just before commit
     })
     .returning(["id"])
@@ -236,7 +260,7 @@ async function recordRemovalChange(typeRec: TypeRec, entityrec: EntityRec, setti
   const mappedChanges = await mapChangesIdsToRefs(typeRec, changes); //Convert ids to guids / attribute tags
   const { data: oldsettings, datablob: oldsettings_blob } = await prepareAnyForDatabase(mappedChanges.oldsettings);
   const { data: modifications, datablob: modifications_blob } = await prepareAnyForDatabase(mappedChanges.modifications);
-  const { data: source, datablob: source_blob } = await prepareAnyForDatabase(debugFlags["wrd:forcehistory"] ? { stacktrace: getStackTrace() } : null);
+  const { data: source, datablob: source_blob } = await prepareAnyForDatabase(getChangeSourceData());
   const changeset = await getAutoChangeSet(typeRec.schemaId, now);
 
   await db<PlatformDB>()

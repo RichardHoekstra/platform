@@ -216,3 +216,12 @@ export function wrd(tag: string): WRDSchemaType {
     schemaCache.set(tag, new WeakRef(schema = new WRDSchemaType(tag)));
   return schema;
 }
+
+/** Describe the source of the changes made in the current work. The description is recorded with every change written to
+    the history of types that keep history (eg. which task, import or request caused the changes) and is returned by GetChanges().
+    Must be called inside an open work; it applies to the rest of that work.
+    @param source - Source description, or null to stop recording a source
+*/
+export function setChangeSource(source: Record<string, unknown> | null): void {
+  wrdFinishHandler().setChangeSource(source);
+}

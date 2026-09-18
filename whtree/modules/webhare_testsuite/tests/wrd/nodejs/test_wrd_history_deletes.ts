@@ -3,7 +3,9 @@
    - effects cascading from a deletion are recorded with the deletion as their cause
    - every changeset is numbered in commit order, and the schema's history head only advances on commit
 */
-import { wrd, type WRDSchemaLike } from "@webhare/wrd";
+import { wrd, setChangeSource, type WRDSchemaLike } from "@webhare/wrd";
+import { updateAuditContext } from "@webhare/auth";
+import { decodeHSON } from "@webhare/hscompat";
 import * as test from "@webhare/test";
 import * as whdb from "@webhare/whdb";
 import { createWRDTestSchema, testSchemaTag, type CustomExtensions } from "@mod-webhare_testsuite/js/wrd/testhelpers";
@@ -198,6 +200,37 @@ async function testDeletesAndHead() {
   await whdb.commitWork();
   test.eq(headBeforeHS + 2, await wrdschema.getHistoryHead());
   test.eqPartial([{ historyseqnr: headBeforeHS + 2 }], await db<PlatformDB>().selectFrom("wrd.changesets").select("historyseqnr").where("id", "=", hsChangeset).execute());
+
+  // STORY: changesets carry the acting user, changes carry the source of the work they were made in
+  updateAuditContext({ actionBy: personA, actionByLogin: "alice@example.com" });
+  await whdb.beginWork();
+  setChangeSource({ task: "test_wrd_history_deletes", digest: "sha256:0123" });
+  await wrdschema.update("wrdPerson", personD, { wrdFirstName: "Sourced" });
+  await wrdschema.delete("wrdPerson", personD);
+  await whdb.commitWork();
+
+  const sourced = await db<PlatformDB>().selectFrom("wrd.changesets").selectAll().where("wrdschema", "=", schemaId).orderBy("historyseqnr", "desc").executeTakeFirstOrThrow();
+  test.eq(personA, sourced.entity, "changeset records the acting user");
+  test.eqPartial({ entityid: personA, login: "alice@example.com" }, decodeHSON(sourced.userdata));
+  test.eqPartial([ // (entity reads 0: D no longer exists, so its guid can't be mapped back to an id)
+    { changetype: "edit", source: { task: "test_wrd_history_deletes", digest: "sha256:0123" } },
+    { changetype: "delete", source: { task: "test_wrd_history_deletes", digest: "sha256:0123" } },
+  ], await hsPersontype.GetChanges(sourced.id));
+
+  // The source belongs to the work: the next work starts without one (the acting user is still known). HareScript can set it too
+  await whdb.beginWork();
+  await wrdschema.update("wrdPerson", personA, { wrdFirstName: "Unsourced" });
+  await whdb.commitWork();
+  const unsourced = (await hsPersontype.ListChangesets(personA)).at(-1)!;
+  test.eqPartial({ entity: personA, userdata: { login: "alice@example.com" } }, unsourced);
+  test.eqPartial([{ entity: personA, changetype: "edit", source: null }], await hsPersontype.GetChanges(unsourced.id));
+
+  await whdb.beginWork();
+  await loadlib("mod::wrd/lib/api.whlib").SetWRDChangeSource({ task: "hs" });
+  await hsPersontype.DeleteEntity(personA);
+  await whdb.commitWork();
+  const hsSourced = await db<PlatformDB>().selectFrom("wrd.changesets").selectAll().where("wrdschema", "=", schemaId).orderBy("historyseqnr", "desc").executeTakeFirstOrThrow();
+  test.eqPartial([{ changetype: "delete", source: { task: "hs" } }], await hsPersontype.GetChanges(hsSourced.id));
 
   // Every committed changeset got a unique number and the head is the highest one: the head is a complete observation point
   const numbered = await db<PlatformDB>().selectFrom("wrd.changesets").select("historyseqnr").where("wrdschema", "=", schemaId).orderBy("historyseqnr").execute();

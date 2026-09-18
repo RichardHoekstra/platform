@@ -2915,7 +2915,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
       @cell(datetime) return.when Date of the change
       @cell return.oldsettings Contents of old entity, reconstructed as much as possible
       @cell return.modifications Modified values, reconstructed as much as possible
-      @cell(record) return.source Optional source data
+      @cell(record) return.source Source description recorded with the change (see SetWRDChangeSource), if any
       @cell(string) return.changetype Type of change: 'new': new entity, 'edit': modification, 'close': closing of entity, 'newclose': new entity that was closed in the same change, 'delete': deletion of the entity
       @cell(integer) return.cause Id of the change that caused this change (0 if this change was not the cascading effect of another change)
   */
@@ -3063,6 +3063,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
                                   ? "new"
                                   : "edit"
           , change.cause
+          , change.source
           , ...(options.__debug ? [ __debug := change.source ] : DEFAULT RECORD)
           ];
     }
@@ -3084,6 +3085,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
                                             ? "new"
                                             : "edit"
                , cause :=           Any(cause)
+               , source :=          Any(source)
                , oldsettings :=     merged.oldsettings
                , modifications :=   merged.modifications
             FROM changes
@@ -3610,7 +3612,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
 
             RECORD encoded_oldsettings := PrepareAnyForDatabase(changes.oldsettings);
             RECORD encoded_modifications := PrepareAnyForDatabase(changes.modifications);
-            RECORD encoded_source := PrepareAnyForDatabase(historydebugging ? [ stacktrace := GetAsyncStackTrace() ] : DEFAULT RECORD);
+            RECORD encoded_source := PrepareAnyForDatabase(GetChangeSourceData(historydebugging));
 
             INTEGER changeset := options.changeset ?? GetWRDCommitHandler()->GetAutoChangeSet(this->__typerec.wrd_schema);
             IF (changeset = 0)
@@ -3992,7 +3994,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
 
     RECORD encoded_oldsettings := PrepareAnyForDatabase(changes.oldsettings);
     RECORD encoded_modifications := PrepareAnyForDatabase(changes.modifications);
-    RECORD encoded_source := PrepareAnyForDatabase(IsDebugTagEnabled("wrd:forcehistory") ? [ stacktrace := GetAsyncStackTrace() ] : DEFAULT RECORD);
+    RECORD encoded_source := PrepareAnyForDatabase(GetChangeSourceData(IsDebugTagEnabled("wrd:forcehistory")));
 
     INTEGER changeset := GetWRDCommitHandler()->GetAutoChangeSet(this->typerec.wrd_schema);
     IF (changeset = 0)
@@ -4330,6 +4332,15 @@ PUBLIC STATIC OBJECTTYPE WRDType2017 EXTEND WRDTypeBase <
       ORDER BY guid;
   }
 >;
+
+/// The source data to record with a change: the source set for this transaction, plus a stack trace when debugging history
+RECORD FUNCTION GetChangeSourceData(BOOLEAN historydebugging)
+{
+  RECORD source := CELL[ ...(historydebugging ? [ stacktrace := GetAsyncStackTrace() ] : DEFAULT RECORD)
+                       , ...GetWRDCommitHandler()->GetChangeSource()
+                       ];
+  RETURN Length(UnpackRecord(source)) > 0 ? source : DEFAULT RECORD;
+}
 
 /// Find the recorded deletion causing the deletion of an entity (or of settings referring to it): the nearest recorded deletion up the cascade chain
 INTEGER FUNCTION GetDeletionCause(RECORD ARRAY doomed, RECORD ARRAY deletionchanges, INTEGER entityid)

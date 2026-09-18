@@ -10,6 +10,8 @@ class WRDFinishHandler implements FinishHandler {
   autoChangeSets = new Map<number, number>;
   /// All changesets created in this work, to be numbered in commit order
   changeSets: Array<{ wrdSchemaId: number; changeSetId: number }> = [];
+  /// Source description recorded with every change written in this work
+  changeSource: Record<string, unknown> | null = null;
   typeChanges = new Map<number, {
     type: number;
     created?: Set<number>;
@@ -117,6 +119,14 @@ class WRDFinishHandler implements FinishHandler {
 
   changeSetCreated(wrdSchemaId: number, changeSetId: number): void {
     this.changeSets.push({ wrdSchemaId, changeSetId });
+  }
+
+  setChangeSource(source: Record<string, unknown> | null): void {
+    this.changeSource = source;
+  }
+
+  getChangeSource(): Record<string, unknown> | null {
+    return this.changeSource;
   }
 }
 

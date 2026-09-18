@@ -135,6 +135,7 @@ async function testChanges() { //  tests
       {
         id: change0[0].id,
         cause: 0,
+        source: null,
         entity: testPersonId,
         changetype: "new",
         when: prefields.wrdModificationDate,
@@ -231,6 +232,7 @@ async function testChanges() { //  tests
       {
         id: change0[0].id,
         cause: 0,
+        source: null,
         entity: testPersonId,
         changetype: "new",
         when: prefields.wrdModificationDate,
@@ -625,6 +627,7 @@ async function testChanges() { //  tests
       {
         id: changes[0].id,
         cause: 0,
+        source: null,
         changetype: 'new',
         entity: tempperson,
         when: postfields.wrdModificationDate,

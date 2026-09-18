@@ -135,6 +135,7 @@ async function testChanges() { //  tests
       {
         id: change0[0].id,
         cause: 0,
+        source: null,
         entity: testPersonId,
         changetype: "new",
         when: new Date(prefields.wrdModified.epochMilliseconds), //as we're invoking HS APIs .. we'll be getting dates for now
@@ -231,6 +232,7 @@ async function testChanges() { //  tests
       {
         id: change0[0].id,
         cause: 0,
+        source: null,
         entity: testPersonId,
         changetype: "new",
         when: new Date(prefields.wrdModified.epochMilliseconds),
@@ -625,6 +627,7 @@ async function testChanges() { //  tests
       {
         id: changes[0].id,
         cause: 0,
+        source: null,
         changetype: 'new',
         entity: tempperson,
         when: new Date(postfields.wrdModified.epochMilliseconds),

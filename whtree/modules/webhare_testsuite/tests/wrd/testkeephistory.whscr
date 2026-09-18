@@ -95,6 +95,7 @@ MACRO TestChanges()
     TestEQ(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           intfields.wrd_modificationdate
@@ -107,6 +108,7 @@ MACRO TestChanges()
     TestEQ(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           postfields.wrd_modificationdate
@@ -217,6 +219,7 @@ MACRO TestChanges()
     TestEQ(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           intfields.wrd_modificationdate
@@ -225,6 +228,7 @@ MACRO TestChanges()
           ]
         , [ id :=             changes[1].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           postfields.wrd_modificationdate
@@ -237,6 +241,7 @@ MACRO TestChanges()
     TestEQ(
         [ [ id :=             changes[0].id // same id as first change of changeset
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           intfields.wrd_modificationdate
@@ -274,6 +279,7 @@ MACRO TestChanges()
     TestEQ(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         pm1->id
           , changetype :=     "new"
           , when :=           initfields.wrd_modificationdate
@@ -282,6 +288,7 @@ MACRO TestChanges()
           ]
         , [ id :=             changes[1].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         pm1->id
           , changetype :=     "edit"
           , when :=           postfields.wrd_modificationdate
@@ -337,6 +344,7 @@ MACRO TestChanges()
     TestEQ(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         testpersonobj->id
           , changetype :=     "edit"
           , when :=           postfields.wrd_modificationdate
@@ -392,6 +400,7 @@ MACRO TestChanges()
     TestEQ(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         tempperson->id
           , changetype :=     "new"
           , when :=           postfields.wrd_modificationdate
@@ -413,6 +422,7 @@ MACRO TestChanges()
     TestEQ(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         tempperson->id
           , changetype :=     "close"
           , when :=           postclosefields.wrd_modificationdate
@@ -437,6 +447,7 @@ MACRO TestChanges()
     TestEQ(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         immclose->id
           , changetype :=     "newclose"
           , when :=           postimmclosefields.wrd_modificationdate
@@ -462,12 +473,14 @@ MACRO TestChanges()
     TestEQMembers(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         p1->id
           , changetype :=     "newclose"
           , oldsettings :=    DEFAULT RECORD
           ]
         , [ id :=             changes[1].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         p2->id
           , changetype :=     "newclose"
           , oldsettings :=    DEFAULT RECORD
@@ -478,6 +491,7 @@ MACRO TestChanges()
     TestEQMembers(
         [ [ id :=             changes[0].id
           , cause :=          0
+          , source :=         DEFAULT RECORD
           , entity :=         p1->id
           , changetype :=     "newclose"
           , oldsettings :=    DEFAULT RECORD

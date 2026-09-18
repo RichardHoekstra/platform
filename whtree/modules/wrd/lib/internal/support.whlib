@@ -765,6 +765,9 @@ STATIC OBJECTTYPE WRDEntityCommitHandler EXTEND TransactionFinishHandlerBase <
   /// All changesets created in this transaction, to be numbered in commit order
   RECORD ARRAY changesets;
 
+  /// Source description recorded with every change written in this transaction
+  RECORD changesource;
+
   PUBLIC BOOLEAN metadatachanges;
 
   PUBLIC INTEGER ARRAY datachanges;
@@ -976,6 +979,16 @@ STATIC OBJECTTYPE WRDEntityCommitHandler EXTEND TransactionFinishHandlerBase <
   PUBLIC MACRO RegisterChangeSet(INTEGER wrdschema, INTEGER changeset)
   {
     INSERT CELL[ wrdschema, changeset ] INTO this->changesets AT END;
+  }
+
+  PUBLIC MACRO SetChangeSource(RECORD source)
+  {
+    this->changesource := source;
+  }
+
+  PUBLIC RECORD FUNCTION GetChangeSource()
+  {
+    RETURN this->changesource;
   }
 
 >;

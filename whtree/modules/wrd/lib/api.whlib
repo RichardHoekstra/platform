@@ -61,6 +61,16 @@ PUBLIC RECORD FUNCTION DescribeWRDEntity(INTEGER entityid)
     @param(string) findname The name of the WRD Schema to retrieve.
     @return(object %WRDSchema2017) The WRD Schema identified by the given name.
 */
+/** Describe the source of the changes made in the current transaction. The description is recorded with every change
+    written to the history of types that keep history (eg. which task, import or request caused the changes) and is
+    returned by GetChanges(). Applies to the rest of the current transaction.
+    @param source Source description, DEFAULT RECORD to stop recording a source
+*/
+PUBLIC MACRO SetWRDChangeSource(RECORD source)
+{
+  GetWRDCommitHandler()->SetChangeSource(source);
+}
+
 PUBLIC OBJECT FUNCTION OpenWRDSchema(STRING findname)
 {
   RECORD schemarec := IsWRDMetadataCacheDisabled() ? GetCacheableSchemaRecByName(findname).value

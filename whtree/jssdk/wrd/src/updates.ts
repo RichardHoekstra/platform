@@ -10,8 +10,8 @@ import { defaultDateTime, maxDateTime, maxDateTimeTotalMsecs } from "@webhare/hs
 import { appendToArray, compare, generateRandomId, isPromise, omit } from "@webhare/std";
 import { debugFlags } from "@webhare/env/src/envbackend";
 import { isDefaultHareScriptValue, recordRangeIterator } from "@webhare/hscompat/src/algorithms";
-import { getBestMatch, getStackTrace } from "@webhare/js-api-tools";
-import { type Changes, type ChangesWHFSLinks, getAutoChangeSet, getWHFSLinksForChanges, mapChangesIdsToRefs, saveEntitySettingAttachments, serializeChangeEntity } from "./changes";
+import { getBestMatch } from "@webhare/js-api-tools";
+import { type Changes, type ChangesWHFSLinks, getAutoChangeSet, getChangeSourceData, getWHFSLinksForChanges, mapChangesIdsToRefs, saveEntitySettingAttachments, serializeChangeEntity } from "./changes";
 import { wrdFinishHandler } from "./finishhandler";
 import { wrdSettingsGuid } from "./settings";
 import { ValueQueryChecker } from "./checker";
@@ -1055,7 +1055,7 @@ export async function __internalUpdEntity<S extends SchemaTypeDefinition, T exte
         const mappedChanges = await mapChangesIdsToRefs(typeRec, changes); //Convert ids to guids / attribute tags
         const { data: oldsettings, datablob: oldsettings_blob } = await prepareAnyForDatabase(mappedChanges.oldsettings);
         const { data: modifications, datablob: modifications_blob } = await prepareAnyForDatabase(mappedChanges.modifications);
-        const { data: source, datablob: source_blob } = await prepareAnyForDatabase(historyDebugging ? { stacktrace: getStackTrace() } : null);
+        const { data: source, datablob: source_blob } = await prepareAnyForDatabase(getChangeSourceData());
 
         const changeset = options.changeset || await getAutoChangeSet(schemadata.schema.id, now);
 
