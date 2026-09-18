@@ -42,7 +42,9 @@ export function serializeChangeEntity<T>(entity: T & { guid?: Buffer }): Omit<T,
     return entity;
 }
 
-/** Describe the user making the changes, like the HareScript API records GetUserDataForLogging() */
+/** Describe the user making the changes. The HareScript API stores GetUserDataForLogging() here; we can only fill in
+    what the audit context knows, so a change made outside a Tollium session has no realname and the changes screen
+    falls back to showing the login name. */
 function getActingUser(): { entity: Expression<number | null> | null; userdata: string } {
   // The audit context is maintained by @webhare/auth (which depends on us, so we read its scoped resource directly)
   const context = getScopedResource<AuthAuditContext>("platform:authcontext");
@@ -54,9 +56,7 @@ function getActingUser(): { entity: Expression<number | null> | null; userdata: 
        The description below keeps the identity we were given either way. */
     entity: sql<number | null>`(SELECT id FROM wrd.entities WHERE id = ${context.actionBy})`,
     userdata: encodeHSON({
-      entityid: context.actionBy,
       ...(context.actionByLogin ? { login: context.actionByLogin } : null),
-      ...(context.impersonatedBy ? { impersonator_entityid: context.impersonatedBy } : null),
       ...(context.impersonatedByLogin ? { impersonator_login: context.impersonatedByLogin } : null),
     })
   };
@@ -321,8 +321,9 @@ export async function recordEntityDeletion(schemadata: SchemaData, ids: number[]
       .where("id", "not in", [...doomed.keys()])
       .orderBy("id")
       .execute();
+    const inFrontier = new Set(frontier);
     for (const rec of cascaded)
-      doomed.set(rec.id, { rec, parent: rec.leftentity && frontier.includes(rec.leftentity) ? rec.leftentity : rec.rightentity });
+      doomed.set(rec.id, { rec, parent: rec.leftentity && inFrontier.has(rec.leftentity) ? rec.leftentity : rec.rightentity });
     frontier = cascaded.map(rec => rec.id);
   }
   if (!doomed.size)
@@ -350,31 +351,50 @@ export async function recordEntityDeletion(schemadata: SchemaData, ids: number[]
     return null;
   };
 
-  for (const [id, { rec, parent }] of doomed) {
-    const typeRec = schemadata.typeIdMap.get(rec.type);
-    if (!keepsHistory(typeRec))
-      continue;
-    const settings = await db<PlatformDB>().selectFrom("wrd.entity_settings").select(selectEntitySettingColumns).where("entity", "=", id).orderBy("id").execute();
-    deletionChanges.set(id, await recordRemovalChange(typeRec!, rec, settings, settings.map(s => s.id), true, getCause(parent), now));
+  /* Read the settings of a group of entities in one query. Done in blocks so a bulk delete issues a few queries
+     instead of one per entity, while keeping the settings (which carry the blobs) of only one block in memory. */
+  const settingsPerBlock = 100;
+  async function* inBlocks<T extends { id: number }>(entities: T[]): AsyncGenerator<Array<[T, EntitySettingsRec[]]>> {
+    for (let offset = 0; offset < entities.length; offset += settingsPerBlock) {
+      const block = entities.slice(offset, offset + settingsPerBlock);
+      const settings = await db<PlatformDB>()
+        .selectFrom("wrd.entity_settings")
+        .select(selectEntitySettingColumns)
+        .where("entity", "in", block.map(entity => entity.id))
+        .orderBy("id")
+        .execute();
+      const perEntity = Map.groupBy(settings, setting => setting.entity);
+      yield block.map(entity => [entity, perEntity.get(entity.id) ?? []]);
+    }
   }
 
-  for (const [entityId, refs] of Map.groupBy(droppedRefs, ref => ref.entity)) {
-    const rec = await db<PlatformDB>().selectFrom("wrd.entities").selectAll().where("id", "=", entityId).executeTakeFirst();
-    const typeRec = rec && schemadata.typeIdMap.get(rec.type);
-    if (!rec || !keepsHistory(typeRec))
-      continue;
-
-    const settings = await db<PlatformDB>().selectFrom("wrd.entity_settings").select(selectEntitySettingColumns).where("entity", "=", entityId).orderBy("id").execute();
-    // The dropped settings and, transitively, their subsettings
-    const removed = new Set(refs.map(ref => ref.id));
-    for (let added = true; added;) {
-      added = false;
-      for (const setting of settings)
-        if (setting.parentsetting && removed.has(setting.parentsetting) && !removed.has(setting.id)) {
-          removed.add(setting.id);
-          added = true;
-        }
+  const toRecord = [...doomed.values()].filter(victim => keepsHistory(schemadata.typeIdMap.get(victim.rec.type)));
+  for await (const block of inBlocks(toRecord.map(victim => victim.rec))) {
+    for (const [rec, settings] of block) {
+      const parent = doomed.get(rec.id)!.parent;
+      deletionChanges.set(rec.id, await recordRemovalChange(schemadata.typeIdMap.get(rec.type)!, rec, settings, settings.map(s => s.id), true, getCause(parent), now));
     }
-    await recordRemovalChange(typeRec!, rec, settings, [...removed].sort((a, b) => a - b), false, getCause(refs[0].setting), now);
+  }
+
+  // Surviving entities that lose a reference. One lookup for all of them rather than one per entity.
+  const refsPerEntity = Map.groupBy(droppedRefs, ref => ref.entity);
+  const affected = refsPerEntity.size
+    ? await db<PlatformDB>().selectFrom("wrd.entities").selectAll().where("id", "in", [...refsPerEntity.keys()]).orderBy("id").execute()
+    : [];
+  for await (const block of inBlocks(affected.filter(rec => keepsHistory(schemadata.typeIdMap.get(rec.type))))) {
+    for (const [rec, settings] of block) {
+      const refs = refsPerEntity.get(rec.id)!;
+      // The dropped settings and, transitively, their subsettings
+      const removed = new Set(refs.map(ref => ref.id));
+      for (let added = true; added;) {
+        added = false;
+        for (const setting of settings)
+          if (setting.parentsetting && removed.has(setting.parentsetting) && !removed.has(setting.id)) {
+            removed.add(setting.id);
+            added = true;
+          }
+      }
+      await recordRemovalChange(schemadata.typeIdMap.get(rec.type)!, rec, settings, [...removed].sort((a, b) => a - b), false, getCause(refs[0].setting), now);
+    }
   }
 }

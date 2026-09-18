@@ -212,7 +212,7 @@ async function testDeletesAndHead() {
 
   const sourced = await db<PlatformDB>().selectFrom("wrd.changesets").selectAll().where("wrdschema", "=", schemaId).orderBy("historyseqnr", "desc").executeTakeFirstOrThrow();
   test.eq(personA, sourced.entity, "changeset records the acting user");
-  test.eqPartial({ entityid: personA, login: "alice@example.com" }, decodeHSON(sourced.userdata));
+  test.eqPartial({ login: "alice@example.com" }, decodeHSON(sourced.userdata), "the changeset describes the acting user the way the changes screen reads it");
   test.eqPartial([ // (entity reads 0: D no longer exists, so its guid can't be mapped back to an id)
     { changetype: "edit", source: { task: "test_wrd_history_deletes", digest: "sha256:0123" } },
     { changetype: "delete", source: { task: "test_wrd_history_deletes", digest: "sha256:0123" } },
@@ -241,6 +241,21 @@ async function testDeletesAndHead() {
   test.eq(null, staleActor.entity, "a user that no longer exists cannot be referred to");
   test.eqPartial({ login: "alice@example.com" }, decodeHSON(staleActor.userdata), "but the identity we were given is still described");
   updateAuditContext({ actionBy: null, actionByLogin: "" });
+
+  // STORY: deleting through the entity object (the route the WRD browser takes) is recorded as well
+  await whdb.beginWork();
+  const viaEntity = await wrdschema.insert("wrdPerson", { wrdContactEmail: "viaentity@example.com", whuserUnit: testunit, wrdauthAccountStatus: { status: "active" } });
+  await whdb.commitWork();
+  const viaEntityGuid = (await wrdschema.getFields("wrdPerson", viaEntity, ["wrdGuid"])).wrdGuid;
+  const headBeforeEntityDelete = await wrdschema.getHistoryHead();
+
+  await whdb.beginWork();
+  await (await hsPersontype.getEntity(viaEntity) as HSVMObject).DeleteEntity();
+  await whdb.commitWork();
+
+  test.eq(headBeforeEntityDelete + 1, await wrdschema.getHistoryHead());
+  test.eqPartial([{ deleted: true, historyseqnr: headBeforeEntityDelete + 1 }], (await listHistory(schemaId)).filter(row => row.entity === viaEntityGuid && row.deleted));
+  test.eq(null, await wrdschema.getFields("wrdPerson", viaEntity, ["wrdGuid"], { allowMissing: true, historyMode: "all" }));
 
   // Every committed changeset got a unique number and the head is the highest one: the head is a complete observation point
   const numbered = await db<PlatformDB>().selectFrom("wrd.changesets").select("historyseqnr").where("wrdschema", "=", schemaId).orderBy("historyseqnr").execute();

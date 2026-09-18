@@ -4076,27 +4076,34 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
 
     // The change recording the deletion of an entity, if its type keeps history. The cause of a cascaded effect is the nearest recorded deletion up the chain
     RECORD ARRAY deletionchanges;
+    RECORD ARRAY doomedsettings := SELECT * FROM wrd.entity_settings WHERE entity IN doomedids ORDER BY id;
     FOREVERY (RECORD victim FROM doomed)
     {
       OBJECT typeobj := this->pvt_wrdschema->GetTypeById(victim.rec.type);
       IF (NOT ObjectExists(typeobj) OR (typeobj->keephistorydays <= 0 AND NOT historydebugging))
         CONTINUE;
 
-      RECORD ARRAY settings := SELECT * FROM wrd.entity_settings WHERE entity = victim.id ORDER BY id;
+      RECORD ARRAY settings := SELECT * FROM doomedsettings WHERE entity = victim.id;
       INTEGER64 ARRAY allsettingids := SELECT AS INTEGER64 ARRAY id FROM settings;
       INTEGER cause := GetDeletionCause(doomed, deletionchanges, victim.parent);
       INTEGER changeid := typeobj->__RecordRemovalChange(victim.rec, settings, allsettingids, TRUE, cause, now);
       INSERT [ entity := victim.id, change := changeid ] INTO deletionchanges AT END;
     }
 
-    FOREVERY (RECORD affected FROM SELECT entity, refs := GroupedValues(id), firstsetting := Any(setting) FROM droppedrefs GROUP BY entity)
+    // Read the affected entities and their settings in one go rather than one query per entity
+    RECORD ARRAY affectedrefs := SELECT entity, refs := GroupedValues(id), firstsetting := Any(setting) FROM droppedrefs GROUP BY entity;
+    INTEGER ARRAY affectedids := SELECT AS INTEGER ARRAY entity FROM affectedrefs;
+    RECORD ARRAY affectedrecs := SELECT * FROM wrd.entities WHERE id IN affectedids;
+    RECORD ARRAY affectedsettings := SELECT * FROM wrd.entity_settings WHERE entity IN affectedids ORDER BY id;
+
+    FOREVERY (RECORD affected FROM affectedrefs)
     {
-      RECORD rec := SELECT * FROM wrd.entities WHERE id = affected.entity;
+      RECORD rec := SELECT * FROM affectedrecs WHERE id = affected.entity;
       OBJECT typeobj := RecordExists(rec) ? this->pvt_wrdschema->GetTypeById(rec.type) : DEFAULT OBJECT;
       IF (NOT ObjectExists(typeobj) OR (typeobj->keephistorydays <= 0 AND NOT historydebugging))
         CONTINUE;
 
-      RECORD ARRAY settings := SELECT * FROM wrd.entity_settings WHERE entity = affected.entity ORDER BY id;
+      RECORD ARRAY settings := SELECT * FROM affectedsettings WHERE entity = affected.entity;
       // The dropped settings and, transitively, their subsettings
       INTEGER64 ARRAY removed := affected.refs;
       WHILE (TRUE)
@@ -4117,12 +4124,11 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
     INTEGER ARRAY validtypes := this->GetValidTypeIDs();
     this->domainvalues_cached := FALSE;
 
-    this->__RecordEntityDeletion(entityids, validtypes);
-
     INTEGER batchsize := 250;
     FOR (INTEGER idx := 0; idx < LENGTH(entityids); idx := idx + batchsize)
     {
       INTEGER ARRAY killset := ArraySlice(entityids, idx, batchsize);
+      this->__RecordEntityDeletion(killset, validtypes);
       DELETE FROM wrd.entities WHERE id IN killset AND type IN validtypes;
     }
 

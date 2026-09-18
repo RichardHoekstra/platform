@@ -504,10 +504,9 @@ PUBLIC STATIC OBJECTTYPE WRDEntityBase
   /** Delete the entity, cascading any references */
   PUBLIC MACRO DeleteEntity()
   {
-    // ADDME: Log entries?
     // ADDME: Error checking! (references errors for example)
-    DELETE FROM wrd.entities WHERE id = this->entityrec.id;
-    GetWRDCommitHandler()->EntityDeleted(this->pvt_wrdtype->wrdschema->id, this->pvt_wrdtype->id, this->entityrec.id);
+    // Delegate so single deletes record history and report events exactly like bulk deletes do
+    this->pvt_wrdtype->DeleteEntities(INTEGER[ this->entityrec.id ]);
   }
 
   /** Remove entity according to a delete mode
