@@ -28,8 +28,10 @@ class WRDFinishHandler implements FinishHandler {
   async onBeforeCommit() {
     /* Advance the history head of every schema we created a changeset for, and number the changeset with the new head.
        This is done as late as possible: the update locks the schema row until commit, which is what serializes the
-       numbering in commit order, so we want to hold that lock only for the duration of the actual commit */
-    for (const { wrdSchemaId, changeSetId } of this.changeSets)
+       numbering in commit order, so we want to hold that lock only for the duration of the actual commit.
+       Always take the schema locks in ascending schema order, so two transactions touching the same schemas cannot
+       deadlock by locking them in opposite orders */
+    for (const { wrdSchemaId, changeSetId } of this.changeSets.toSorted((lhs, rhs) => lhs.wrdSchemaId - rhs.wrdSchemaId || lhs.changeSetId - rhs.changeSetId))
       await sql`WITH head AS (UPDATE wrd.schemas SET historyhead = historyhead + 1 WHERE id = ${wrdSchemaId} RETURNING historyhead)
                 UPDATE wrd.changesets SET historyseqnr = head.historyhead FROM head WHERE wrd.changesets.id = ${changeSetId}`.execute(db());
     this.changeSets = [];

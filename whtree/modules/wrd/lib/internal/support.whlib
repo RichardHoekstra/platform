@@ -821,8 +821,10 @@ STATIC OBJECTTYPE WRDEntityCommitHandler EXTEND TransactionFinishHandlerBase <
 
     /* Advance the history head of every schema we created a changeset for, and number the changeset with the new head.
        This is done as late as possible: the update locks the schema row until commit, which is what serializes the
-       numbering in commit order, so we want to hold that lock only for the duration of the actual commit */
-    FOREVERY (RECORD cs FROM this->changesets)
+       numbering in commit order, so we want to hold that lock only for the duration of the actual commit.
+       Always take the schema locks in ascending schema order, so two transactions touching the same schemas cannot
+       deadlock by locking them in opposite orders */
+    FOREVERY (RECORD cs FROM SELECT * FROM this->changesets ORDER BY wrdschema, changeset)
     {
       UPDATE wrd.schemas SET historyhead := historyhead + 1 WHERE id = cs.wrdschema;
       INTEGER head := SELECT AS INTEGER historyhead FROM wrd.schemas WHERE id = cs.wrdschema;

@@ -1,5 +1,6 @@
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
-import { db, nextVal } from "@webhare/whdb";
+import { db, nextVal, sql } from "@webhare/whdb";
+import type { Expression } from "kysely";
 import { type EntityPartialRec, type EntityRec, type EntitySettingsRec, type SchemaData, type TypeRec, selectEntitySettingColumns, selectEntitySettingWHFSLinkColumns } from "./db";
 import { omit } from "@webhare/std";
 import { setHareScriptType, type IPCMarshallableData, HareScriptType, getTypedArray, encodeHSON } from "@webhare/hscompat/src/hson";
@@ -42,13 +43,16 @@ export function serializeChangeEntity<T>(entity: T & { guid?: Buffer }): Omit<T,
 }
 
 /** Describe the user making the changes, like the HareScript API records GetUserDataForLogging() */
-function getActingUser(): { entity: number | null; userdata: string } {
+function getActingUser(): { entity: Expression<number | null> | null; userdata: string } {
   // The audit context is maintained by @webhare/auth (which depends on us, so we read its scoped resource directly)
   const context = getScopedResource<AuthAuditContext>("platform:authcontext");
   if (!context?.actionBy)
     return { entity: null, userdata: "" };
   return {
-    entity: context.actionBy,
+    /* Look the user up instead of referring to it directly: the context may still name an entity that has since been
+       deleted, and changesets.entity is a foreign key, so a stale context would abort the whole transaction on commit.
+       The description below keeps the identity we were given either way. */
+    entity: sql<number | null>`(SELECT id FROM wrd.entities WHERE id = ${context.actionBy})`,
     userdata: encodeHSON({
       entityid: context.actionBy,
       ...(context.actionByLogin ? { login: context.actionByLogin } : null),
