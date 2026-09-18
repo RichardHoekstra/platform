@@ -287,7 +287,8 @@ PUBLIC OBJECTTYPE FileList EXTEND FSContentsOverviewBase
       this->filterbutton->title := cachedscreen->filterbuttontitle ?? this->filterbuttontitle;
       this->filterpanel->visible := TRUE;
       cachedscreen->ResetFilter();
-      this->RunTheFilter(FALSE, FALSE);
+      IF (cachedscreen->initial_filter)
+        this->RunTheFilter(FALSE, FALSE);
       // _SetFilterResult sets the folderlistener event masks, don't lose them
       eventmasks := this->folderlistener->masks;
     }

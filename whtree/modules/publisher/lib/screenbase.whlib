@@ -10,8 +10,16 @@ PUBLIC STATIC OBJECTTYPE WHFSFilterScreenBase EXTEND TolliumScreenBase
   RECORD filtersettings;
   INTEGER folder;
 
+  /// Set to FALSE to prevent the filter from running after the initial ResetFilter call
+  PUBLIC BOOLEAN initial_filter;
+
   /// Set to the title to use for the filter button, leave empty for default
   PUBLIC STRING filterbuttontitle;
+
+  MACRO NEW()
+  {
+    this->initial_filter := TRUE;
+  }
 
   PUBLIC MACRO Init(RECORD data)
   {
