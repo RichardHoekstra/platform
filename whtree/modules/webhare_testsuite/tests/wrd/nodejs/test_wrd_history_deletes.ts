@@ -297,6 +297,16 @@ async function testDeletesAndHead() {
   await whdb.commitWork();
   test.eqPartial({ deleted: true, whfslinksmissing: true }, (await listHistory(schemaId)).at(-1)!, "TypeScript marks what it could not record");
 
+  /* STORY: a rollback runs the prepare hooks as well. It must not number or lock anything, not even in a
+     transaction that has already failed, where trying to would break the rollback itself and leave the work open. */
+  const headBeforeFailure = await wrdschema.getHistoryHead();
+  await whdb.beginWork();
+  await wrdschema.insert("wrdPerson", { wrdContactEmail: "rolledback@example.com", whuserUnit: testunit, wrdauthAccountStatus: { status: "active" } });
+  await test.throws(/division by zero/, whdb.query("SELECT 1/0"));
+  await whdb.rollbackWork();
+  test.eq(false, whdb.isWorkOpen(), "the rollback must complete");
+  test.eq(headBeforeFailure, await wrdschema.getHistoryHead());
+
   // STORY: temporary entities get no history on update, so deleting them records nothing either
   const historyBeforeTemps = (await listHistory(schemaId)).length;
   await whdb.beginWork();

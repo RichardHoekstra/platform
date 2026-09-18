@@ -10,6 +10,8 @@ class WRDFinishHandler implements FinishHandler {
   autoChangeSets = new Map<number, number>;
   /// All changesets created in this work, to be numbered in commit order
   changeSets: Array<{ wrdSchemaId: number; changeSetId: number }> = [];
+  /// Set by onBeforeCommit and cleared by onBeforeRollback: whdb runs onAfterPrepare for both, and only a commit may be numbered
+  private committing = false;
   /// Source description recorded with every change written in this work
   changeSource: Record<string, unknown> | null = null;
   typeChanges = new Map<number, {
@@ -32,6 +34,11 @@ class WRDFinishHandler implements FinishHandler {
      locks in ascending schema order, so two transactions touching the same schemas cannot deadlock by locking them
      in opposite orders. */
   async onAfterPrepare() {
+    /* A rollback prepares too. Numbering then would lock wrd.schemas rows for a transaction that is thrown away,
+       and in a transaction that already failed the update itself fails, which aborts the rollback and leaves the
+       work open. */
+    if (!this.committing)
+      return;
     while (this.changeSets.length) {
       const pending = this.changeSets.toSorted((lhs, rhs) => lhs.wrdSchemaId - rhs.wrdSchemaId || lhs.changeSetId - rhs.changeSetId);
       this.changeSets = [];
@@ -41,7 +48,12 @@ class WRDFinishHandler implements FinishHandler {
     }
   }
 
+  onBeforeRollback() {
+    this.committing = false;
+  }
+
   onBeforeCommit() {
+    this.committing = true;
     this.autoChangeSets.clear();
 
     // schedule the broadcasts to take place before the commit handlers
