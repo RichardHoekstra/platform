@@ -10,6 +10,7 @@ import { encodeWRDGuid, getIdToGuidMap } from "./accessors";
 import { wrdFinishHandler } from "./finishhandler";
 import { prepareAnyForDatabase } from "@webhare/whdb/src/formats";
 import { debugFlags } from "@webhare/env/src/envbackend";
+import { maxDateTimeTotalMsecs } from "@webhare/hscompat/src/datetime";
 import { getStackTrace } from "@webhare/js-api-tools";
 
 
@@ -29,6 +30,9 @@ export type Changes<T extends string | number | null> = {
     deletedsettings: number[];
     /** Set if this change records the deletion of the entity. All settings in oldsettings are then in deletedsettings */
     deleted?: true;
+    /** Set if the old settings held WHFS backed values (rich text, instances, file references) that this
+        implementation cannot record, so their absence from oldsettings.whfslinks is not proof they were empty */
+    whfslinksmissing?: true;
   };
 };
 
@@ -213,6 +217,7 @@ function mapChangesRefs<A extends number | string | null, B extends number | str
       whfslinks: changes.modifications.whfslinks,
       deletedsettings: changes.modifications.deletedsettings,
       ...(changes.modifications.deleted ? { deleted: true } : null),
+      ...(changes.modifications.whfslinksmissing ? { whfslinksmissing: true } : null),
     }
   };
 
@@ -236,7 +241,7 @@ export async function mapChangesIdsToRefs(typeRec: TypeRec, changes: Changes<num
     @param cause - The change causing this change, if any
     @returns The id of the recorded change
 */
-async function recordRemovalChange(typeRec: TypeRec, entityrec: EntityRec, settings: EntitySettingsRec[], removedSettingIds: number[], deleted: boolean, cause: number | null, now: Date): Promise<number> {
+async function recordRemovalChange(typeRec: TypeRec, entityrec: EntityRec, settings: EntitySettingsRec[], removedSettingIds: number[], deleted: boolean, whfsLinked: boolean, cause: number | null, now: Date): Promise<number> {
   const changeId = await nextVal("wrd.changes.id");
   const changes: Changes<number | null> = {
     oldsettings: {
@@ -250,6 +255,7 @@ async function recordRemovalChange(typeRec: TypeRec, entityrec: EntityRec, setti
       whfslinks: [],
       deletedsettings: getTypedArray(HareScriptType.IntegerArray, removedSettingIds),
       ...(deleted ? { deleted: true } : null),
+      ...(whfsLinked ? { whfslinksmissing: true } : null),
     }
   };
 
@@ -354,7 +360,7 @@ export async function recordEntityDeletion(schemadata: SchemaData, ids: number[]
   /* Read the settings of a group of entities in one query. Done in blocks so a bulk delete issues a few queries
      instead of one per entity, while keeping the settings (which carry the blobs) of only one block in memory. */
   const settingsPerBlock = 100;
-  async function* inBlocks<T extends { id: number }>(entities: T[]): AsyncGenerator<Array<[T, EntitySettingsRec[]]>> {
+  async function* inBlocks<T extends { id: number }>(entities: T[]): AsyncGenerator<Array<[T, EntitySettingsRec[], boolean]>> {
     for (let offset = 0; offset < entities.length; offset += settingsPerBlock) {
       const block = entities.slice(offset, offset + settingsPerBlock);
       const settings = await db<PlatformDB>()
@@ -363,16 +369,27 @@ export async function recordEntityDeletion(schemadata: SchemaData, ids: number[]
         .where("entity", "in", block.map(entity => entity.id))
         .orderBy("id")
         .execute();
+      /* We cannot record WHFS backed values yet (getWHFSLinksForChanges throws on them, which is why the update
+         path refuses such entities), so note which entities had them instead of leaving their absence ambiguous */
+      const whfsLinked = new Set(settings.length ? (await db<PlatformDB>()
+        .selectFrom("wrd.entity_settings_whfslink")
+        .innerJoin("wrd.entity_settings", "wrd.entity_settings.id", "wrd.entity_settings_whfslink.id")
+        .select("wrd.entity_settings.entity")
+        .where("wrd.entity_settings_whfslink.id", "in", settings.map(setting => setting.id))
+        .execute()).map(row => row.entity) : []);
       const perEntity = Map.groupBy(settings, setting => setting.entity);
-      yield block.map(entity => [entity, perEntity.get(entity.id) ?? []]);
+      yield block.map(entity => [entity, perEntity.get(entity.id) ?? [], whfsLinked.has(entity.id)]);
     }
   }
 
-  const toRecord = [...doomed.values()].filter(victim => keepsHistory(schemadata.typeIdMap.get(victim.rec.type)));
+  /* Temporary entities never get history, the update path skips them too. They do stay in the closure, because
+     whatever hangs off them still cascades and may well need recording. */
+  const toRecord = [...doomed.values()].filter(victim =>
+    keepsHistory(schemadata.typeIdMap.get(victim.rec.type)) && victim.rec.creationdate?.getTime() !== maxDateTimeTotalMsecs);
   for await (const block of inBlocks(toRecord.map(victim => victim.rec))) {
-    for (const [rec, settings] of block) {
+    for (const [rec, settings, whfsLinked] of block) {
       const parent = doomed.get(rec.id)!.parent;
-      deletionChanges.set(rec.id, await recordRemovalChange(schemadata.typeIdMap.get(rec.type)!, rec, settings, settings.map(s => s.id), true, getCause(parent), now));
+      deletionChanges.set(rec.id, await recordRemovalChange(schemadata.typeIdMap.get(rec.type)!, rec, settings, settings.map(s => s.id), true, whfsLinked, getCause(parent), now));
     }
   }
 
@@ -382,7 +399,7 @@ export async function recordEntityDeletion(schemadata: SchemaData, ids: number[]
     ? await db<PlatformDB>().selectFrom("wrd.entities").selectAll().where("id", "in", [...refsPerEntity.keys()]).orderBy("id").execute()
     : [];
   for await (const block of inBlocks(affected.filter(rec => keepsHistory(schemadata.typeIdMap.get(rec.type))))) {
-    for (const [rec, settings] of block) {
+    for (const [rec, settings, whfsLinked] of block) {
       const refs = refsPerEntity.get(rec.id)!;
       // The dropped settings and, transitively, their subsettings
       const removed = new Set(refs.map(ref => ref.id));
@@ -394,7 +411,7 @@ export async function recordEntityDeletion(schemadata: SchemaData, ids: number[]
             added = true;
           }
       }
-      await recordRemovalChange(schemadata.typeIdMap.get(rec.type)!, rec, settings, [...removed].sort((a, b) => a - b), false, getCause(refs[0].setting), now);
+      await recordRemovalChange(schemadata.typeIdMap.get(rec.type)!, rec, settings, [...removed].sort((a, b) => a - b), false, whfsLinked, getCause(refs[0].setting), now);
     }
   }
 }

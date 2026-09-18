@@ -2945,7 +2945,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
          WHERE changeset = changesetid
                AND type = this->typerec.id
                AND (IsValueSet(options.filterentities) ? entity IN filterguids : TRUE)
-         ORDER BY creationdate;
+         ORDER BY creationdate, id; // all changes of one delete share a creationdate, so order by id too
 
     IF (NOT RecordExists(changes))
       RETURN RECORD[];
@@ -3968,7 +3968,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
         [ oldsettings :=
               [ entityrec :=        entityrec
               , settings :=         this->SaveEntitySettingAttachments(changeid, settings)
-              , whfslinks :=        RECORD[] //FIXME recording WHFS links is not supported yet (see the JS implementation), but that shouldn't block deletes
+              , whfslinks :=        this->GetWHFSLinksForChanges(SELECT AS INTEGER64 ARRAY id FROM settings)
               ]
         , modifications :=
               [ entityrec :=        DEFAULT RECORD
@@ -4080,7 +4080,10 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
     FOREVERY (RECORD victim FROM doomed)
     {
       OBJECT typeobj := this->pvt_wrdschema->GetTypeById(victim.rec.type);
-      IF (NOT ObjectExists(typeobj) OR (typeobj->keephistorydays <= 0 AND NOT historydebugging))
+      // Temporary entities never get history, the update path skips them too. They stay in the closure, because
+      // whatever hangs off them still cascades and may well need recording.
+      IF (NOT ObjectExists(typeobj) OR victim.rec.creationdate = MAX_DATETIME
+          OR (typeobj->keephistorydays <= 0 AND NOT historydebugging))
         CONTINUE;
 
       RECORD ARRAY settings := SELECT * FROM doomedsettings WHERE entity = victim.id;

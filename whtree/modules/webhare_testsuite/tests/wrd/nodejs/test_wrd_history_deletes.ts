@@ -17,6 +17,8 @@ import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import { readAnyFromDatabase } from "@webhare/whdb/src/formats";
 import { encodeWRDGuid } from "@webhare/wrd/src/accessors";
 import { throwError } from "@webhare/std";
+import { buildRTD } from "@webhare/services";
+import { openSite } from "@webhare/whfs";
 
 type WRD_TestschemaSchemaType = WRDSchemaLike["wrd:testschema"];
 
@@ -36,7 +38,10 @@ async function listHistory(schemaId: number) {
   return Promise.all(rows.map(async row => ({
     ...row,
     entity: encodeWRDGuid(row.entity),
-    deleted: Boolean(((await readAnyFromDatabase(row.modifications, row.modifications_blob)) as { deleted?: boolean } | null)?.deleted),
+    ...await (async () => {
+      const mods = (await readAnyFromDatabase(row.modifications, row.modifications_blob)) as { deleted?: boolean; whfslinksmissing?: boolean } | null;
+      return { deleted: Boolean(mods?.deleted), whfslinksmissing: Boolean(mods?.whfslinksmissing) };
+    })(),
   })));
 }
 
@@ -256,6 +261,67 @@ async function testDeletesAndHead() {
   test.eq(headBeforeEntityDelete + 1, await wrdschema.getHistoryHead());
   test.eqPartial([{ deleted: true, historyseqnr: headBeforeEntityDelete + 1 }], (await listHistory(schemaId)).filter(row => row.entity === viaEntityGuid && row.deleted));
   test.eq(null, await wrdschema.getFields("wrdPerson", viaEntity, ["wrdGuid"], { allowMissing: true, historyMode: "all" }));
+
+  /* STORY: values backed by WHFS (rich text with links or instances, instances, WHFS references) cannot be recorded
+     by the TypeScript implementation yet, and its update path refuses such entities. HareScript can record them and
+     now does; TypeScript marks the record instead of pretending the value was empty. Plain rich text is stored as a
+     blob and recorded by both. The entities are created before the type keeps history, because the TypeScript update
+     path would refuse them otherwise. */
+  const loose = wrd<"*">(testSchemaTag);
+  await whdb.beginWork();
+  const holderType = await loose.createType("whfsholder", { metaType: "object", keepHistoryDays: 0 });
+  await holderType.createAttribute("rt", { attributeType: "richTextDocument" });
+  await holderType.createAttribute("ref", { attributeType: "whfsRef" });
+  await whdb.commitWork();
+  await whdb.beginWork();
+  const refTarget = (await openSite("webhare_testsuite.testsite")).id; //an object the WHFS mapper can name
+  const holderValue = { rt: await buildRTD([{ p: "plain rich text" }]), ref: refTarget };
+  const viaHS = await loose.insert("whfsholder", holderValue);
+  const viaTS = await loose.insert("whfsholder", holderValue);
+  await loose.getType("whfsholder").updateMetadata({ keepHistoryDays: 1 });
+  await whdb.commitWork();
+  loose.__clearCache();
+
+  const hsHolderType = await (await loadlib("mod::wrd/lib/api.whlib").OpenWRDSchema(testSchemaTag) as HSVMObject).getType("WHFSHOLDER") as HSVMObject;
+  await whdb.beginWork();
+  await hsHolderType.DeleteEntity(viaHS);
+  await whdb.commitWork();
+  const hsHolderChangeset = (await db<PlatformDB>().selectFrom("wrd.changesets").select("id").where("wrdschema", "=", schemaId).orderBy("historyseqnr", "desc").executeTakeFirstOrThrow()).id;
+  const hsHolderChanges = await hsHolderType.GetChanges(hsHolderChangeset);
+  test.eqPartial([{ changetype: "delete", oldsettings: { ref: refTarget } }], hsHolderChanges, "HareScript records the WHFS reference of a deleted entity");
+  test.assert(hsHolderChanges[0].oldsettings.rt, "and its rich text");
+  test.eq(false, (await listHistory(schemaId)).find(row => row.changeset === hsHolderChangeset)?.whfslinksmissing);
+
+  await whdb.beginWork();
+  await loose.delete("whfsholder", viaTS);
+  await whdb.commitWork();
+  test.eqPartial({ deleted: true, whfslinksmissing: true }, (await listHistory(schemaId)).at(-1)!, "TypeScript marks what it could not record");
+
+  // STORY: temporary entities get no history on update, so deleting them records nothing either
+  const historyBeforeTemps = (await listHistory(schemaId)).length;
+  await whdb.beginWork();
+  const tempViaTS = await wrdschema.insert("wrdPerson", { wrdContactEmail: "temp1@example.com", wrdauthAccountStatus: { status: "active" } }, { temp: true });
+  const tempViaHS = await wrdschema.insert("wrdPerson", { wrdContactEmail: "temp2@example.com", wrdauthAccountStatus: { status: "active" } }, { temp: true });
+  await wrdschema.delete("wrdPerson", tempViaTS);
+  await hsPersontype.DeleteEntity(tempViaHS);
+  await whdb.commitWork();
+  test.eq(historyBeforeTemps, (await listHistory(schemaId)).length);
+
+  /* STORY: another module's finish handler writes WRD data while the commit is being prepared, after WRD's own
+     handler already ran. That changeset must still be numbered, or the head would silently skip it. */
+  const headBeforeLateWrite = await wrdschema.getHistoryHead();
+  await whdb.beginWork();
+  await wrdschema.insert("wrdPerson", { wrdContactEmail: "early@example.com", whuserUnit: testunit, wrdauthAccountStatus: { status: "active" } });
+  whdb.onFinishWork({
+    // WRD's own handler was registered by the insert above, so it prepares first and has already moved on
+    onBeforeCommit: async () => {
+      await wrdschema.insert("wrdPerson", { wrdContactEmail: "late@example.com", whuserUnit: testunit, wrdauthAccountStatus: { status: "active" } });
+    }
+  });
+  await whdb.commitWork();
+  test.eq(0, (await db<PlatformDB>().selectFrom("wrd.changesets").select("id").where("wrdschema", "=", schemaId).where("historyseqnr", "=", 0).execute()).length,
+    "a changeset created by a later commit handler must be numbered too");
+  test.eq(headBeforeLateWrite + 2, await wrdschema.getHistoryHead());
 
   // Every committed changeset got a unique number and the head is the highest one: the head is a complete observation point
   const numbered = await db<PlatformDB>().selectFrom("wrd.changesets").select("historyseqnr").where("wrdschema", "=", schemaId).orderBy("historyseqnr").execute();

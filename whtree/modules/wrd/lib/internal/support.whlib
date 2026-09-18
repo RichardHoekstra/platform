@@ -824,13 +824,20 @@ STATIC OBJECTTYPE WRDEntityCommitHandler EXTEND TransactionFinishHandlerBase <
        numbering in commit order, so we want to hold that lock only for the duration of the actual commit.
        Always take the schema locks in ascending schema order, so two transactions touching the same schemas cannot
        deadlock by locking them in opposite orders */
-    FOREVERY (RECORD cs FROM SELECT * FROM this->changesets ORDER BY wrdschema, changeset)
+    /* Keep going until nothing new turns up: a commit handler that ran before this one may have created
+       changesets of its own. HareScript has no after-prepare hook, so a handler running after this one is out
+       of reach here; the TypeScript side numbers in onAfterPrepare and does not have that gap. */
+    WHILE (Length(this->changesets) > 0)
     {
-      UPDATE wrd.schemas SET historyhead := historyhead + 1 WHERE id = cs.wrdschema;
-      INTEGER head := SELECT AS INTEGER historyhead FROM wrd.schemas WHERE id = cs.wrdschema;
-      UPDATE wrd.changesets SET historyseqnr := head WHERE id = cs.changeset;
+      RECORD ARRAY pending := SELECT * FROM this->changesets ORDER BY wrdschema, changeset;
+      this->changesets := RECORD[];
+      FOREVERY (RECORD cs FROM pending)
+      {
+        UPDATE wrd.schemas SET historyhead := historyhead + 1 WHERE id = cs.wrdschema;
+        INTEGER head := SELECT AS INTEGER historyhead FROM wrd.schemas WHERE id = cs.wrdschema;
+        UPDATE wrd.changesets SET historyseqnr := head WHERE id = cs.changeset;
+      }
     }
-    this->changesets := RECORD[];
   }
 
   /** Called when the transaction has committed

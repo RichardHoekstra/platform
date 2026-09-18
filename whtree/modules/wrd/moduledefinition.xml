@@ -232,7 +232,8 @@
       </d:integer>
       <d:integer name="historyhead">
         <d:documentation>History head: the historyseqnr of the last committed changeset in this schema. Only advances when a
-          transaction that created a changeset commits, so a reader that saw head H has seen every changeset with historyseqnr &lt;= H</d:documentation>
+          transaction that created a changeset commits, so a reader that saw head H has seen every changeset with historyseqnr &lt;= H.
+          Bulk maintenance deletes (the deleteclosedafter cleanup and DeleteAllEntities) are not recorded and do not advance it</d:documentation>
       </d:integer>
       <d:index name="uniquename" columns="name" unique="true" uppercase="true" />
     </d:table>
