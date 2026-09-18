@@ -16,7 +16,7 @@ const default_mousestate =
   cy: 0,
   downel: null,
   downelrect: null,
-  downbuttons: [],
+  downbuttons: new Set<number>(),
   samplefreq: 50,
   gesturequeue: [] as MouseGesture[],
   gesturetimeout: null,
@@ -1013,7 +1013,7 @@ function processGestureQueue() {
     }
 
     if (typeof part.down === 'number') {
-      if (mousestate.downbuttons.includes(part.down))
+      if (mousestate.downbuttons.has(part.down))
         throw new Error("Invalid mouse gesture - sending down for button #" + part.down + " when it is aleady down");
       if (part.down === 0) {
         mousestate.downel = target.el;
@@ -1044,17 +1044,16 @@ function processGestureQueue() {
       }
 
       //ADDME discover cancellation etc and properly handle those
-      mousestate.downbuttons.push(part.down);
+      mousestate.downbuttons.add(part.down);
     } else if (typeof part.up === 'number') {
-      if (!mousestate.downbuttons.includes(part.up))
+      if (!mousestate.downbuttons.has(part.up))
         throw new Error("Invalid mouse gesture - sending up for button #" + part.up + " when it is not down");
 
       //FIXME see above for missing event parameters
 
       if (!mousestate.dndstate)
         fireMouseEvent("mouseup", target.cx, target.cy, target.el, part.up, null, part);
-      if (mousestate.downbuttons.includes(part.up))
-        mousestate.downbuttons.splice(mousestate.downbuttons.indexOf(part.up), 1);
+      mousestate.downbuttons.delete(part.up);
 
       /* Is this a click?
          originally: (start and end is same element. ADDME doesn't work this way if drag is triggered, ie on button: mousedown,move,up = click, on link: mousedown,move,up = dragging)
@@ -1316,8 +1315,7 @@ export function startExternalFileDrag(file: File): void {
     mousestate.dndstate.addFile(file);
 
   // ensure button 0 is down
-  if (!mousestate.downbuttons.includes(0))
-    mousestate.downbuttons.push(0);
+  mousestate.downbuttons.add(0);
 }
 
 /** Returns the current drag data store
