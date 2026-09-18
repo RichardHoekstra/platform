@@ -39,6 +39,8 @@ PUBLIC OBJECTTYPE FilterPanel EXTEND WHFSFilterScreenBase
   {
     WHFSFilterScreenBase::Init(data);
 
+    this->initial_filter := FALSE;
+
     this->and_search := TRUE;
     this->results_limit := 100;
 

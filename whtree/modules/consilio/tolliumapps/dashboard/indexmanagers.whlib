@@ -81,15 +81,16 @@ PUBLIC STATIC OBJECTTYPE IndexMgrs EXTEND DashboardPanelBase
       result := JoinArrays(result, "indexname", catalogs, [ catalog := "" ], [ rightouterjoin := TRUE ]);
 
       ^indices->rows :=
-          SELECT *
-               , catalog_sort := (catalog = "" ? "1" : "0") || catalog // sort connected indices first
+          SELECT TEMPORARY catalog_sort := (catalog = "" ? "1" : "0") || catalog || "\t" || name // sort connected indices first
+               , *
+               , catalog_sort := catalog_sort
                , rawhealth := health
                , rawdocs := docs
                , rawsize := size
                , health := this->GetHealthIcon(health, ^indices)
                , docs := this->contexts->user->FormatMoney(docs, 0, TRUE)
                , size := this->contexts->user->FormatFileSize(size, 0, TRUE)
-               , size_sort := Right("000000000000000000" || size, 19)
+               , size_sort := Right("000000000000000000" || size, 19) || catalog_sort
                , listrowclasses := catalog = "" ? [ "grayedout" ] : STRING[]
             FROM result;
       ^indices->empty := this->GetTid(".noindices");

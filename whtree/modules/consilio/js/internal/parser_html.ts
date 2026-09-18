@@ -1,6 +1,6 @@
 import { decodeHSON } from "@webhare/hscompat";
 import { toSnakeCase } from "@webhare/std";
-import { type DefaultTreeAdapterMap, parse } from "parse5";
+import { type DefaultTreeAdapterTypes, parse } from "parse5";
 
 
 // All HTML elements to be separated by spaces
@@ -113,19 +113,19 @@ export async function parseHTMLPage(htmlPage: Blob) {
   // Image links we've already seen
   const imageLinks: string[] = [];
 
-  function parseNode(node: DefaultTreeAdapterMap["node"]) {
+  function parseNode(node: DefaultTreeAdapterTypes.Node) {
     if (node.nodeName === "#document") {
-      for (const childNode of (node as DefaultTreeAdapterMap["element"]).childNodes)
+      for (const childNode of (node as DefaultTreeAdapterTypes.Element).childNodes)
         parseNode(childNode);
     } else if (!node.nodeName.startsWith("#")) {
-      elementStart(node.nodeName.toUpperCase(), (node as DefaultTreeAdapterMap["element"]).attrs);
-      for (const childNode of (node as DefaultTreeAdapterMap["element"]).childNodes)
+      elementStart(node.nodeName.toUpperCase(), (node as DefaultTreeAdapterTypes.Element).attrs);
+      for (const childNode of (node as DefaultTreeAdapterTypes.Element).childNodes)
         parseNode(childNode);
       elementEnd(node.nodeName.toUpperCase());
     } else if (node.nodeName === "#text")
-      text((node as DefaultTreeAdapterMap["textNode"]).value);
+      text((node as DefaultTreeAdapterTypes.TextNode).value);
     else if (node.nodeName === "#comment")
-      comment((node as DefaultTreeAdapterMap["commentNode"]).data);
+      comment((node as DefaultTreeAdapterTypes.CommentNode).data);
   }
 
   function elementStart(elementName: string, attrs?: Array<{name: string; value: string}>) {
