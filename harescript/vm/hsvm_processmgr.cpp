@@ -721,6 +721,11 @@ VMGroup * JobManager::CreateVMGroup(bool highpriority)
 
         std::string newgroupid = Blex::GenerateUFS128BitId();
 
+        {
+                HareScript::LockedLocalGroupData::WriteRef localdata(ref.group->localdata);
+                localdata->groupid = newgroupid;
+        }
+
         LockedJobData::WriteRef lock(jobdata);
         ref.group->jmdata.groupid = newgroupid;
         return ref.group;
@@ -926,12 +931,6 @@ std::string JobManager::GetGroupExternalSessionData(VMGroup const *group) const
 {
         LockedJobData::ReadRef lock(jobdata);
         return group->jmdata.externalsessiondata;
-}
-
-std::shared_ptr< const Blex::Environment > JobManager::GetGroupEnvironmentOverride(VMGroup const *group) const
-{
-        LockedJobData::ReadRef lock(jobdata);
-        return group->jmdata.environment;
 }
 
 void JobManager::SetRunningStatus(VMGroup *group, bool isrunning)
@@ -1176,6 +1175,10 @@ void JobManager::GetGroupInfoUnlocked(VMGroup const &group, VMGroupInfo *info)
 /// Overwrite group id
 void JobManager::SetGroupId(VMGroup &group, std::string const &newgroupid)
 {
+        {
+                HareScript::LockedLocalGroupData::WriteRef localdata(group.localdata);
+                localdata->groupid = newgroupid;
+        }
         LockedJobData::ReadRef lock(jobdata);
         group.jmdata.groupid = newgroupid;
 }
@@ -1184,12 +1187,6 @@ void JobManager::SetGroupExternalSessionData(VMGroup &group, std::string const &
 {
         LockedJobData::ReadRef lock(jobdata);
         group.jmdata.externalsessiondata = sessiondata;
-}
-
-void JobManager::SetGroupEnvironmentOverride(VMGroup &group, std::shared_ptr< const Blex::Environment > env)
-{
-        LockedJobData::ReadRef lock(jobdata);
-        group.jmdata.environment = env;
 }
 
 bool JobManager::WillReachState(LockedJobData::WriteRef &, VMGroup *group, RunningState::Type state)
@@ -1614,7 +1611,7 @@ void HSLockManager::RemoveQueueEntryLocked(LockedData::WriteRef &lock, HSLock *h
         hslock->event.SetSignalled(false);
 }
 
-void HSLockManager::GetLockStatus(JobManager *jobmgr, HSVM *vm, HSVM_VariableId id_set)
+void HSLockManager::GetLockStatus(JobManager *, HSVM *vm, HSVM_VariableId id_set)
 {
         HSVM_SetDefault(vm, id_set, HSVM_VAR_RecordArray);
 
@@ -1640,7 +1637,7 @@ void HSLockManager::GetLockStatus(JobManager *jobmgr, HSVM *vm, HSVM_VariableId 
                         unsigned lockorder = std::distance(process_locks.begin(), std::find(process_locks.begin(), process_locks.end(), qit));
 
                         HSVM_StringSetSTD(vm, HSVM_RecordCreate(vm, var_lock, HSVM_GetColumnId(vm, "NAME")), lockdata.name);
-                        HSVM_StringSetSTD(vm, HSVM_RecordCreate(vm, var_lock, HSVM_GetColumnId(vm, "GROUPID")), jobmgr->GetGroupId(qit->processdata->vmgroup));
+                        HSVM_StringSetSTD(vm, HSVM_RecordCreate(vm, var_lock, HSVM_GetColumnId(vm, "GROUPID")), LockedLocalGroupData::ReadRef(qit->processdata->vmgroup->localdata)->groupid);
                         HSVM_IntegerSet(vm, HSVM_RecordCreate(vm, var_lock, HSVM_GetColumnId(vm, "MAXCONCURRENT")), qit->maxconcurrent);
                         HSVM_IntegerSet(vm, HSVM_RecordCreate(vm, var_lock, HSVM_GetColumnId(vm, "LOCKPOSITION")), count - 1);
                         HSVM_IntegerSet(vm, HSVM_RecordCreate(vm, var_lock, HSVM_GetColumnId(vm, "GROUPLOCKPOSITION")), lockorder);
@@ -1648,7 +1645,7 @@ void HSLockManager::GetLockStatus(JobManager *jobmgr, HSVM *vm, HSVM_VariableId 
                         HSVM_DateTimeSet(vm, HSVM_RecordCreate(vm, var_lock, HSVM_GetColumnId(vm, "WAITSTART")), qit->waitstart.GetDays(), qit->waitstart.GetMsecs());
                         HSVM_DateTimeSet(vm, HSVM_RecordCreate(vm, var_lock, HSVM_GetColumnId(vm, "LOCKSTART")), qit->lockstart.GetDays(), qit->lockstart.GetMsecs());
 
-                        LOCK_PRINT(" "  << lockdata.name << " gid: " << jobmgr->GetGroupId(qit->processdata->vmgroup) << " cnt: " << count << " mc: " << qit->maxconcurrent << " lo: " << lockorder);
+                        LOCK_PRINT(" "  << lockdata.name << " gid: " << LockedLocalGroupData::ReadRef(qit->processdata->vmgroup->localdata)->groupid << " cnt: " << count << " mc: " << qit->maxconcurrent << " lo: " << lockorder);
                 }
         }
 }
@@ -2501,7 +2498,7 @@ void GetJobEnvironment(VarId id_set, VirtualMachine *vm)
             throw VMRuntimeError(Error::InternalError, "Job with this id does not exist");
 
         Blex::Environment env;
-        std::shared_ptr< const Blex::Environment > override = jobmgr->GetGroupEnvironmentOverride(it->second->GetVMGroup());
+        auto override = HareScript::LockedLocalGroupData::ReadRef(it->second->GetVMGroup()->localdata)->environment;
 
         Blex::Environment const *useenv;
         if (override)
@@ -2532,8 +2529,6 @@ void SetJobEnvironment(VirtualMachine *vm)
 
         int32_t handle = HSVM_IntegerGet(*vm, HSVM_Arg(0));
 
-        JobManager *jobmgr = vm->GetVMGroup()->GetJobManager();
-
         JobManagerContext jmcontext(vm->GetContextKeeper());
 
         std::map< int32_t, std::shared_ptr< Job > >::iterator it = jmcontext->jobs.find(handle);
@@ -2557,7 +2552,7 @@ void SetJobEnvironment(VirtualMachine *vm)
                 (*override)[HSVM_StringGetSTD(*vm, var_name)] = HSVM_StringGetSTD(*vm, var_value);
         }
 
-        jobmgr->SetGroupEnvironmentOverride(*it->second->GetVMGroup(), override);
+        LockedLocalGroupData::WriteRef(it->second->GetVMGroup()->localdata)->environment = override;
 }
 
 void SetJobCancellable(VirtualMachine *vm)

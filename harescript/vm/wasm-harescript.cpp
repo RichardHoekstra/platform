@@ -343,12 +343,12 @@ void EMSCRIPTEN_KEEPALIVE InjectEvent(HSVM *, const char *name, uint8_t const *p
 }
 
 bool EMSCRIPTEN_KEEPALIVE HasEnvironmentOverride(HSVM *hsvm) {
-        return HareScript::GetVirtualMachine(hsvm)->GetVMGroup()->jmdata.environment.get();
-}
+        return HareScript::LockedLocalGroupData::ReadRef(HareScript::GetVirtualMachine(hsvm)->GetVMGroup()->localdata)->environment.get();
+        }
 
 void EMSCRIPTEN_KEEPALIVE GetEnvironment(HSVM *hsvm, HSVM_VariableId id_set) {
         Blex::Environment env;
-        std::shared_ptr< const Blex::Environment > override = HareScript::GetVirtualMachine(hsvm)->GetVMGroup()->jmdata.environment;
+        auto override = HareScript::LockedLocalGroupData::ReadRef(HareScript::GetVirtualMachine(hsvm)->GetVMGroup()->localdata)->environment;
 
         Blex::Environment const *useenv;
         if (override)
@@ -391,7 +391,7 @@ void EMSCRIPTEN_KEEPALIVE SetEnvironment(HSVM *hsvm, HSVM_VariableId data)
                 (*override)[HSVM_StringGetSTD(hsvm, var_name)] = HSVM_StringGetSTD(hsvm, var_value);
         }
 
-        HareScript::GetVirtualMachine(hsvm)->GetVMGroup()->jmdata.environment = override;
+        HareScript::LockedLocalGroupData::WriteRef(HareScript::GetVirtualMachine(hsvm)->GetVMGroup()->localdata)->environment = override;
 }
 
 emscripten::EM_VAL EMSCRIPTEN_KEEPALIVE GetLoadedLibrariesInfo(HSVM *hsvm, bool onlydirectloaded)
