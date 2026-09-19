@@ -15,13 +15,13 @@ function forwardPublisherNavigation(event: Event) {
 
   const desturl = navaction.href;
   if (desturl.split('#')[0] !== location.href.split('#')[0]) { //it's actual navigation...
-    for (const origin of config.interfaceServers) {
-      try {
-        window.top?.postMessage({ type: "webhare-navigation", location: desturl }, origin);
-      } catch (ignore) {
-        //ignore crossdomain errors
-      }
-    }
+    for (const origin of config.interfaceServers)
+      if (origin.startsWith(document.referrer || ''))
+        try {
+          window.top?.postMessage({ type: "webhare-navigation", location: desturl }, origin);
+        } catch (ignore) {
+          //ignore crossdomain errors
+        }
   }
 }
 

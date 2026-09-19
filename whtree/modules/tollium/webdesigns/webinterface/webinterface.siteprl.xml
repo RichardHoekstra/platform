@@ -58,7 +58,8 @@
       <webrule path="/" match="initial">
         <addheader header="X-XSS-Protection" value="1; mode=block" />
         <addheader header="X-Content-Type-Options" value="nosniff" />
-        <addheader header="Referrer-Policy" value="no-referrer" />
+        <!-- pass the origin, needed by iframes and publisher view to suppress postmesaasge errors -->
+        <addheader header="Referrer-Policy" value="origin" />
 
         <!-- note: the applicationportal will overwrite the CSP and X-Frame-Options so this policy only applies to the wrdauth (login) pages -->
         <addheader header="X-Frame-Options" value="DENY" />
