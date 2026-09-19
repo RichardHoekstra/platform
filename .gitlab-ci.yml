@@ -191,7 +191,7 @@ updatetestscripts:
   dependencies: []
   only:
     refs:
-      - master
+      - main
     variables:
       - $WHBUILD_BUILDBOTPASSWORD
   except:

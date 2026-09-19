@@ -1,6 +1,6 @@
 #!/bin/bash -x
 
-# This script is maintained at https://gitlab.com/webhare/platform/blob/master/addons/testmodule.sh - 'master' branch builds
+# This script is maintained at https://github.com/webhare/platform/blob/main/addons/testmodule.sh - 'main' branch builds
 # automatically update the online version at https://build.webhare.dev/ci/scripts/testmodule.sh
 #
 # This script and its URL exist to allow us to update how the module CI works without updating individual .gitlab-ci.yamls too often

@@ -5,7 +5,7 @@ The recommended way to run WebHare inside a docker for development is:
 
 ```bash
   docker run -ti --rm --name webhare -p 80:80 -p 443:443 \
-  -v ~/whdata:/opt/whdata webhare/webhare-core:master
+  -v ~/whdata:/opt/whdata docker.io/webhare/platform:main
 ```
 
 On macOS and Linux, `~` refers to your home directory. On Windows you should
@@ -19,7 +19,7 @@ What these options do:
 - `--name webhare`: Names the container so you can `docker exec webhare`
 - `-p <port>:<port>`: Publishes the specified port (80 and 443)
 - `-v <outside path>:<inside path>`: Mounts the specified path onto the specified internal path
-- `webhare/webhare-core:master`: The [tag](https://hub.docker.com/r/webhare/webhare-core/tags) to install
+- `docker.io/webhare/platform:main`: The [tag](https://hub.docker.com/r/webhare/platform/tags) to install
 
 ### Using a data volume
 Using a data volume is often more stable and improves performance on Windows and macOS hosts,
@@ -33,7 +33,7 @@ To create and use a volume, and have a separate module dir in `whmodules`:
 ```bash
   docker volume create webhare-data
   docker run -ti --rm --name webhare -p 80:80 -p 443:443 \
-  -v webhare-data:/opt/whdata -v ~/whmodules:/opt/whmodules webhare/webhare-core:master
+  -v webhare-data:/opt/whdata -v ~/whmodules:/opt/whmodules docker.io/webhare/platform:main
 ```
 
 For more information see [Manage data in Docker](https://docs.docker.com/storage/)
@@ -68,4 +68,3 @@ You can force a coredump by sending a QUIT signal to the process (eg `pkill -QUI
 
 Coredumps generally end up in the /tmp/ directory. If you cannot find the coredumps,
 check the various [/proc/ settings](http://man7.org/linux/man-pages/man5/core.5.html).
-

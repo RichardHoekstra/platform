@@ -26,18 +26,6 @@ to run tests with prices both including and excluding VATs:
 
 The value of test parameter can be queried using `getTestArgument(idx)`
 
-## Running WebHare with testsuite
-We now supply a build which embeds the webhare_testsuite (for safety reasons,
-normal builds omit this). To start it:
-
-```bash
-docker pull webhare/webhare-core:master-withts
-docker run --rm -p 8989:8000 webhare/webhare-core:master-withts
-```
-
-this will create a testsuite server with its administrative interface on port 8989.
-Go to http://127.0.0.1:8989/ to access it.
-
 ## Simulating CI
 ```bash
 wh buildcontainer
@@ -53,11 +41,6 @@ as possible.
 
 To do this, find the name of the image you want to test. If you've built the image locally
 (eg you've run `wh buildcontainer`) the image will be named `localhost/webhare/platform:devbuild`.
-
-If you want to test against a CI built version,
-you're probably after `webhare/webhare-core:master-withts`. If you didn't build
-it locally, pull it first: `docker pull webhare/webhare-core:master-withts`
-to make sure you have the newset version
 
 Launch a test image in the foreground:
 ```bash

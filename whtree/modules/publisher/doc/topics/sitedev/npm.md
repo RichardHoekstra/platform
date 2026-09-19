@@ -51,39 +51,9 @@ import 'font-awesome/css/font-awesome.css';
 Note that we generally recommend to use JavaScript `import` for CSS files and
 not `@import` as the former allows the bundler to de-duplicate the CSS import.
 
-## Developing your own modules
-If you want to develop your own modules (for use with WebHare or to also
-share them with the wider npm ecosystem) you can use 'npm link' as you would
-with non WebHare modules.
-
-Set up a separate project for your upcoming NPM module:
-```bash
-mkdir ~/projects/myproject
-cd ~/projects/myproject
-git init
-npm init
-npm link
-```
-
-And from your project
-```bash
-npm link myproject
-```
-
-When you're done, commit and push your project to npm
-```bash
-git remote add origin git@gitlab.com:mynamespace/myproject.git
-git add .
-git commit
-npm publish --public
-git push -u origin master
-```
-
-And before committing your module, 'properly' refer to your project (and undo the link)
-```bash
-npm install myproject@^0.1.0
-```
 
 ## Shipped node_modules
 WebHare ships with some node_modules of its own to implement various funtionality (eg bundling). These NPM modules
 are stored in whtree/node_modules and only accessible to built-in modules to prevent accidental undeclared dependencies
+
+Some of these builtin modules are exported through `@webnare/deps`.
