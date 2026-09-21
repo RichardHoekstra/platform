@@ -8,7 +8,6 @@ declare module "@webhare/tollium-test" {
    (eg: compByName is going to require a lot of downstream changes if it would document it could
         return null (lots of !s) or start throwing if a component was not found */
 
-import { toElement, type CastableToElement } from "dompack/testframework/pointer";
 import { getCurrentScreen, getTestScreen, type ScreenProxy } from "@mod-tollium/js/testframework.ts";
 
 import * as test from "@webhare/test-frontend";
@@ -47,15 +46,11 @@ class ListProxy {
   }
 }
 
-class ComponentProxy implements CastableToElement {
+class ComponentProxy {
   readonly node: HTMLElement;
 
   constructor(node: HTMLElement) {
     this.node = node;
-  }
-
-  [toElement](): HTMLElement {
-    return this.node;
   }
 
   get list() {

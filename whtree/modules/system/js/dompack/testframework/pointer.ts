@@ -35,8 +35,6 @@ interface PointEventOptions extends ElementActionOptions {
   preventBubble: boolean;
 }
 
-export const toElement = Symbol("pointer.toElement");
-
 const mousestate = { ...default_mousestate };
 const browserPlatform = getPlatform();
 
@@ -579,9 +577,6 @@ export function sendMouseGesture(gestureparts: MouseGesture[]): Promise<void> {
   for (let i = 0; i < gestureparts.length; ++i) {
     at += gestureparts[i].delay || 0;
     gestureparts[i].at = at;
-
-    if (gestureparts[i].el?.[toElement])
-      gestureparts[i].el = gestureparts[i].el[toElement]();
   }
 
   // Resolve this promise when the last gesture has been processed
@@ -633,7 +628,7 @@ function convertbndrec(elt) {
   return JSON.stringify({ left: rec.left, top: rec.top, right: rec.right, bottom: rec.bottom });
 }
 
-// Validate if the targeted element in part (if el is specitied) is the same as the at element hittested from the mouse cursor target
+// Validate if the targeted element in part (if el is specified) is the same as the at element hittested from the mouse cursor target
 function validateMouseDownTarget(part: MouseGesture, elhere: Element, position) {
   let wantedtotarget = part.el;
 
@@ -1253,9 +1248,6 @@ function fireMouseEvent(eventtype: string, cx: number, cy: number, el: Element, 
   return checkedDispatchEvent(el, evt);
 }
 
-export interface CastableToElement {
-  [toElement]: () => Element;
-};
 export type ValidElementTarget = Element | string | SelectorPart[];
 export type ElementTargetOptions = {
   /** X coordinate to target. A number is interpreted as a pixel coordinate relative tot the top left corner, a string is interpreted as a percentage of the full width. If not set, defaults to 50% */
@@ -1280,7 +1272,7 @@ export type ElementClickOptions = ElementTargetOptions & ElementActionOptions & 
 };
 
 export type MouseGesture = ElementTargetOptions & ElementActionOptions & {
-  el?: Element | CastableToElement;
+  el?: Element;
   down?: MouseButton;
   up?: MouseButton;
   delay?: number;
