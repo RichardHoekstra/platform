@@ -453,7 +453,7 @@ int WebHareServer::Execute ()
         {
 
                 webserver->RegisterConnectionCategory(1, 5000); //FIXME remove entirely, move responsibility complete to jobmgr
-                webserver->RegisterConnectionCategory(2, 500); // Category for RPCs
+                webserver->RegisterConnectionCategory(2, 50); // Category for unified cache host
                 webserver->MainLoop(numdispatchers);
         }
 
