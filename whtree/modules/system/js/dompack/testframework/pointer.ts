@@ -5,18 +5,18 @@ import * as dompack from 'dompack';
 import * as domevents from '../src/events';
 import * as domfocus from "../browserfix/focus";
 import { getName, getPlatform } from "../extra/browser";
-import { findElement, qSA } from '@webhare/test-frontend';
+import { click, findElement, qSA } from '@webhare/test-frontend';
 import { SimulatedFileSystemFileEntry, type RawDragItem } from './filesystem';
-import { getRelativeBounds } from "@webhare/dompack";
 import type { Selector } from '@mod-tollium/js/testframework';
 
 const default_mousestate =
 {
   cx: 0,
   cy: 0,
-  downel: null,
+  downel: null as Element | null,
+  downeldescr: '' as string,
   downelrect: null,
-  downbuttons: [],
+  downbuttons: new Set<number>(),
   samplefreq: 50,
   gesturequeue: [] as MouseGesture[],
   gesturetimeout: null,
@@ -902,6 +902,29 @@ function mouseFocusTo(el: Element) {
   }
 }
 
+function getSelector(el: Element | null) {
+  if (!el || el.nodeType !== Node.ELEMENT_NODE) return 'unknown';
+  if (el.id) return '#' + el.id;
+  const path = [];
+  while (el && el.nodeType === Node.ELEMENT_NODE) {
+    let selector = el.nodeName.toLowerCase();
+    if (el.className && typeof el.className === 'string') {
+      selector += '.' + el.className.trim().split(/\s+/).join('.');
+    }
+    path.unshift(selector);
+    el = el.parentElement;
+  }
+  return path.join(' > ');
+}
+
+function describeTarget(el: Element | null) {
+  if (!el)
+    return null;
+  const rect = el.getBoundingClientRect();
+  const basename = `${el.nodeName.toLowerCase()}${el.id ? `#${el.id}` : `${el.className ? '.' + el.className.trim().split(/\s+/).join('.') : ''}`}`;
+  return `${basename} (${rect.left.toFixed(0)},${rect.top.toFixed(0)})-${rect.right.toFixed(0)},${rect.bottom.toFixed(0)}) (${rect.width.toFixed(0)}x${rect.height.toFixed(0)}) ${getSelector(el)}`;
+}
+
 function processGestureQueue() {
   if (mousestate.gesturetimeout) {
     clearTimeout(mousestate.gesturetimeout);
@@ -949,7 +972,7 @@ function processGestureQueue() {
       view: targetdoc.defaultView,
       cx: position.x,
       cy: position.y,
-      el: elhere
+      el: elhere,
     };
 
     //interpolate mousemove events
@@ -1013,11 +1036,12 @@ function processGestureQueue() {
     }
 
     if (typeof part.down === 'number') {
-      if (mousestate.downbuttons.includes(part.down))
+      if (mousestate.downbuttons.has(part.down))
         throw new Error("Invalid mouse gesture - sending down for button #" + part.down + " when it is aleady down");
       if (part.down === 0) {
         mousestate.downel = target.el;
         mousestate.downelrect = target.el ? target.el.getBoundingClientRect() : null;
+        mousestate.downeldescr = describeTarget(target.el);
       }
 
       if (!mousestate.dndstate) {
@@ -1044,17 +1068,30 @@ function processGestureQueue() {
       }
 
       //ADDME discover cancellation etc and properly handle those
-      mousestate.downbuttons.push(part.down);
+      mousestate.downbuttons.add(part.down);
     } else if (typeof part.up === 'number') {
-      if (!mousestate.downbuttons.includes(part.up))
+      if (!mousestate.downbuttons.has(part.up))
         throw new Error("Invalid mouse gesture - sending up for button #" + part.up + " when it is not down");
 
       //FIXME see above for missing event parameters
 
-      if (!mousestate.dndstate)
+      const toclick = mousestate.downel ? commonAncestor(mousestate.downel, target.el) : null;
+
+      if (!mousestate.dndstate) {
+        if (toclick && mousestate && mousestate.downel !== target.el) {
+          console.log(`[testfw] Mousedown and mouseup target are different${part.up === 0 ? `, click will go to: ${toclick} ${describeTarget(toclick)}` : ''}`);
+          console.log(`[testfw] Original mousedown: ${mousestate.downeldescr} ${mousestate.downel}`);
+
+          const cur_mousedown = describeTarget(mousestate.downel);
+          if (cur_mousedown !== mousestate.downeldescr) //log if different:
+            console.log(`[testfw] Current mousedown:  ${cur_mousedown}`);
+
+          console.log(`[testfw] Current mouseup:    ${describeTarget(target.el)} ${target.el}`);
+        }
         fireMouseEvent("mouseup", target.cx, target.cy, target.el, part.up, null, part);
-      if (mousestate.downbuttons.includes(part.up))
-        mousestate.downbuttons.splice(mousestate.downbuttons.indexOf(part.up), 1);
+      }
+      mousestate.downbuttons.delete(part.up);
+
 
       /* Is this a click?
          originally: (start and end is same element. ADDME doesn't work this way if drag is triggered, ie on button: mousedown,move,up = click, on link: mousedown,move,up = dragging)
@@ -1065,7 +1102,6 @@ function processGestureQueue() {
       if (part.up === 0) {
         mousestate.dndcandidate = null;
         if (!mousestate.dndstate && mousestate.downel) {
-          const toclick = commonAncestor(mousestate.downel, target.el);
           if (toclick) { //if no common ancestor, one of the nodes is outside the DOM
             if (toclick !== target.el) //TODO hide this behind a debug flag as a console.log? but only if we finished updating tests and no longer care about this warning
               console.warn("[testfw] Sending click to common ancestor %o instead of mousedown target %o or mouseup target %o", toclick, mousestate.downel, target.el);
@@ -1316,8 +1352,7 @@ export function startExternalFileDrag(file: File): void {
     mousestate.dndstate.addFile(file);
 
   // ensure button 0 is down
-  if (!mousestate.downbuttons.includes(0))
-    mousestate.downbuttons.push(0);
+  mousestate.downbuttons.add(0);
 }
 
 /** Returns the current drag data store

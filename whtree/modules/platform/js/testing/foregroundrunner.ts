@@ -156,6 +156,8 @@ export async function runTest(test: Test) {
 
   try {
     page = await puppeteer.newPage();
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+
     page.on('console', message => addLogLine(`${message.type().substring(0, 3).toUpperCase()} ${message.text()}`, message.stackTrace()));
     page.on('pageerror', message => addLogLine(`PageError: ${message}`));
 
