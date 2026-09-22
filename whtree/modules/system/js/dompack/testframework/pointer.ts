@@ -32,6 +32,7 @@ const default_mousestate =
 
 interface PointEventOptions extends ElementActionOptions {
   preventBubble: boolean;
+  clickcount?: number;
 }
 
 const mousestate = { ...default_mousestate };
@@ -1131,24 +1132,27 @@ function fireMouseEvent(eventtype: string, cx: number, cy: number, el: Element, 
   if (!el)
     return false;
 
-  //https://developer.mozilla.org/en-US/docs/DOM/event.initMouseEvent
-  //console.log("FireMouseEvent",eventtype,cx,cy,el,button,relatedtarget,options);
-  const ctrl = options.ctrl || (navigator.platform !== "MacIntel" && options.cmd);
-  const meta = options.meta || (navigator.platform === "MacIntel" && options.cmd);
-  const canBubble = !options.preventBubble;
-
-  if (el.disabled)
+  if ("disabled" in el && el.disabled)
     return true;
 
-  const doc = el.ownerDocument || el;
-  const evt = doc.createEvent("MouseEvent");
+  const event = new MouseEvent(eventtype, {
+    bubbles: !options.preventBubble,
+    cancelable: true,
+    view: (el.ownerDocument ? el.ownerDocument.defaultView : null) || window,
+    detail: options.clickcount || 1,
+    screenX: cx + 25,
+    screenY: cy + 25,
+    clientX: cx,
+    clientY: cy,
+    ctrlKey: Boolean(options.ctrl || (navigator.platform !== "MacIntel" && options.cmd)),
+    altKey: options.alt || false,
+    shiftKey: options.shift || false,
+    metaKey: Boolean(options.meta || (navigator.platform === "MacIntel" && options.cmd)),
+    button: button,
+    relatedTarget: relatedtarget || null
+  });
 
-  //console.log(arguments,typeof doc, typeof el, typeOf(doc), typeOf(el));
-  //console.trace();
-  evt.initMouseEvent(eventtype, canBubble, true, doc.defaultView, options.clickcount || 1, cx + 25, cy + 25, cx, cy,
-    ctrl || false, options.alt || false, options.shift || false, meta || false,
-    button, relatedtarget || null);
-  return checkedDispatchEvent(el, evt);
+  return el.dispatchEvent(event);
 }
 
 export type ValidElementTarget = Element | string | SelectorPart[];
