@@ -153,9 +153,9 @@ PUBLIC STATIC OBJECTTYPE Editor EXTEND TolliumScreenBase <
     this->contexts->editdocumentapi->AddEventListener("readonly", PTR this->SetReadOnly);
     this->contexts->editdocumentapi->AddEventListener("loaddocument", PTR this->LoadData);
     this->contexts->editdocumentapi->AddEventListener("storedocument", PTR this->StoreData);
-    this->contexts->editdocumentapi->onprechecksave := PTR this->OnPrecheckSave;
-    this->contexts->editdocumentapi->onvalidate := PTR this->ValidateFormFile;
-    this->contexts->editdocumentapi->onsave := PTR this->OnSave;
+    this->contexts->editdocumentapi->onprechecksave := PTR this->OnPrecheckSave(#1, this->contexts->editdocumentapi->onprechecksave);
+    this->contexts->editdocumentapi->onvalidate := PTR this->ValidateFormFile(#1, this->contexts->editdocumentapi->onvalidate);
+    this->contexts->editdocumentapi->onsave := PTR this->OnSave(#1, #2, this->contexts->editdocumentapi->onsave);
 
     this->LoadEditorExtensions();
     this->UpdateAllowDenyFormComponents();
@@ -191,28 +191,27 @@ PUBLIC STATIC OBJECTTYPE Editor EXTEND TolliumScreenBase <
       ^rabbitplaceholder->visible := FALSE;
   }
 
-  BOOLEAN FUNCTION OnPrecheckSave(BOOLEAN ispublish)
-  {
-    IF(NOT ispublish)
-      RETURN TRUE; //we don't care about drafts
-
-    //TODO check if retention period actually changed, we might spuriously give this error now if results are close to being expired
-    INTEGER numtoexpire := GetFormExpectedExpiredResults(this->contexts->applytester, this->GetFormWHFSObjectId(), this->contexts->editdocumentapi->GetInstanceData("http://www.webhare.net/xmlns/publisher/formwebtool"));
-    IF(numtoexpire > 0 AND this->RunSimpleScreen("verify",  GetTid("publisher:tolliumapps.formedit.messages.willdeleteresults", ToString(numtoexpire))) != "yes")
-      RETURN FALSE;
-
-    RETURN TRUE; //no further objections
-  }
-  MACRO OnSave(OBJECT work, BOOLEAN ispublish)
-  {
-    IF(NOT ispublish)
-      RETURN; //we don't care about drafts
-
-    RecalculateFormResultsExpirationDates(this->GetFormWHFSObjectId());
-    DeleteExpiredFormResults(this->GetFormWHFSObjectId());
+  BOOLEAN FUNCTION OnPrecheckSave(BOOLEAN ispublish, FUNCTION PTR previous_onsave) {
+    IF(ispublish) { //we only care about drafts
+      //TODO check if retention period actually changed, we might spuriously give this error now if results are close to being expired
+      INTEGER numtoexpire := GetFormExpectedExpiredResults(this->contexts->applytester, this->GetFormWHFSObjectId(), this->contexts->editdocumentapi->GetInstanceData("http://www.webhare.net/xmlns/publisher/formwebtool"));
+      IF(numtoexpire > 0 AND this->RunSimpleScreen("verify",  GetTid("publisher:tolliumapps.formedit.messages.willdeleteresults", ToString(numtoexpire))) != "yes")
+        RETURN FALSE;
+    }
+    RETURN previous_onsave != DEFAULT FUNCTION PTR ? previous_onsave(ispublish) : TRUE; //no further objections
   }
 
-  MACRO ValidateFormFile(OBJECT work)
+  MACRO OnSave(OBJECT work, BOOLEAN ispublish, MACRO PTR previous_onsave) {
+    IF(ispublish) { //we only care about drafts
+      RecalculateFormResultsExpirationDates(this->GetFormWHFSObjectId());
+      DeleteExpiredFormResults(this->GetFormWHFSObjectId());
+    }
+
+    IF(previous_onsave != DEFAULT MACRO PTR)
+      previous_onsave(work, ispublish);
+  }
+
+  MACRO ValidateFormFile(OBJECT work, MACRO PTR previous_onvalidate)
   {
     // Check if there are no RTDs with merge fields on non-thankyou pages
     OBJECT finalform := this->curform->__OpenAsLiveForm(this->uselanguage, this->contexts->applytester);
@@ -281,6 +280,9 @@ PUBLIC STATIC OBJECTTYPE Editor EXTEND TolliumScreenBase <
     // Give the validation handlers an opportunity to do whole-form validation
     FOREVERY (MACRO PTR validate FROM this->validationhandlers)
       validate(work, this->curform, this->contexts);
+
+    IF (previous_onvalidate != DEFAULT MACRO PTR)
+      previous_onvalidate(work);
   }
 
   MACRO MarkFormAsDirty()
