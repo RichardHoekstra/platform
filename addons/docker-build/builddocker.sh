@@ -31,12 +31,14 @@ while [[ $1 =~ ^-.* ]]; do
     DEBUG=1
   elif [ "$1" == "--amd64" ]; then # Build for intel/amd64 on ARM. Haven't seen this work in practice yet, node processes hang during the finalization step
     ARCH="linux/amd64"
+  elif [ "$1" == "--build-arg" ]; then
+    shift
+    DOCKERBUILDARGS+=("$1")
   elif [ "$1" == "--podman" ]; then
     USEPODMAN="1"
     # without label=disable we can't run our build scripts. Adding `,relabel=shared` to RUN --mount=type=bind helps but makes us Docker incompatible
     # but still buildah lets us enter intermediate stages like old docker build did, so maintaining podman is already useful for that
     DOCKERBUILDARGS+=(--security-opt=label=disable)
-    echo "WARNING: podman builds were unsafe (stale layers) until https://github.com/containers/buildah/issues/5400 was fixed. not verified yet if it actualy resolves the issue"
   elif [ "$1" == "--nocache" ] || [ "$1" == "--no-cache"  ]; then
     DOCKERBUILDARGS+=(--no-cache)
   elif [ "$1" == "--dockerfile" ]; then
@@ -88,7 +90,7 @@ list_finaltag
 
 if [ -n "$USEPODMAN" ]; then
   podman -v
-  buildah -v
+  buildah -v 2>/dev/null || echo "buildah not installed on host"
   DOCKERBUILDARGS+=(--layers)
   if [ -n "$CI_REGISTRY_IMAGE" ]; then
     DOCKERBUILDARGS+=(--cache-from "$CI_REGISTRY_IMAGE")
