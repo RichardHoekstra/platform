@@ -457,10 +457,6 @@ std::string GetSystemTempDir()
         if (tmpdir && *tmpdir)
             return tmpdir;
 
-        tmpdir = getenv("TEMP");
-        if (tmpdir && *tmpdir)
-            return tmpdir;
-
         return "/tmp/";
 }
 
