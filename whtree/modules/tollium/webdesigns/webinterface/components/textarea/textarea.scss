@@ -8,16 +8,11 @@ textarea
   min-height: 23px;
   position: relative;
   vertical-align: top;
-  -webkit-appearance:none ;
 
   border: 1px solid #b3b3b3;
   border-radius: 2px;
-  padding: 0 5px;
-  color: #000000;
-  font-size: 12px;
-  line-height: 16px;
   background: $control-background-color;
-  padding: 1px 5px;
+  padding: 3px 5px;
 
   &:focus
   {
