@@ -50,15 +50,15 @@ testContainerTagCalculation()
     export WEBHARE_VERSION=5.6.7
   }
 
-  CI_COMMIT_REF_NAME=master
-  CI_COMMIT_REF_SLUG=master
+  CI_COMMIT_REF_NAME=main
+  CI_COMMIT_REF_SLUG=main
 
-  # building 'master' should also tag release branches so users can 'target' those for their dockers
+  # building 'main' should also tag release branches so users can 'target' those for their dockers
   echo ---- CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME CI_COMMIT_REF_SLUG=$CI_COMMIT_REF_SLUG
   get_finaltag
   list_finaltag
-  testEq "$CI_REGISTRY_IMAGE:master" "$BRANCH_IMAGES"
-  testEq "webhare/platform:master registry.gitlab.com/webhare/platform:master webhare/platform:release-5-6 registry.gitlab.com/webhare/platform:release-5-6 webhare/platform:5.6.7 registry.gitlab.com/webhare/platform:5.6.7" "$PUBLIC_IMAGES"
+  testEq "$CI_REGISTRY_IMAGE:main" "$BRANCH_IMAGES"
+  testEq "webhare/platform:main registry.gitlab.com/webhare/platform:main webhare/platform:release-5-6 registry.gitlab.com/webhare/platform:release-5-6 webhare/platform:5.6.7 registry.gitlab.com/webhare/platform:5.6.7" "$PUBLIC_IMAGES"
   testEq "5.6.7" "$WEBHARE_VERSION"
 
   getwebhareversion() # mock version getter

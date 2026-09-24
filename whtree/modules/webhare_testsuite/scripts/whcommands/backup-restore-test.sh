@@ -14,7 +14,7 @@ Error: $1
 
 You can run this script manually by providing it with a WebHare container, eg:
 
-MYIMAGE=webhare/platform:master
+MYIMAGE=webhare/platform:main
 podman pull $MYIMAGE
 rm -rf /tmp/backup-restore-test
 export TESTENV_CONTAINER1="$(podman run -d -v /tmp/backup-restore-test:/opt/whdata --name wh-backup-restore-test $MYIMAGE)"
