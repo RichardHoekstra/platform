@@ -48,6 +48,12 @@ AddTest::AddTest(const char *testname, TestFunction testfunc)
         testlist->push_back(newtest);
 }
 
+#ifdef __EMSCRIPTEN__
+const char *testprefix = "wasm-";
+#else
+const char *testprefix = "native-";
+#endif
+
 const char* GetTempDir()
 {
         if (testsuite_name.empty())
@@ -60,7 +66,7 @@ const char* GetTempDir()
                     throw std::runtime_error("Temp directory '" + tmpbase + "' is not an absolute path");
 
                 std::vector<std::string> dirs_to_kill;
-                for (Blex::Directory itr(Blex::GetSystemTempDir(), testsuite_name + "-*");itr;++itr)
+                for (Blex::Directory itr(Blex::GetSystemTempDir(), testprefix + testsuite_name + "-*");itr;++itr)
                     dirs_to_kill.push_back(itr.CurrentPath());
                 for(unsigned i=0;i<dirs_to_kill.size();++i)
                     Blex::RemoveDirRecursive(dirs_to_kill[i]);
@@ -228,5 +234,3 @@ Blex::FileStream* OpenTestFile(std::string const &name)
 } //end namespace Test
 
 } //end namespace Blex
-
-

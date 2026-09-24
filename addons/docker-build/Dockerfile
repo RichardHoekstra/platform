@@ -119,6 +119,9 @@ RUN --mount=type=bind,source=addons/docker-build/setup-opensearch.sh,target=/set
     WEBHARE_CHECKEDOUT_TO=/opt/wh \
     /bin/bash /setup-opensearch.sh "$WHBUILD_ASSETROOT" 3.2.0
 
+# Useful devcontainer tools
+RUN dnf install -y podman fuse-overlayfs strace
+
 ADD addons/docker-build/dropins /
 
 # pghost can't be placed inside /opt/wh, because that is a mounted directory
@@ -126,7 +129,7 @@ ENV WEBHARE_PGHOST=/tmp/
 
 # Set the run command and an entrypoint that ensures a proper environment even if we go straight to /bin/bash
 ENTRYPOINT [ "/opt/container/entrypoint.sh" ]
-CMD [ "/opt/container/launch.sh" ]
+CMD [ "/bin/bash" ]
 
 ################# STAGE 2 - application image
 FROM       base AS appimage

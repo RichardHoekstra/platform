@@ -68,6 +68,13 @@ brew cask install adoptopenjdk
 If you're getting an error that openjdk isn't notarized, you can go to System Preferences, Security & Privacy and click
 "Allow anyway" on the General tab to enable it.
 
+## Build using devcontainer & podman
+```bash
+wh builddocker --podman --devcontainer
+podman run --rm -ti  -v ~/projects/webhare:/opt/wh --device /dev/fuse --net host --privileged localhost/webhare/platform:developcontainer /bin/bash
+wh builddocker --podman
+```
+
 
 ## Building for docker
 ```bash
