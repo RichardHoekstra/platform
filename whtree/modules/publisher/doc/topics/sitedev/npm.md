@@ -56,4 +56,4 @@ not `@import` as the former allows the bundler to de-duplicate the CSS import.
 WebHare ships with some node_modules of its own to implement various funtionality (eg bundling). These NPM modules
 are stored in whtree/node_modules and only accessible to built-in modules to prevent accidental undeclared dependencies
 
-Some of these builtin modules are exported through `@webnare/deps`.
+Some of these builtin modules are exported through `@webhare/deps`.
