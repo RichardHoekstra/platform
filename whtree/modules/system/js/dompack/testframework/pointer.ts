@@ -5,9 +5,8 @@ import * as dompack from 'dompack';
 import * as domevents from '../src/events';
 import * as domfocus from "../browserfix/focus";
 import { getName, getPlatform } from "../extra/browser";
-import { click, findElement, qSA } from '@webhare/test-frontend';
+import { findElement, qSA } from '@webhare/test-frontend';
 import { SimulatedFileSystemFileEntry, type RawDragItem } from './filesystem';
-import type { Selector } from '@mod-tollium/js/testframework';
 
 const default_mousestate =
 {
@@ -33,9 +32,8 @@ const default_mousestate =
 
 interface PointEventOptions extends ElementActionOptions {
   preventBubble: boolean;
+  clickcount?: number;
 }
-
-export const toElement = Symbol("pointer.toElement");
 
 const mousestate = { ...default_mousestate };
 const browserPlatform = getPlatform();
@@ -349,12 +347,15 @@ function setMouseCursor(x, y) {
 }
 
 //like getElementFromPoint, but sees through shadow roots
-function getDeepElementFromPoint(doc: Document | ShadowRoot, px: number, py: number) {
+function getDeepElementFromPoint(doc: Document | ShadowRoot, px: number, py: number): Element | null {
   const el = doc.elementFromPoint(px, py);
-  if (!doc.contains(el)) //we got something outside this root
-    return el; //then return it. this happens if the targetted item is inert
+  if (!doc.contains(el))
+    return el; // sometimes chrome will return the owning element when hittesting inside its shadow root. just return that element.
+
+  //TODO try to iterate into iframes?
   if (el && el.shadowRoot?.elementFromPoint)
     return getDeepElementFromPoint(el.shadowRoot, px, py) ?? el;
+
   return el;
 }
 
@@ -377,37 +378,6 @@ export function getValidatedElementFromPoint(doc: Document, px: number, py: numb
   const scroll = { x: 0, y: 0 }; // actually breaks the ui.menu test.... var scroll = safe_id(doc.body).getScroll();
   const lookupx = /*Math.floor*/(px - scroll.x);
   const lookupy = /*Math.floor*/(py - scroll.y);
-
-  // In Internet Explorer, elementFromPoint only returns elements that are actually within the browser viewport, so if we're
-  // trying to lookup an element that is currently not visible, we'll scroll the main document so the iframe lookup position
-  // is in view.
-  // if (getName()=="ie" && doc.defaultView.frameElement) //doesn't this apply to all browsers ?
-  {
-    const maindoc = doc.defaultView.frameElement.ownerDocument;
-
-    // Get the position of the iframe within the main window
-    const docpos = doc.defaultView.frameElement.getBoundingClientRect();
-
-    // Get the main window size and scroll position
-    const docscroll = { x: maindoc.body.scrollLeft, y: maindoc.body.scrollTop };
-
-    // The absolute lookup position (relative to the browser's top left corner)
-    const abslookupx = lookupx + docpos.left - docscroll.x;
-    const abslookupy = lookupy + docpos.top - docscroll.y;
-
-    // If the lookup position is not located within the visible viewport, try to scroll it into view
-    if (abslookupx < 0)
-      docscroll.x += abslookupx;
-    else if (abslookupx > maindoc.documentElement.clientWidth)
-      docscroll.x += (abslookupx - maindoc.documentElement.clientWidth) + 1;
-    if (abslookupy < 0)
-      docscroll.y += abslookupy;
-    else if (abslookupy > maindoc.documentElement.clientHeight)
-      docscroll.y += (abslookupy - maindoc.documentElement.clientHeight) + 1;
-
-    maindoc.body.scrollLeft = docscroll.x;
-    maindoc.body.scrollTop = docscroll.y;
-  }
 
   // Make sure mouse cursor element is hidden, so it doesn't interfere
   const el = getDeepElementFromPoint(doc, lookupx, lookupy);
@@ -579,9 +549,6 @@ export function sendMouseGesture(gestureparts: MouseGesture[]): Promise<void> {
   for (let i = 0; i < gestureparts.length; ++i) {
     at += gestureparts[i].delay || 0;
     gestureparts[i].at = at;
-
-    if (gestureparts[i].el?.[toElement])
-      gestureparts[i].el = gestureparts[i].el[toElement]();
   }
 
   // Resolve this promise when the last gesture has been processed
@@ -597,73 +564,13 @@ export function sendMouseGesture(gestureparts: MouseGesture[]): Promise<void> {
   return retval;
 }
 
-function getBrowserFocusableElement(el) {
-  return _getFocusableElement(el);
-  /* FIXME is the IE workaround still needed ?
-  if(getName()!="ie")
-    return getFocusableElement(el);
-
-  /* https://msdn.microsoft.com/en-us/library/ie/ms534654%28v=vs.85%29.aspx
-The following elements can have focus by default but are not tab stops.
-These elements can be set as tab stops by setting the tabIndex property to a positive integer. applet, div, frameSet, span, table, td.
-* /
-  for(;el;el=el.parentNode)
-  {
-    if($wh.isFocusableComponent(el))
-      return el;
-    if(el.nodeName && ['APPLET','DIV','FRAMESET','SPAN','TABLE','TD'].includes(el.nodeName.toUpperCase()))
-      return el;
-  }
-  return null;
-*/
-}
-
-export function _getFocusableElement(el) {
+function getBrowserFocusableElement(el: Element) {
   for (; el; el = el.parentNode)
     if (domfocus.canFocusTo(el))
       return el;
 
   return null;
 }
-
-function convertbndrec(elt) {
-  if (!elt.getBoundingClientRect)
-    return 'n/a';
-  const rec = elt.getBoundingClientRect();
-  return JSON.stringify({ left: rec.left, top: rec.top, right: rec.right, bottom: rec.bottom });
-}
-
-// Validate if the targeted element in part (if el is specitied) is the same as the at element hittested from the mouse cursor target
-function validateMouseDownTarget(part: MouseGesture, elhere: Element, position) {
-  let wantedtotarget = part.el;
-
-  if (wantedtotarget && elhere !== wantedtotarget) { //we only need to validate on mousedown, mouseup is common to hit something different
-    while (wantedtotarget && wantedtotarget.inert)
-      wantedtotarget = wantedtotarget.parentNode; //if you're targeting an inert node, we should expect you to be targeting its first non-inert parent
-
-    if (!deepContains(wantedtotarget, elhere)) {
-      console.log("Wanted to target: ", wantedtotarget, " at " + position.x + "," + position.y, " but actual element is:", elhere, part);
-
-      console.log("Original target", wantedtotarget, part.el.nodeName, part.el.className, convertbndrec(part.el));
-      console.log("Final target", elhere, elhere.nodeName, elhere.className, convertbndrec(elhere));
-      const fc = elhere.firstChild;
-      if (fc)
-        console.log("childtarget", fc, fc.nodeName, convertbndrec(fc));
-
-      //        console.log('partel', part.el.innerHTML);
-      //        console.log('elhere', elhere.innerHTML);
-
-      const partel = wantedtotarget;
-      setTimeout(function () {
-        console.log("AFTER DELAY: Original target", partel, partel.nodeName, partel.getBoundingClientRect());
-        console.log("AFTER DELAY: Final target", elhere, elhere.nodeName, elhere.getBoundingClientRect());
-      }, 400);
-
-      throw new Error("Final target element is not a child of the original target! Perhaps target was obscured at the time of the mouse action ? if this was intentional, add { validateTarget: false } to the gesture");
-    }
-  }
-}
-
 
 function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
   if (!el)
@@ -961,8 +868,7 @@ function processGestureQueue() {
     if (!elhere) {
       elhere = currentdoc.documentElement;
       console.error("Unable to find element at location " + position.x + "," + position.y);
-    } else if (part.validateTarget === true || (part.validateTarget !== false && typeof part.down === 'number')) //by default we validate on mousedown only,  mouseup is common to hit something different
-      validateMouseDownTarget(part, elhere, position);
+    }
 
     const targetdoc = elhere.ownerDocument;
 
@@ -1226,36 +1132,29 @@ function fireMouseEvent(eventtype: string, cx: number, cy: number, el: Element, 
   if (!el)
     return false;
 
-  //https://developer.mozilla.org/en-US/docs/DOM/event.initMouseEvent
-  //console.log("FireMouseEvent",eventtype,cx,cy,el,button,relatedtarget,options);
-  const ctrl = options.ctrl || (navigator.platform !== "MacIntel" && options.cmd);
-  const meta = options.meta || (navigator.platform === "MacIntel" && options.cmd);
-  const canBubble = !options.preventBubble;
-
-  if (el.disabled)
+  if ("disabled" in el && el.disabled)
     return true;
 
-  const doc = el.ownerDocument || el;
-  const evt = doc.createEvent("MouseEvent");
+  const event = new MouseEvent(eventtype, {
+    bubbles: !options.preventBubble,
+    cancelable: true,
+    view: (el.ownerDocument ? el.ownerDocument.defaultView : null) || window,
+    detail: options.clickcount || 1,
+    screenX: cx + 25,
+    screenY: cy + 25,
+    clientX: cx,
+    clientY: cy,
+    ctrlKey: Boolean(options.ctrl || (navigator.platform !== "MacIntel" && options.cmd)),
+    altKey: options.alt || false,
+    shiftKey: options.shift || false,
+    metaKey: Boolean(options.meta || (navigator.platform === "MacIntel" && options.cmd)),
+    button: button,
+    relatedTarget: relatedtarget || null
+  });
 
-  //find a valid target for mouse events
-  while (el.closest('inert'))
-    el = el.closest('inert'); //jump out of any inert parts
-
-  while (el && (el.nodeType === 1 && getComputedStyle(el).pointerEvents === 'none'))
-    el = el.parentNode;
-
-  //console.log(arguments,typeof doc, typeof el, typeOf(doc), typeOf(el));
-  //console.trace();
-  evt.initMouseEvent(eventtype, canBubble, true, doc.defaultView, options.clickcount || 1, cx + 25, cy + 25, cx, cy,
-    ctrl || false, options.alt || false, options.shift || false, meta || false,
-    button, relatedtarget || null);
-  return checkedDispatchEvent(el, evt);
+  return el.dispatchEvent(event);
 }
 
-export interface CastableToElement {
-  [toElement]: () => Element;
-};
 export type ValidElementTarget = Element | string | SelectorPart[];
 export type ElementTargetOptions = {
   /** X coordinate to target. A number is interpreted as a pixel coordinate relative tot the top left corner, a string is interpreted as a percentage of the full width. If not set, defaults to 50% */
@@ -1280,7 +1179,7 @@ export type ElementClickOptions = ElementTargetOptions & ElementActionOptions & 
 };
 
 export type MouseGesture = ElementTargetOptions & ElementActionOptions & {
-  el?: Element | CastableToElement;
+  el?: Element;
   down?: MouseButton;
   up?: MouseButton;
   delay?: number;

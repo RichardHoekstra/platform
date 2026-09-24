@@ -403,7 +403,13 @@ export default class Pulldown extends SelectList {
     this._replacednode.selectedIndex = selectitem._pulldownidx;
 
     //fire the update event, but signal our change event not to refresh
-    dompack.fireModifiedEvents(this._replacednode, { detail: { __norefresh: true } });
+    this._replacednode.dispatchEvent(new InputEvent("input"));
+
+    //change events don't really support detail, but dompack-pulldown expected it so mock it
+    const changeEvent = new Event("change", { detail: { __norefresh: true } });
+    Object.defineProperty(changeEvent, 'detail', { value: { __norefresh: true }, writable: false });
+    this._replacednode.dispatchEvent(changeEvent);
+
     return true; //change, close!
   }
 }

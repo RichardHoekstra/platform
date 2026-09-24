@@ -197,6 +197,39 @@ export async function listTasks(type: string, searchparameters?: ListTasksOption
   }));
 }
 
+/** Wait for the specified managed tasks to complete within the given deadline
+ *
+ * @param taskTypes - Array of task types to wait for
+ * @param options - Options for waiting
+ * @param options.createdAfter - Only consider tasks created after this date
+ * @param options.acceptCancel - Whether to accept task cancellation
+ * @param options.deadline - Maximum time to wait for tasks to complete
+ */
+export async function flushTasks(taskTypes: string[], options?: {
+  createdAfter?: Temporal.Instant;
+  acceptCancel?: boolean;
+  deadline?: WaitPeriod;
+}) {
+  const createdAfter = options?.createdAfter;
+  const timeout = convertWaitPeriodToDate(options?.deadline ?? "PT10M");
+
+  while (true) { //if we receive multiple tasks, they may create more tasks of types we checked earlier, so loop until ALL tasks are done
+    let anyTasks = false;
+
+    for (const type of taskTypes) {
+      const tasks = await listTasks(type, { createdAfter });
+      if (tasks.length) {
+        anyTasks = true;
+        for (const task of tasks)
+          await retrieveTaskResult(task.id, { timeout, acceptCancel: options?.acceptCancel });
+      }
+    }
+
+    if (!anyTasks)
+      return;
+  }
+}
+
 /** Schedule a managed task if this transaction commits
  *
  *  A managed task, once scheduled, will always attempt to complete, and is restarted when it or the task manager fails.

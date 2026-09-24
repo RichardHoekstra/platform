@@ -46,7 +46,7 @@ test.runTests([
     test.startExternalFileDrag(await test.fetchAsFile('/tollium_todd.res/webhare_testsuite/tollium/landscape_4.jpg', { overrideContentType: "application/octet-stream" }));
 
     // drop it
-    await test.sendMouseGesture([{ el: droptarget, up: 0 }]);
+    await test.sendMouseGesture([{ el: droptarget.node, up: 0 }]);
     await test.waitForUI();
     test.eqPartial([
       {
@@ -58,7 +58,7 @@ test.runTests([
 
     test.startExternalFileDrag(await test.fetchAsFile('/tollium_todd.res/webhare_testsuite/tollium/contact.wharchive'));
     // drop the archive
-    await test.sendMouseGesture([{ el: droptarget, up: 0 }]);
+    await test.sendMouseGesture([{ el: droptarget.node, up: 0 }]);
     await test.waitForUI();
     test.eqPartial([
       {

@@ -20,6 +20,7 @@ export type DomEventOptions =
     detail?: object;
   };
 
+/** @deprecated Browsers finally have cross-platform event dispatching. Use element.dispatchEvent(new MouseEvent/FocusEvent/CustomEvent) */
 export function dispatchDomEvent(element: EventTarget, eventtype: string, options?: DomEventOptions) {
   //see here https://developer.mozilla.org/en-US/docs/Web/Events whether an event is bubbles/cancelabel
   options = {
@@ -62,21 +63,14 @@ export function dispatchDomEvent(element: EventTarget, eventtype: string, option
 
 /** Fire the proper modified events (input and/or change) on the element after changing its value
  * @param element - Element to receive event
- * @param options - Event options
  * @deprecated Use changeValue so we can figure out the proper events to fire
  */
-export function fireModifiedEvents(element: FormControlElement, options?: DomEventOptions) {
-  dispatchDomEvent(element, 'input', options);
-  dispatchDomEvent(element, 'change', options);
+export function fireModifiedEvents(element: FormControlElement) {
+  element.dispatchEvent(new InputEvent("input"));
+  element.dispatchEvent(new Event("change"));
 }
 
-//manually fire 'onchange' events. needed for event simulation - DEPRECATED
-/**
- * @param element - Element to receive event
- * @param type - Event type
- * @param options - Event options
- * @deprecated Use dispatchDomEvent instead
- */
+/** @deprecated Browsers finally have cross-platform event dispatching. Use element.dispatchEvent(new MouseEvent/FocusEvent/CustomEvent) */
 export function fireHTMLEvent(element: EventTarget, type: string, options?: DomEventOptions) {
   return dispatchDomEvent(element, type, options);
 }
