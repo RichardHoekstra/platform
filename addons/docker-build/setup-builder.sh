@@ -29,8 +29,6 @@ while [[ $1 =~ ^-.* ]]; do
 done
 
 
-# ASSETROOT="$1"
-
 if [ -z "$WHBUILD_DOWNLOADCACHE" ]; then
   echo WHBUILD_DOWNLOADCACHE not set
   exit 1

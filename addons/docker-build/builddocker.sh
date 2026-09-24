@@ -1,10 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-if [ -z "$WEBHARE_CHECKEDOUT_TO" ]; then
-  echo "We expect to be launched by 'wh buildcontainer' "
-  exit 1
-fi
+cd "$(dirname "${BASH_SOURCE[0]}")"/../.. || exit 1  # Change to checkout directory
 
 DOCKERBUILDARGS=()
 USEPODMAN=""
@@ -24,7 +21,7 @@ fi
 
 DOCKERFILE="$(pwd)/addons/docker-build/Dockerfile"
 
-while [[ $1 =~ ^-.* ]]; do
+while [[ ${1:-} =~ ^-.* ]]; do
   if [ "$1" == "--nopull" ]; then
     NOPULL=1
   elif [ "$1" == "--debug" ]; then
@@ -45,7 +42,7 @@ while [[ $1 =~ ^-.* ]]; do
     shift
     DOCKERFILE="$1"
   elif [ "$1" == "--devcontainer" ]; then
-    TARGETSTAGE="devcontainer"
+    TARGETSTAGE="devcontainer"      # FIXME shouldn't build-devcontainer & run-devcontainer suffice?
     FINALTAGARGS+=(--devcontainer)
   else
     echo "Illegal option $1"
@@ -70,20 +67,20 @@ if [ -n "$ARCH" ]; then
   fi
 fi
 
-if [ -n "$CI_COMMIT_SHA" ]; then
+if [ -n "${CI_COMMIT_SHA:-}" ]; then
   # validate CI environment
   echo "CI build detected ($CI_COMMIT_SHA)"
   echo "CI build - environment variables:"
   set | grep -E '^(CI_|TESTFW_|WEBHARE_DEBUG)' | sort
 
-  if [ -z "$CI_REGISTRY_IMAGE" ]; then
+  if [ -z "${CI_REGISTRY_IMAGE:-}" ]; then
     echo "Please enable the container registry for this project"
     exit 1
   fi
 fi
 
-wh_getnodeconfig
-wh_getemscriptenversion
+# Get WH and emscripten versions
+eval "$(addons/docker-build/get-build-vars.sh)"
 
 get_finaltag "${FINALTAGARGS[@]}"
 list_finaltag

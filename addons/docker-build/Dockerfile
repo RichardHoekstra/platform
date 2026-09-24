@@ -1,6 +1,3 @@
-# WARNING: podman builds are unsafe (stale layers) until https://github.com/containers/buildah/issues/5400 is fixed
-# Updating the #date/timestamp comment on a command can help to force a rebuild
-
 ################# STAGE 0 - base image. shared between builder and runner
 FROM almalinux:10 AS base
 LABEL maintainer="WebHare bv <info@webhare.com>"
@@ -46,8 +43,6 @@ ENV \
   WEBHARE_CHECKEDOUT_TO=/opt/wh \
   WHBUILD_EMSCRIPTEN_VERSION=$WHBUILD_EMSCRIPTEN_VERSION
 
-ARG WHBUILD_ASSETROOT
-
 # Add vendor stuff (needed for emsdk)
 COPY vendor/ /opt/wh/vendor/
 
@@ -56,7 +51,7 @@ RUN --mount=type=bind,source=addons/docker-build/setup-base-shared.sh,target=/se
     --mount=type=bind,source=addons/docker-build/setup-builder.sh,target=/setup-builder.sh \
     --mount=type=cache,id=builderdownloads,target=/tmp/downloads \
     --mount=type=cache,id=baseimage3,sharing=locked,target=/var/cache/dnf \
-    /bin/bash /setup-builder.sh "$WHBUILD_ASSETROOT" # 2024-08-19
+    /bin/bash /setup-builder.sh # 2024-08-19
 
 # Add base source code and stuff needed to compile it
 # fonts are needed for drawlib tests
@@ -99,8 +94,6 @@ ENV \
   WHBUILD_EMSCRIPTEN_VERSION=$WHBUILD_EMSCRIPTEN_VERSION \
   WHBUILD_DEVCONTAINER=1
 
-ARG WHBUILD_ASSETROOT
-
 # Expose usual WebHare hostingports
 EXPOSE 13684
 
@@ -111,16 +104,15 @@ RUN --mount=type=bind,source=addons/docker-build/setup-base-shared.sh,target=/se
      --mount=type=bind,source=addons/docker-build/setup-builder.sh,target=/setup-builder.sh \
      --mount=type=cache,id=builderdownloads,target=/tmp/downloads \
      --mount=type=cache,id=baseimage3,sharing=locked,target=/var/cache/dnf \
-     /bin/bash /setup-builder.sh --skip-emscripten "$WHBUILD_ASSETROOT" # 2024-08-19
+     /bin/bash /setup-builder.sh --skip-emscripten # 2024-08-19
+
+ARG WHBUILD_ASSETROOT
 
 # Install OpenSearch
 RUN --mount=type=bind,source=addons/docker-build/setup-opensearch.sh,target=/setup-opensearch.sh \
     --mount=type=cache,id=opensearch,target=/tmp/downloads \
     WEBHARE_CHECKEDOUT_TO=/opt/wh \
     /bin/bash /setup-opensearch.sh "$WHBUILD_ASSETROOT" 3.2.0
-
-# Useful devcontainer tools
-RUN dnf install -y podman fuse-overlayfs strace
 
 ADD addons/docker-build/dropins /
 
