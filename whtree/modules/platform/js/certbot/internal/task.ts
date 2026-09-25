@@ -70,6 +70,8 @@ async function isCertificateForHostname(keyPair: StoredKeyPair, hostname: string
 }
 
 export type CertificateRequestResult = {
+  provider?: { id: number; domain: string};
+} & ({
   /** The request was successful */
   success: true;
   /** The id of the certificate/key pair that was updated/created */
@@ -89,7 +91,7 @@ export type CertificateRequestResult = {
   isTemporary?: boolean;
   /** Additional error data */
   errorData?: string;
-};
+});
 
 type CertificateRequestData = {
   certificateId?: number;
@@ -225,6 +227,7 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
     };
   if (!directory)
     return {
+      provider: { id: provider.wrdId, domain: provider.issuerDomain },
       success: false,
       isTemporary: true,
       error: "noproviderdirectory",
@@ -248,6 +251,7 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
         const response = await fetch(`http://${domain}/.webhare/direct/system/uuid.shtml`, { signal: AbortSignal.timeout(2000) });
         if (!response.ok)
           return {
+            provider: { id: provider.wrdId, domain: provider.issuerDomain },
             success: false,
             error: "hostconnecterror",
             errorMessage: `Error while checking domain '${domain}' connectivity: ${response.statusText.substring(0, 512) || "Unknown error"}`,
@@ -258,6 +262,7 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
           if (taskdata.debug)
             logDebug("platform:certbot", { "#what": "Server mismatch", myUuid, serverUuid });
           return {
+            provider: { id: provider.wrdId, domain: provider.issuerDomain },
             success: false,
             error: "hostnotlocal",
             errorMessage: `Domain '${domain}' not hosted by this installation`,
@@ -266,6 +271,7 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
         }
       } catch (e) {
         return {
+          provider: { id: provider.wrdId, domain: provider.issuerDomain },
           success: false,
           error: "hostconnecterror",
           errorMessage: `Error while checking domain '${domain}' connectivity: ${(e as Error).message}`,
@@ -328,6 +334,7 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
       } catch (_) { }
     }
     return {
+      provider: { id: provider.wrdId, domain: provider.issuerDomain },
       success: false,
       error: "requesterror",
       errorMessage: (e as Error).message,
@@ -343,6 +350,7 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
   const test = await testCertificate(certificate, { privateKey: certKeyPair.privateKey, checkFullChain: !taskdata.staging && !taskdata.testOnly });
   if (!test.success) {
     return {
+      provider: { id: provider.wrdId, domain: provider.issuerDomain },
       success: false,
       isTemporary: true,
       error: "testerror",
@@ -354,6 +362,7 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
   if (taskdata.staging || taskdata.testOnly) {
     // Don't actually update the certificate and private keys, but return them in the task result for inspection
     return {
+      provider: { id: provider.wrdId, domain: provider.issuerDomain },
       success: true,
       certificateId: 0,
       certificate,
@@ -387,12 +396,14 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
     });
 
     return {
+      provider: { id: provider.wrdId, domain: provider.issuerDomain },
       success: true,
       certificateId: certFolder.id,
     };
   } catch (e) {
     logError(e as Error);
     return {
+      provider: { id: provider.wrdId, domain: provider.issuerDomain },
       success: false,
       error: "storeerror",
       errorMessage: (e as Error).message,
