@@ -6,9 +6,10 @@ import { explainImageProcessing, getUCSubUrl, getUnifiedCC, packImageResizeMetho
 import { beginWork, commitWork } from "@webhare/whdb";
 import { openType, whfsType } from "@webhare/whfs";
 import { getSharpResizeOptions, isImageLossless } from "@mod-platform/js/cache/imgcache";
-import { createSharpImage, type Sharp } from "@webhare/deps/src/deps";
+import { createSharpImage } from "@webhare/deps/src/deps";
 import { promises as fs } from "node:fs";
 import { listDirectory } from "@webhare/system-tools";
+import { compareSharpImages, fetchUCLink } from "./data/image-fetch";
 
 async function clearUnifiedCache() {
   const ucCacheDir = backendConfig.dataRoot + "caches/platform/uc/";
@@ -414,56 +415,6 @@ async function testImgCacheTokens() {
 
   test.eqPartial({ item: { type: 1, id: 123, cc: 456, resizemethod: { method: 'fill', setwidth: 25, setheight: 25, quality: 0 } } }, await analyze(jpegJsTok, '.jpg'));
   test.eqPartial({ item: { type: 1, id: 123, cc: 456, resizemethod: { method: 'fill', setwidth: 25, setheight: 25, quality: 85 } } }, await analyze(jpegJsTokExplicit85, '.jpg'));
-}
-
-async function attemptFetch(finalurl: string, expectType: string) {
-  const fetchResult = await fetch(finalurl);
-  test.eq(200, fetchResult.status, `Failed to fetch ${finalurl}`);
-
-  const contentType = fetchResult.headers.get("content-type") || '';
-  const cacheControl = fetchResult.headers.get("cache-control") || '';
-  const fetchBuffer = await fetchResult.arrayBuffer();
-
-  if (["image/jpeg", "image/png"].includes(contentType) && contentType !== expectType && !cacheControl.includes("immutable"))
-    return null; //this was a fast result, wait for the final
-
-  const actualImage = await ResourceDescriptor.from(Buffer.from(fetchBuffer), { getImageMetadata: true });
-  test.eq(contentType, actualImage.mediaType);
-
-  return { contentType, cacheControl, fetchBuffer, fetchResult };
-}
-
-async function fetchUCLink(url: string, expectType: string) {
-  const finalurl = new URL(url, backendConfig.backendURL).href;
-
-  const { contentType, cacheControl, fetchBuffer, fetchResult } = await test.wait(() => attemptFetch(finalurl, expectType), { annotation: `Waiting for ${finalurl} to be available with content-type ${expectType}` });
-
-  test.eq(expectType, contentType);
-  const fetchData = await ResourceDescriptor.from(Buffer.from(fetchBuffer), { getImageMetadata: true, getHash: true });
-  return { resource: fetchData, finalurl, fetchBuffer, cacheControl, contentType, lastModified: fetchResult.headers.get("Last-Modified") };
-}
-
-async function compareSharpImages(expect: Sharp | string, actual: Sharp, { minMSE = 0, maxMSE = 0 } = {}) {
-  if (typeof expect === "string")
-    expect = await createSharpImage(expect);
-
-  const rawExpect = await expect.raw({ depth: 'uchar' }).toBuffer({ resolveWithObject: true });
-  const rawActual = await actual.raw({ depth: 'uchar' }).toBuffer({ resolveWithObject: true });
-  test.eq(rawExpect.info, rawActual.info);
-
-  let totalDiff = 0; //squared absolute difference
-  for (let row = 0; row < rawActual.info.height; ++row)
-    for (let col = 0; col < rawActual.info.width; ++col)
-      for (let channel = 0; channel < rawActual.info.channels; ++channel) {
-        const idx = (row * rawActual.info.width + col) * rawActual.info.channels + channel;
-        totalDiff += Math.pow(Math.abs(rawExpect.data[idx] - rawActual.data[idx]), 2);
-      }
-
-  const mse = totalDiff / (rawActual.info.width * rawActual.info.height * rawActual.info.channels);
-  if (mse > maxMSE)
-    throw new Error(`MSE too high: ${mse} > ${maxMSE}`);
-  if (mse < minMSE)
-    throw new Error(`MSE too low: ${mse} < ${minMSE}`);
 }
 
 async function testImgCache() {
