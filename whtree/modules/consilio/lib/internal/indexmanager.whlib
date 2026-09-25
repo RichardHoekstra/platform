@@ -646,33 +646,42 @@ PUBLIC RECORD FUNCTION QueryIndexManager(INTEGER indexid, RECORD query, RECORD o
       ELSE
         INSERT CELL track_total_hits := options.totaltotrack < 0 INTO searchquery; // -1: always track accurately, 0: don't track at all
     }
-    BOOLEAN scrolling;
+    STRING suffix := indexid > 0 AND indexmanager.indextype = whconstant_consilio_catalogtype_unmanaged ? (options.suffix != "" ? "-" || options.suffix : "") : "";
+    STRING pitid;
     IF (options.count != defaultoptions.count)
     {
       INSERT CELL size := options.count >= 0 ? options.count : 10000 INTO searchquery;
 
-      // If requesting all results, use the scrolling API
-      scrolling := options.count = -1;
+      // If requesting all results, request results using a Point In Time
+      IF (options.count = -1)
+      {
+        // Request a PIT
+        RECORD response := SendRawJSONToOpenSearch(indexmanager.id, "POST", (indexid != 0 ? indexmanager.indexname || suffix : "*") || "/_search/point_in_time?keep_alive=10s", DEFAULT RECORD);
+        IF (response.status = SearchOk)
+        {
+          pitid := response.result.pit_id;
+          searchquery := [ ...searchquery, pit := [ id := pitid, keep_alive := "10s" ] ];
+        }
+      }
     }
 
-    STRING scrollid;
+    VARIANT ARRAY search_after;
     BOOLEAN search_done;
     INTEGER totalhits;
     WHILE (NOT search_done)
     {
-      RECORD response;
-      // If we have a scroll id, request the next batch of results
-      IF (scrollid != "")
-        response := SendRawJSONToOpenSearch(indexmanager.id, "GET", "/_search/scroll", [ scroll := "10s", scroll_id := scrollid ]);
-      ELSE
+      RECORD request := searchquery;
+      IF (pitid != "")
       {
-        STRING suffix := indexid > 0 AND indexmanager.indextype = whconstant_consilio_catalogtype_unmanaged ? (options.suffix != "" ? "-" || options.suffix : "") : "";
-        response := SendRawJSONToOpenSearch(indexmanager.id, "GET", (indexid != 0 ? indexmanager.indexname || suffix : "_all") || "/_search" || (scrolling ? "?scroll=10s" : "")
-                                              , searchquery
-                                              , [ expectstatus := options.acceptmissingindex ? [ 200, 404 ] : [ 200 ] ]);
-        IF(response.code = 404) //Index (not yet) present
-          RETURN CELL[ ...result, status := SearchOk ];
+        IF (Length(search_after) > 0)
+          INSERT CELL search_after := search_after INTO request;
       }
+      RECORD response;
+      response := SendRawJSONToOpenSearch(indexmanager.id, "GET", (pitid != "" ? "" : indexid != 0 ? indexmanager.indexname || suffix : "_all") || "/_search"
+                                            , request
+                                            , [ expectstatus := options.acceptmissingindex ? [ 200, 404 ] : [ 200 ] ]);
+      IF(response.code = 404) //Index (not yet) present
+        RETURN CELL[ ...result, status := SearchOk ];
 
       result.status := response.status;
       IF (result.status = SearchOk)
@@ -684,13 +693,12 @@ PUBLIC RECORD FUNCTION QueryIndexManager(INTEGER indexid, RECORD query, RECORD o
         }
         ELSE
         {
-          // If we're not using the scrolling API, we're done, otherwise
-          // store the scroll id for retrieval of the next batch of results
-          IF (NOT scrolling)
+          // If we're not searching a Point In Time, we're done
+          IF (pitid = "")
             search_done := TRUE;
 
-          // Only need to read the total count once - scrollid is empty when not scrolling or when receiving the first result
-          IF (scrollid = "")
+          // Only need to read the total count once - search_after is empty when not scrolling or when receiving the first result
+          IF (Length(search_after) = 0)
           {
             result.totalcount := response.result.hits.total.value;
             result.totalexact := response.result.hits.total.relation = "eq";
@@ -699,8 +707,8 @@ PUBLIC RECORD FUNCTION QueryIndexManager(INTEGER indexid, RECORD query, RECORD o
           // An array with length 0 is returned as VARIANT ARRAY
           IF (Length(response.result.hits.hits) > 0)
           {
-            IF (scrolling)
-              scrollid := response.result._scroll_id;
+            // Store the sort field of the last result for the next PIT search
+            search_after := response.result.hits.hits[END-1].sort;
 
             result.results := result.results CONCAT ReadOpenSearchResults(response.result.hits.hits, searchquery, mapping, options);
           }
@@ -715,9 +723,9 @@ PUBLIC RECORD FUNCTION QueryIndexManager(INTEGER indexid, RECORD query, RECORD o
         BREAK;
     }
 
-    // Clear the last scrolling context, if necessary
-    IF (scrollid != "")
-      SendRawJSONToOpenSearch(indexmanager.id, "DELETE", "/_search/scroll", [ scroll_id := [ scrollid ] ]);
+    // Delete the PIT, if necessary
+    IF (pitid != "")
+      SendRawJSONToOpenSearch(indexmanager.id, "DELETE", "/_search/point_in_time", [ pit_id := [ pitid ] ]);
   }
 
   IF(IsDebugTagEnabled("consilio:searches"))
