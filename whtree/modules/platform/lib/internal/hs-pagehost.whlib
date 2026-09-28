@@ -8,6 +8,7 @@ LOADLIB "mod::publisher/lib/siteprofiles.whlib";
 LOADLIB "mod::publisher/lib/internal/webdesign/webpagebase.whlib";
 LOADLIB "mod::publisher/lib/internal/webdesign/webcontext.whlib";
 
+LOADLIB "mod::system/lib/cache.whlib";
 LOADLIB "mod::system/lib/whfs.whlib";
 LOADLIB "mod::system/lib/internal/webserver/support.whlib";
 LOADLIB "mod::system/lib/webserver.whlib";
@@ -20,6 +21,8 @@ RECORD FUNCTION EncodeWebdesignResponse(OBJECT webdesign, BLOB content, RECORD A
   OBJECT ogplugin := webdesign->GetPlugin("http://www.webhare.net/xmlns/socialite","opengraph");
   IF(ObjectExists(ogplugin))
     opengraph := ogplugin->ogproperties;
+  IF(RecordExists(opengraph) AND RecordExists(opengraph.imageresource))
+    opengraph.imageresource := ExportTSDescriptor(opengraph.imageresource);
 
   RECORD ARRAY datalayer_pushes;
   OBJECT gtmplugin := webdesign->GetPlugin("http://www.webhare.net/xmlns/publisher/siteprofile","gtm");

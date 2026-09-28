@@ -1,10 +1,12 @@
 import * as test from "@mod-webhare_testsuite/js/wts-backend.ts";
 import { fetchAsDoc, fetchPreviewAsDoc, getAsDoc } from "@mod-webhare_testsuite/js/whfs";
 import { openSite, openFile, whfsType } from "@webhare/whfs";
-import { beginWork, commitWork } from "@webhare/whdb";
+import { beginWork, commitWork, runInWork } from "@webhare/whdb";
 import { createContentPageRequest } from "@webhare/router";
 import { IncomingWebRequest } from "@webhare/router/src/request";
-import { IntExtLink } from "@webhare/services";
+import { IntExtLink, ResourceDescriptor } from "@webhare/services";
+import { fetchUCLink } from "../data/image-fetch";
+
 
 async function testBreadCrumbs() {
   const testSiteRoot: string = (await test.getTestSiteJS()).webRoot!;
@@ -170,7 +172,7 @@ async function testPageMetadata() {
   const doc1clink1 = await testfolder.ensureFile("doc1clink1", { publish: true, title: "", type: "platform:filetypes.contentlink", target: new IntExtLink(doc1.id) });
   const doc1clinkreq1 = await createContentPageRequest(doc1clink1, { webRequest: new IncomingWebRequest(doc1clink1.link!) });
   test.eq(true, doc1clinkreq1.isLinkedContent);
-  test.eq("", doc1clinkreq1.pageMetadata.title);
+  test.eq("doc1clink1", doc1clinkreq1.pageMetadata.title);
   test.eq("", doc1clinkreq1.pageMetadata.pageHeading);
 
   await testfolder.update({ indexDoc: doc1clink1.id });
@@ -196,7 +198,7 @@ async function testPageMetadata() {
   const doc2 = await testfolder.ensureFile("doc2", { publish: true, title: "", type: "platform:filetypes.markdown" });
   const doc2Req = await createContentPageRequest(doc2, { webRequest: new IncomingWebRequest(doc2.link!) });
 
-  test.eq("", doc2Req.pageMetadata.title);
+  test.eq("doc2", doc2Req.pageMetadata.title);
   test.eq("", doc2Req.pageMetadata.pageHeading);
 
   await testfolder.update({ indexDoc: doc2.id });
@@ -226,11 +228,16 @@ async function testPageMetadata() {
 }
 
 async function testOpenGraph() {
+  await runInWork(async () => {
+    //Setup test
+    await (await test.getTestSiteHSTemp()).ensureFile("opengraph.html", { data: await ResourceDescriptor.from("<p>Een <b>test</b> pagina</p>") });
+  });
+
   {
     const parsed = await getAsDoc("site::webhare_testsuite.testsitejs/testpages/staticpage");
     test.eq({
-      siteName: "WebHare Testsite",
       type: "website",
+      title: "StaticPage",
       url: /\/TestPages\/StaticPage\/$/
     }, parsed.openGraph);
   }
@@ -239,48 +246,84 @@ async function testOpenGraph() {
     const parsed = await getAsDoc("site::webhare_testsuite.testsitejs/testpages/metadata");
     test.eq({
       //url: /\/TestPages\/metadata\/$/, //TODO dynamic pages should probably get a canonical URL too
-      siteName: "WebHare Testsite",
       type: "website",
+      title: "metadata",
       image: {
         url: "https://beta.webhare.net/testpages/metadata/testimage.jpg",
         alt: "Test image",
-      }
+      },
     }, parsed.openGraph, "Opengraph data should have been merged (siteName/type was global)");
   }
 
-  {
+  for (const site of ["webhare_testsuite.testsite", "webhare_testsuite.testsitejs"]) { //The JS part of this test will verify proper transfer of opengraph data from HS to TS
     //test HS giving us readable metadata
+    const testSite = await openSite(site);
+    await runInWork(async () => (await testSite.openFolder("tmp")).ensureFile("opengraph.html", { data: await ResourceDescriptor.from("<p>Een <b>test</b> pagina</p>"), type: "platform:filetypes.html" }));
+
+    const dynPageWithShareImage = await fetchAsDoc(`site::${site}/testpages/dynamicpage`, { shareimage: "1" });
     test.eq({
       image: {
-        url: (await test.getTestSiteHS()).webRoot + "TestPages/rangetestfile.jpeg",
+        url: testSite.webRoot! + "TestPages/rangetestfile.jpeg"
       },
-      title: "webhare_testsuite.testsite",
-      siteName: "webhare_testsuite.testsite",
+      title: "dynamicpage",
       type: "website"
-    }, (await fetchAsDoc("site::webhare_testsuite.testsite/testpages/dynamicpage", { shareimage: "1" })).openGraph);
+    }, dynPageWithShareImage.openGraph);
+
+    const dynPageWithShareImage2 = await fetchAsDoc(`site::${site}/testpages/dynamicpage`, { shareimage: "2" });
+    test.eq({
+      image: {
+        url: uri => uri.startsWith(new URL(testSite.webRoot!).origin),  //expect an absolute URL
+        width: 1200,
+        height: 630,
+        type: "image/jpeg"
+      },
+      title: "dynamicpage",
+      type: "website"
+    }, dynPageWithShareImage2.openGraph);
+
+    const checkImage2 = await fetchUCLink(dynPageWithShareImage2.openGraph!.image!.url!, "image/jpeg");
+    test.eq(false, checkImage2.isFastResult, "ensure we didn't get an image/jpeg just because UC was in a hurry");
+    test.eq("image/jpeg", checkImage2.contentType);
 
     test.eq({
       title: "A share title",
       description: "A share description",
-      siteName: "webhare_testsuite.testsite",
       type: "website"
-    }, (await fetchAsDoc("site::webhare_testsuite.testsite/testpages/dynamicpage", { sharedescription: "1" })).openGraph);
-
-    //test HS transferring opengraph data to TS
-    test.eq({
-      image: {
-        url: (await test.getTestSiteJS()).webRoot + "TestPages/rangetestfile.jpeg",
-      },
-      siteName: "WebHare Testsite",
-      type: "website"
-    }, (await fetchAsDoc("site::webhare_testsuite.testsitejs/testpages/dynamicpage", { shareimage: "1" })).openGraph);
+    }, (await fetchAsDoc(`site::${site}/testpages/dynamicpage`, { sharedescription: "1" })).openGraph);
 
     test.eq({
-      title: "A share title",
-      description: "A share description",
-      siteName: "WebHare Testsite",
+      title: "opengraph.html",
       type: "website",
-    }, (await fetchAsDoc("site::webhare_testsuite.testsitejs/testpages/dynamicpage", { sharedescription: "1" })).openGraph);
+      siteName: "PluginTest"
+    }, (await fetchPreviewAsDoc(`site::${site}/tmp/opengraph.html`)).openGraph);
+
+    if (site === "webhare_testsuite.testsitejs") {
+      //Test pure TS/TS integration. There's no TS->HS channel for OG data so can't run tests there
+      const dynPageWithJSShareImage = await fetchAsDoc(`site::webhare_testsuite.testsitejs/testpages/dynamicpage-js`, { shareimage: "1" });
+      test.eq({
+        image: {
+          url: testSite.webRoot! + "TestPages/rangetestfile.jpeg"
+        },
+        title: "dynamicpage-js",
+        type: "website"
+      }, dynPageWithJSShareImage.openGraph);
+
+      const dynPageWithJSShareImage2 = await fetchAsDoc(`site::webhare_testsuite.testsitejs/testpages/dynamicpage-js`, { shareimage: "2" });
+      test.eq({
+        image: {
+          url: uri => uri.startsWith(new URL(testSite.webRoot!).origin),  //expect an absolute URL
+          width: 1200,
+          height: 630,
+          type: "image/jpeg"
+        },
+        title: "dynamicpage-js",
+        type: "website"
+      }, dynPageWithJSShareImage2.openGraph);
+
+      const checkImageJS2 = await fetchUCLink(dynPageWithJSShareImage2.openGraph!.image!.url!, "image/jpeg");
+      test.eq(false, checkImageJS2.isFastResult, "ensure we didn't get an image/jpeg just because UC was in a hurry");
+      test.eq("image/jpeg", checkImageJS2.contentType);
+    }
   }
 }
 

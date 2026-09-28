@@ -9,24 +9,25 @@ async function attemptFetch(finalurl: string, expectType: string) {
   const contentType = fetchResult.headers.get("content-type") || '';
   const cacheControl = fetchResult.headers.get("cache-control") || '';
   const fetchBuffer = await fetchResult.arrayBuffer();
+  const isFastResult = ["image/jpeg", "image/png"].includes(contentType) && !cacheControl.includes("immutable");
 
-  if (["image/jpeg", "image/png"].includes(contentType) && contentType !== expectType && !cacheControl.includes("immutable"))
+  if (isFastResult && contentType !== expectType)
     return null; //this was a fast result, wait for the final
 
   const actualImage = await ResourceDescriptor.from(Buffer.from(fetchBuffer), { getImageMetadata: true });
   test.eq(contentType, actualImage.mediaType);
 
-  return { contentType, cacheControl, fetchBuffer, fetchResult };
+  return { contentType, cacheControl, fetchBuffer, fetchResult, isFastResult };
 }
 
 export async function fetchUCLink(url: string, expectType: string) {
   const finalurl = new URL(url, backendConfig.backendURL).href;
 
-  const { contentType, cacheControl, fetchBuffer, fetchResult } = await test.wait(() => attemptFetch(finalurl, expectType), { annotation: `Waiting for ${finalurl} to be available with content-type ${expectType}` });
+  const { contentType, cacheControl, fetchBuffer, fetchResult, isFastResult } = await test.wait(() => attemptFetch(finalurl, expectType), { annotation: `Waiting for ${finalurl} to be available with content-type ${expectType}` });
 
   test.eq(expectType, contentType);
   const fetchData = await ResourceDescriptor.from(Buffer.from(fetchBuffer), { getImageMetadata: true, getHash: true });
-  return { resource: fetchData, finalurl, fetchBuffer, cacheControl, contentType, lastModified: fetchResult.headers.get("Last-Modified") };
+  return { resource: fetchData, finalurl, fetchBuffer, cacheControl, contentType, lastModified: fetchResult.headers.get("Last-Modified"), isFastResult };
 }
 
 export async function compareSharpImages(expect: Sharp | string, actual: Sharp, { minMSE = 0, maxMSE = 0 } = {}) {

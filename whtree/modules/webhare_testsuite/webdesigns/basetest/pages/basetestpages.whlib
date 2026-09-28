@@ -5,6 +5,7 @@ LOADLIB "wh::xml/xsd.whlib";
 
 LOADLIB "mod::publisher/lib/webdesign.whlib";
 
+LOADLIB "mod::system/lib/testframework.whlib";
 LOADLIB "mod::system/lib/webserver.whlib";
 
 PUBLIC OBJECTTYPE WebStaticPage EXTEND StaticPageBase
@@ -82,7 +83,12 @@ PUBLIC OBJECTTYPE DynamicPage EXTEND WebPageBase <
 
     IF(GetWebVariable("shareimage") = "1") {
       this->webdesign->ogshareimage := this->webdesign->targetsite->webroot || "TestPages/rangetestfile.jpeg";
+    } ELSE IF(GetWebVariable("shareimage") = "2") {
+      OBJECT snowbeagle_avif := this->webdesign->targetsite->OpenByPath("photoalbum/snowbeagle.jpg");
+      this->webdesign->ogshareimageresource := snowbeagle_avif->GetWrapped();
+      TestEq("image/jpeg", this->webdesign->ogshareimageresource.mimetype);
     }
+
     IF(GetWebVariable("sharedescription") = "1") {
       this->webdesign->ogsharetitle := "A share title";
       this->webdesign->ogsharedescription := "A share description";

@@ -3,7 +3,6 @@ apply:
       all
     setMetadata:
       openGraph:
-        siteName: "WebHare Testsite"
         type: "website"
 
   - to:
@@ -13,3 +12,9 @@ apply:
         image:
           url: https://beta.webhare.net/testpages/metadata/testimage.jpg
           alt: "Test image"
+
+  - to:
+      sitePath: "*opengraph*"
+    setMetadata:
+      openGraph:
+        siteName: "PluginTest"

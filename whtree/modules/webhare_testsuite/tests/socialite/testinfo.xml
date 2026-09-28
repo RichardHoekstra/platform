@@ -1,6 +1,5 @@
 <group xmlns="http://www.webhare.net/xmlns/system/testinfo">
   <test script="test_embedvideo.whscr" tags="external" />
-  <test script="test_plugins.whscr" />
   <test script="test_seotab.whscr" />
   <test script="test_google.whscr" tags="external" ifenvironset="TESTSECRET_GOOGLE_APIKEY" />
 </group>
