@@ -69,7 +69,7 @@
         <enableon source="filelist" min="1" max="1" checkflags="candownload canedit canwrite" requirefocus="true" />
       </uploadaction>
       <action name="duplicate" onexecute="doduplicate">
-        <enableon source="filelist" min="1" max="1" checkflags="isactive canwrite" requirefocus="true" frameflags="cancreate" />
+        <enableon source="filelist" min="1" max="1" checkflags="isactive canwrite" frameflags="cancreate" requirefocus="true" />
       </action>
       <action name="newsite" ellipsis="true" frameflags="issysop" onexecute="donewsite" title="">
         <enableon source="foldertreeproxy" min="1" checkflags="isactive !iswithinsite canadd" />
@@ -335,9 +335,9 @@
         <enableon source="filelist" min="1" onexecute="doboostwordsoverviewlist" />
       </action>
       <action name="versions" frameflags="issupervisor" onexecute="DoVersions">
-        <enableon source="foldertree" min="1" max="1" />
-        <enableon source="filelist" min="1" max="1" />
+        <enableon source="filelist" min="1" max="1" checkflags="!isfolder" />
       </action>
+      <action name="versionoverview" frameflags="issysop" onexecute="DoVersionOverview" />
       <helpaction name="help" languages="nl" manual="publisher/filemanager" tid="~help" />
     </actions>
 
@@ -467,6 +467,7 @@
           <item action="managewhfsregister" disablemode="hidden" />
           <item action="managefoldersync" />
           <item action="syncfolder" />
+          <item action="versionoverview" disablemode="hidden" />
           <item name="insertpos_utilities" title="" visible="false" />
         </item>
         <divider />

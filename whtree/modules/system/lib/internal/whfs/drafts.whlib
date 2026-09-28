@@ -1,5 +1,6 @@
 <?wh
 LOADLIB "wh::datetime.whlib";
+LOADLIB "wh::util/algorithms.whlib";
 
 LOADLIB "mod::system/lib/database.whlib";
 LOADLIB "mod::system/lib/internal/typecoder.whlib";
@@ -87,28 +88,59 @@ PUBLIC INTEGER FUNCTION CreateFullSnapshot(DATETIME now, INTEGER baseobjectid, I
     @cell(string) return.version Version number. First version is 0.1, first published version is 1.0
 */
 PUBLIC RECORD ARRAY FUNCTION ListObjectHistory(INTEGER objid, RECORD options DEFAULTSTO DEFAULT RECORD) {
-  options := ValidateOptions(CELL[ include_autosaves := FALSE ], options);
+  RECORD ARRAY items := QueryObjectHistory([ files := [ objid ] , ...options ]);
 
-  RECORD ARRAY historyitems :=
+  INTEGER lastactive := -1;
+  FOREVERY (RECORD rec FROM items)
+    IF (rec.type IN [ "final", "approved", "created" ])
+      lastactive := #rec;
+  IF (lastactive >= 0)
+    items[lastactive].isactive := TRUE;
+
+  RETURN items;
+}
+
+/** Queries object history. Returns an array of history items for the specified files, sorted on file (fs_object), when, and then history id
+    @param options Options for querying object history
+    @cell options.files Array of object ids to query history for
+    @cell options.date_start Start date for history items
+    @cell options.date_limit End date for history items
+    @cell options.include_autosaves Whether to include autosave history items
+    @return Array of history items for the specified files
+    @cell return.id History item id
+    @cell return.type One of 'recycled', 'saved', 'reverted', 'created', 'approved'
+    @cell return.user User authobject id
+    @cell return.snapshot WHFS id of the file with the contents for this history
+    @cell return.when Modification time
+    @cell return.version Version number. First version is 0.1, first published version is 1.0
+*/
+PUBLIC RECORD ARRAY FUNCTION QueryObjectHistory(RECORD options DEFAULTSTO DEFAULT RECORD) {
+  options := ValidateOptions(CELL[
+    files := INTEGER[],
+    date_start := DEFAULT DATETIME,
+    date_limit := MAX_DATETIME,
+    include_autosaves := FALSE
+  ], options, [
+    optional := [ "files" ]
+  ]);
+
+  RETURN
      SELECT id
+          , fs_object
           , type := type >= 0 AND type < Length(whconstant_historytypes) ? whconstant_historytypes[type] : "#" || type
           , user
           , userdata := DecodeHSONOrJSONRecord(userdata)
           , when
           , snapshot
           , version
-          , isactive :=     snapshot = objid
+          , isactive :=     snapshot = fs_object
           , name := currentname
        FROM system_internal.fs_history
-      WHERE fs_object = objid
-            AND (options.include_autosaves OR type NOT IN [whconstant_historytype_autosave, whconstant_historytype_abandoned_autosave ])
-   ORDER BY when, id;
-
-  INTEGER lastapproved := SELECT AS INTEGER id FROM historyitems WHERE type IN [ "final", "approved", "created" ] ORDER BY when DESC LIMIT 1;
-  RETURN
-      SELECT *
-           , isactive :=    id = lastapproved
-        FROM historyitems;
+      WHERE (CellExists(options, "FILES") ? fs_object IN options.files : TRUE)
+        AND when >= options.date_start
+        AND when < options.date_limit
+        AND (options.include_autosaves ? TRUE : type NOT IN [whconstant_historytype_autosave, whconstant_historytype_abandoned_autosave ])
+   ORDER BY fs_object, when, id;
 }
 
 PUBLIC RECORD FUNCTION GetCurrentVersion(INTEGER objid) {

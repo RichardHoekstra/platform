@@ -2138,6 +2138,11 @@ PUBLIC STATIC OBJECTTYPE App EXTEND TolliumScreenBase <
   MACRO DoVersions() {
     RunFSObjectVersionsDialog(this, this->GetCurrentlySelectedFSobject());
   }
+
+  MACRO DoVersionOverview() {
+    this->RunScreen("mod::publisher/tolliumapps/versions/versions.xml#versionoverview");
+  }
+
 >;
 
 PUBLIC STATIC OBJECTTYPE ConvertToSiteDialog EXTEND TolliumScreenBase
