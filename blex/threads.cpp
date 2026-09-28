@@ -1580,8 +1580,8 @@ bool Process::Start(std::string const &applicationfilename,
             return false; //process already running
 
         //Setup arguments. c_str() is not async-signal-safe, so we must do it here
-        const char *path = applicationfilename.c_str();
-        const char *workdir = working_directory.empty() ? 0 : working_directory.c_str();
+        const char * const path = applicationfilename.c_str();
+        const char * const volatile workdir = working_directory.empty() ? 0 : working_directory.c_str();
 
         std::vector<char *> args;
         args.push_back(const_cast<char*>(path));

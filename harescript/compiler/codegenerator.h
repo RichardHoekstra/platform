@@ -82,6 +82,8 @@ struct Instruction
         explicit Instruction(LineColumn _position, unsigned _lowstacksize)
         : position(_position)
         , lowstacksize(_lowstacksize)
+        , type(InstructionSet::_type::ILLEGAL)
+        , data()
         , on_exception(0)
         {}
 
@@ -223,5 +225,3 @@ class CodeGenerator
 
 //---------------------------------------------------------------------------
 #endif
-
-

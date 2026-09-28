@@ -104,6 +104,7 @@ struct ParsedPart
         , columnnum(col)
         , type(_type)
         , datatype(DT_Cell)
+        , encoding(CE_Invalid)
         , cmd_limit(0)
         , else_limit(0)
         , content_pos(0)
