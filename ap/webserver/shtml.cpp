@@ -130,7 +130,7 @@ void Shtml::ExternalContentHandler(WebServer::Connection *webcon, std::string co
 {
         // Special case skoda_tourdusofa, max 500 rpcs concurrently
         std::string const &url = webcon->GetRequestParser().GetReceivedUrl();
-        std::string const &mask = "/wh_services/*skoda_tourdusofa*";
+        std::string const &mask = "/.wh/ea/uc/*";
         unsigned cat = Blex::StrLike(url.begin(), url.end(), mask.begin(), mask.end()) ? 2 : 1;
 
         DEBUGPRINT("Start in cat " << cat << " for URL " << url);

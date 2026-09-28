@@ -435,6 +435,7 @@
           <text tid="togglepreview">Toon voorvertoning</text>
           <text tid="unpinitems">Bescherming opheffen</text>
           <text tid="upload">Uploaden</text>
+          <text tid="versionoverview">Versiehistorie</text>
           <text tid="versions">Versies</text>
           <text tid="viewbrowser">Bekijken</text>
           <text tid="viewbrowserlive">Gepubliceerde versie in browser bekijken</text>
@@ -1905,17 +1906,25 @@
           <text tid="event-recycled">Verwijderd</text>
           <text tid="event-saved">Opgeslagen</text>
           <text tid="filename">Bestandsnaam</text>
+          <text tid="filter">Filter</text>
           <text tid="filterfrom">Laatst gewijzigd tussen</text>
           <text tid="filterto">en</text>
+          <text tid="from">Vanaf</text>
           <text tid="fullname">Naam</text>
-          <text tid="include_autosaves">Toon autosaves</text>
+          <text tid="include_autosaves">Toon automatisch opgeslagen wijzigingen</text>
+          <text tid="include_recycled">Toon verwijderd</text>
           <text tid="metadata">Metadata</text>
           <text tid="newdocumentnopreview">Deze versie (aanmaken van het document) heeft geen preview</text>
+          <text tid="openinpublisher">In Publisher openen</text>
+          <text tid="openinversions">Versies</text>
           <text tid="previewisnothistoricsnapshot">Deze voorbeeldweergave is geen historische momentopname, maar de inhoud van deze versie zoals weergegeven op de huidige site.</text>
           <text tid="previewtab">Voorbeeldweergave</text>
+          <text tid="to">tot</text>
           <text tid="unknownuser">Onbekende gebruiker</text>
           <text tid="versionnumber">Contentversie</text>
+          <text tid="versionoverview">Versiehistorie</text>
           <text tid="when">Datum</text>
+          <text tid="whfspath">Pad</text>
         </textgroup>
       </textgroup>
       <textgroup gid="seoreport">   <!-- tolliumapps.filemanager.seoreport -->

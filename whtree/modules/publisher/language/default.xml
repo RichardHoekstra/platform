@@ -435,6 +435,7 @@
           <text tid="togglepreview">Show preview</text>
           <text tid="unpinitems">Remove protection</text>
           <text tid="upload">Upload</text>
+          <text tid="versionoverview">Version history</text>
           <text tid="versions">Versions</text>
           <text tid="viewbrowser">View</text>
           <text tid="viewbrowserlive">View published version in browser</text>
@@ -1907,17 +1908,25 @@
           <text tid="event-recycled">Deleted</text>
           <text tid="event-saved">Saved</text>
           <text tid="filename">Filename</text>
+          <text tid="filter">Filter</text>
           <text tid="filterfrom">Last changed between</text>
           <text tid="filterto">and</text>
+          <text tid="from">From</text>
           <text tid="fullname">Name</text>
-          <text tid="include_autosaves">Include autosaves</text>
+          <text tid="include_autosaves">Include automatically saved changes</text>
+          <text tid="include_recycled">Include recycled</text>
           <text tid="metadata">Metadata</text>
           <text tid="newdocumentnopreview">This version (document creation) does not have a preview</text>
+          <text tid="openinpublisher">Open in Publisher</text>
+          <text tid="openinversions">Versions</text>
           <text tid="previewisnothistoricsnapshot">This preview is not a historic snapshot, but the the contents of this version rendered in the current site.</text>
           <text tid="previewtab">Preview</text>
+          <text tid="to">until</text>
           <text tid="unknownuser">Unknown user</text>
           <text tid="versionnumber">Content version</text>
+          <text tid="versionoverview">Version history</text>
           <text tid="when">Date</text>
+          <text tid="whfspath">Path</text>
         </textgroup>
       </textgroup>
       <textgroup gid="seoreport">   <!-- tolliumapps.filemanager.seoreport -->

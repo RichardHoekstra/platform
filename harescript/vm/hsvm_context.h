@@ -420,6 +420,9 @@ class BLEXLIB_PUBLIC VMGroup
         /// Closes all handles of VMs in this group (after termination)
         void CloseHandles();
 
+        /// Group data, locked per-group
+        LockedLocalGroupData localdata;
+
         /// process environment for jobs
         std::unique_ptr< Blex::Environment > env;
 

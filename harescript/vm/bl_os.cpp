@@ -1590,15 +1590,7 @@ void HS_GetEnvironmentVariable(VarId id_set, VirtualMachine *vm)
 {
         std::string name = HSVM_StringGetSTD(*vm, HSVM_Arg(0)), value;
 
-        std::shared_ptr< const Blex::Environment > override;
-#ifndef __EMSCRIPTEN__
-        JobManager *jobmgr = vm->GetVMGroup()->GetJobManager();
-        if (jobmgr)
-            override = jobmgr->GetGroupEnvironmentOverride(vm->GetVMGroup());
-#else
-            override = vm->GetVMGroup()->jmdata.environment;
-#endif
-
+        auto override = LockedLocalGroupData::ReadRef(vm->GetVMGroup()->localdata)->environment;
         if (override)
         {
                 for (auto itr : *override)
@@ -1617,15 +1609,7 @@ void HS_GetEnvironment(VarId id_set, VirtualMachine *vm)
 {
 
         Blex::Environment env;
-        std::shared_ptr< const Blex::Environment > override;
-
-#ifndef __EMSCRIPTEN__
-        JobManager *jobmgr = vm->GetVMGroup()->GetJobManager();
-        if (jobmgr)
-            override = jobmgr->GetGroupEnvironmentOverride(vm->GetVMGroup());
-#else
-            override = vm->GetVMGroup()->jmdata.environment;
-#endif
+        auto override = LockedLocalGroupData::ReadRef(vm->GetVMGroup()->localdata)->environment;
 
         Blex::Environment const *useenv;
         if (override)

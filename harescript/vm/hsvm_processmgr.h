@@ -299,10 +299,6 @@ class BLEXLIB_PUBLIC JobManager
         */
         std::string GetGroupExternalSessionData(VMGroup const *group) const;
 
-        /** Get the environment override for a vmgroup
-        */
-        std::shared_ptr< const Blex::Environment > GetGroupEnvironmentOverride(VMGroup const *group) const;
-
         /** Set whether a vmgroup is running (for the running timeout)
         */
         void SetRunningStatus(VMGroup *group, bool isrunning);
@@ -337,9 +333,6 @@ class BLEXLIB_PUBLIC JobManager
 
         /// Overwrite group external session data
         void SetGroupExternalSessionData(VMGroup &group, std::string const &sessiondata);
-
-        /// Overwrite the environment override for a vmgroup
-        void SetGroupEnvironmentOverride(VMGroup &group, std::shared_ptr< const Blex::Environment > environment);
 
         /// Returns whether the jobmanager is still running (if not, it is shutting down)
         bool IsRunning();

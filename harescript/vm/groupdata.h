@@ -106,10 +106,18 @@ struct JobManagerGroupData
 
         /// External session data
         std::string externalsessiondata;
+};
 
+struct LocalGroupData
+{
         /// Environment override
         std::shared_ptr< const Blex::Environment > environment;
+
+        /// Copy of the unique group id for this group
+        std::string groupid;
 };
+
+typedef Blex::InterlockedData< LocalGroupData, Blex::Mutex > LockedLocalGroupData;
 
 /** Class to keep (MT-safe) references to a VM group
 */

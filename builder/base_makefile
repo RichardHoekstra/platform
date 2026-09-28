@@ -906,19 +906,24 @@ install-binaries: $(ALLINSTALLDIRS) | success.blex success.harescript success.dr
 install: install-binaries postinstall # install everything including postinstall steps such as finalize
 	${HIDE}rm $(PREFIX)/bin/{appserver,backup,consilio,dbserver,dumpcomplexfslog,dumprawtable} 2>/dev/null || true #cleanup old bins
 
-ifeq ($(WEBHARE_IN_DOCKER),1)
+# Check whether to run the finalize step
+ifneq ($(WHBUILD_DEVCONTAINER),)
+ENABLE_FINALIZE:=1
+else
+ifneq ($(WEBHARE_IN_DOCKER),)
+ENABLE_FINALIZE:=0
+else
+ENABLE_FINALIZE:=1
+endif
+endif
+
+ifeq ($(ENABLE_FINALIZE),0)
 
 postuninstall:
 
 postinstall:
 
-else ifeq ($(WHBUILD_SKIPFINALIZE),1)
-
-postuninstall:
-
-postinstall:
-
-else #so, not WEBHARE_IN_DOCKER
+else #so, ENABLE_FINALIZE
 
 # FIXME nativedeps mode should just not bother with a local node install and use the system's main node
 
@@ -944,7 +949,7 @@ success.node $(PREFIX)/jssdk/tsrun/dist/resolveplugin.js $(PREFIX)/modules/platf
 	$(PREFIX)/bin/wh finalize-webhare
 	touch $@
 
-endif #WEBHARE_IN_DOCKER
+endif #ENABLE_FINALIZE
 
 
 #####################################################################

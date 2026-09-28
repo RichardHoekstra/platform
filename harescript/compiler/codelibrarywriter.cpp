@@ -615,7 +615,7 @@ void CodeLibraryWriter::AddCodedFunctions(HareScript::WrappedLibrary &wrapper, H
         for (std::map<unsigned, Symbol *>::iterator it = rfunctions.begin(); it != rfunctions.end(); ++it)
         {
                 std::string funcname = GetMangledFunctionName(it->second);
-                FunctionDef funcdef;
+                FunctionDef funcdef{};
                 PrepareSymbolDef(wrapper, &funcdef, *it->second);
 
                 funcdef.name_index = wrapper.linkinfo.SetName(funcname);

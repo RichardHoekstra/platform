@@ -461,8 +461,7 @@ Blex::FileOffset Marshaller::AnalyzeInternal(VarId var, bool to_packet)
                                 data_size += columns.size();
 
                                 // Add length of columns
-                                unsigned idx = 0;
-                                for (Blex::PodVector< ColumnNameId >::iterator it = columns.begin(); it != columns.end(); ++it, ++idx)
+                                for (Blex::PodVector< ColumnNameId >::iterator it = columns.begin(); it != columns.end(); ++it)
                                 {
                                         data_size += stackm.columnnamemapper.GetReverseMapping(*it).size();
                                 }
