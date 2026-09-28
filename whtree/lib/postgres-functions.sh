@@ -109,6 +109,14 @@ HERE
  echo "include '${WEBHARE_DATAROOT}etc/postgresql-custom.conf'"
 }
 
+handle_error() {
+  local exit_code=$?
+  echo "PostgreSQL initialization failed in function $2 at line $1, error code: $exit_code"
+  cat "$LOGFILE"
+  rm "$LOGFILE"
+  exit "$exit_code"
+}
+
 function ensure_postgres_keys() {
   if [ ! -f "$1/server.key" ] || [ ! -f "$1/server.crt" ]; then
     echo "Generating SSL key and certificate files for PostgreSQL..."
@@ -122,9 +130,12 @@ init_webhare_pg_db()
 
   echo "Initializing new PostgreSQL database"
 
+  set -E
+  trap 'handle_error $LINENO $FUNCNAME' ERR
+
   # Log postgres' output, we only show it when creation fails
   LOGFILE="$(mktemp)"
-  if ! init_webhare_pg_db_2 "$@" > $LOGFILE 2>&1 ; then
+  if ! init_webhare_pg_db_2 "$@" > "$LOGFILE" 2>&1; then
     echo "PostgreSQL initialization failed"
     cat "$LOGFILE"
     rm "$LOGFILE"
@@ -150,8 +161,7 @@ init_webhare_pg_db_2()
 
   if ! $RUNAS "$PGBINDIR/initdb" -U postgres -D "$DATAROOTDIR" --auth-local=trust --encoding 'UTF-8' --locale='C' ; then
     echo DB initdb failed
-    cat "$LOGFILE"
-    exit 1
+    return 1
   fi
 
   # Set the configuration file
@@ -171,12 +181,15 @@ init_webhare_pg_db_2()
     WAITS=$(( WAITS + 1 ))
     if [ $WAITS -gt 300 ]; then #we'll give it one minute
       echo "PostgreSQL failed to start within expected time"
-      exit 1
+      return 1
     fi
   done
 
   # Generate SSL keys
   ensure_postgres_keys "$DATAROOTDIR"
+
+  echo "Doing BOEM" 1>&2
+  boem
 
   # Bootstrap the database
   rc=0
@@ -187,8 +200,7 @@ init_webhare_pg_db_2()
 
   if [ "$rc" != "0" ]; then
     echo DB bootstrap failed with errorcode $rc
-    cat "$LOGFILE"
-    exit $rc
+    return $rc
   fi
   return 0
 }
