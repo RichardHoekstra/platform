@@ -47,7 +47,6 @@
   <test script="test_workers.ts" />
   <test script="test_unifiedcache.ts" />
   <test script="test_modulesupport.ts" />
-  <test script="test_puppeteer.ts" />
   <test script="test_externals.ts" tags="external"/>
   <test name="meta" path="meta/" />
   <test name="wasm" path="wasm/" />
