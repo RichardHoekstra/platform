@@ -273,5 +273,5 @@ IF (args.reindex AND NOT args.dryrun)
         WHERE id NOT IN (SELECT AS INTEGER ARRAY id FROM toprocess));
 
   IF (Length(to_reindex) > 0)
-    ReindexWHFSChanges(to_reindex, CELL[ __debug := args.debug, __progress := TRUE ]);
+    ReindexWHFSChanges(to_reindex, CELL[ __debug := args.debug, __progress := TRUE, args.recursive ]);
 }
