@@ -164,7 +164,7 @@ export class PageMetadata {
   }
 }
 
-function toOpenGrah(res: ExportedTSDescriptor | ResourceDescriptor | undefined, siteBaseURL: string) {
+function toOpenGraph(res: ExportedTSDescriptor | ResourceDescriptor | undefined, siteBaseURL: string) {
   if (!res)
     return null;
 
@@ -194,7 +194,7 @@ export function getOpenGraphData(pageMetadata: PageMetadata, siteBaseURL: string
     ogData.push({ property: "og:type", content: pageMetadata.openGraph.type });
 
 
-  const ogImageData = pageMetadata.openGraph.image?.url ? pageMetadata.openGraph.image : toOpenGrah(pageMetadata.openGraph.imageResource, siteBaseURL);
+  const ogImageData = pageMetadata.openGraph.image?.url ? pageMetadata.openGraph.image : toOpenGraph(pageMetadata.openGraph.imageResource, siteBaseURL);
 
   if (ogImageData) {
     ogData.push({ property: "og:image", content: ogImageData.url });

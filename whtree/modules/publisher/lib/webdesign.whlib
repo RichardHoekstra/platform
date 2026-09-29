@@ -233,7 +233,7 @@ PUBLIC STATIC OBJECTTYPE WebDesignBase EXTEND WebContext <
 
   /// Share image property. Adds the opengraph plugin without requiring you to explicitly declare it
   PUBLIC PROPERTY ogshareimage(GetOGShareImage, SetOGShareImage);
-  /// Share image resource property. Adds the opengraph plugin without requiring you to explicitly declare it. Setting an image resource is now recommended as it allows WebHare to selet proper output format settings. The image source must be a database image
+  /// Share image resource property. Adds the opengraph plugin without requiring you to explicitly declare it. Setting an image resource is now recommended as it allows WebHare to select proper output format settings. The image source must be a database image.
   PUBLIC PROPERTY ogshareimageresource(GetOGShareImageResource, SetOGShareImageResource);
   /// Share description property. Adds the opengraph plugin without requiring you to explicitly declare it
   PUBLIC PROPERTY ogsharetitle(GetOGShareTitle, SetOGShareTitle);
