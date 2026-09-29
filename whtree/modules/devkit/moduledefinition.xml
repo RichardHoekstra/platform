@@ -87,6 +87,9 @@
       <tryfolder path="whdata::storage/devkit/sdk-docs/" />
       <tryfile path="scripts/web/sdk-notfound.shtml" />
     </webrule>
+    <webrule path="allroots:/.wh/mod/devkit/public" match="initial">
+      <addheader header="access-control-allow-origin" value="*" />
+    </webrule>
   </backend>
 
   <moduleregistry>
