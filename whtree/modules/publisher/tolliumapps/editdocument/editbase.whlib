@@ -296,6 +296,8 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
     ^isunlisted->enabled := this->editable AND ^isunlisted->visible AND edit_workflow_metadata;
     ^description->enabled := this->editable AND ^description->visible AND edit_workflow_metadata;
     ^keywords->enabled := this->editable AND ^keywords->visible AND edit_workflow_metadata;
+
+    ^seotab_heading->visible := ^seotitle->visible OR ^description->visible OR ^keywords->visible;
     this->UpdatePinned();
   }
 
