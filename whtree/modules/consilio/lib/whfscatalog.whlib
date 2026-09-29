@@ -10,18 +10,19 @@ LOADLIB "wh::util/algorithms.whlib";
 
 LOADLIB "mod::consilio/lib/api.whlib";
 LOADLIB "mod::consilio/lib/catalogs.whlib";
+LOADLIB "mod::consilio/lib/internal/indexmanager.whlib";
 
 LOADLIB "mod::system/lib/services.whlib";
 LOADLIB "mod::system/lib/internal/webhareconstants.whlib";
 
 
+INTEGER publisher_fsobjects_catalog;
 OBJECT publisher_fsobjects_source;
 
 INTEGER ARRAY FUNCTION GetIndexedWHFSObjectsForFolder(INTEGER folderid)
 {
   RECORD query := CQMatch("whfstree", "=", ToString(folderid));
-  RETURN SELECT AS INTEGER ARRAY DISTINCT whfsid
-           FROM RunConsilioSearch(whconstant_consilio_catalog_whfs, query, [ count := -1, mapping := [ whfsid := 0 ] ]).results;
+  RETURN SELECT AS INTEGER ARRAY DISTINCT whfsid FROM QueryIndexManager(publisher_fsobjects_catalog, query, [ count := -1, mapping := [ whfsid := 0 ] ]).results;
 }
 
 //Foregound WHFS (re)index. Exposing this because frontend apps need a way to ensure their just commited change is indexed as fast as possible, and visible to them
@@ -35,13 +36,14 @@ INTEGER ARRAY FUNCTION GetIndexedWHFSObjectsForFolder(INTEGER folderid)
 */
 PUBLIC MACRO ReindexWHFSChanges(RECORD ARRAY to_reindex, RECORD options DEFAULTSTO DEFAULT RECORD)
 {
-  options := ValidateOptions([ __eventid := "", __debug := FALSE, __progress := FALSE, refresh := TRUE ], options);
+  options := ValidateOptions([ __eventid := "", __debug := FALSE, __progress := FALSE, refresh := TRUE, recursive := TRUE ], options);
 
   IF(NOT ObjectExists(publisher_fsobjects_source))
   {
     OBJECT catalog := OpenConsilioCatalog(whconstant_consilio_catalog_whfs);
     IF(NOT ObjectExists(catalog))
       THROW NEW Exception(`Publisher index '${whconstant_consilio_catalog_whfs}' not available`);
+    publisher_fsobjects_catalog := catalog->id;
 
     publisher_fsobjects_source := catalog->OpenContentSource("consilio:whfsobjects");
     IF(NOT ObjectExists(publisher_fsobjects_source))
@@ -51,7 +53,7 @@ PUBLIC MACRO ReindexWHFSChanges(RECORD ARRAY to_reindex, RECORD options DEFAULTS
   INTEGER ARRAY to_update, to_delete;
   FOREVERY (RECORD obj FROM to_reindex)
   {
-    IF (obj.isfolder)
+    IF (obj.isfolder AND options.recursive)
     {
       // This will re-index the folder object contents recursively
       FOREVERY (INTEGER subobjid FROM GetIndexedWHFSObjectsForFolder(obj.id))
@@ -84,26 +86,25 @@ PUBLIC MACRO ReindexWHFSChanges(RECORD ARRAY to_reindex, RECORD options DEFAULTS
   DATETIME now := GetCurrentDateTime();
   FOREVERY (INTEGER objid FROM to_delete)
   {
+    IF(options.__progress)
+      Print(`\rDeleting ${#objid+1}/${Length(to_delete)}: #${objid}`);
     TRY
       publisher_fsobjects_source->DeleteGroup("fsobj_" || objid, [ foreground := TRUE ]);
     CATCH (OBJECT e)
       LogHareScriptException(e, [ info := [ context := "consilio:whfscatalog", to_delete := objid ] ]);
-    IF(options.__progress)
-      Print(`Deleting ${#objid+1}/${Length(to_delete)}: #${objid}\r`);
   }
   IF(options.__progress AND Length(to_delete) > 0)
     Print(`\n`);
 
   FOREVERY (INTEGER objid FROM to_update)
   {
+    IF(options.__progress)
+      Print(`\rUpdating ${#objid+1}/${Length(to_update)}: #${objid}`);
     TRY
       publisher_fsobjects_source->ReindexGroup("fsobj_" || objid, [ foreground := TRUE ]);
     CATCH (OBJECT e)
       LogHareScriptException(e, [ info := [ context := "consilio:whfscatalog", to_update := objid ] ]);
-    IF(options.__progress)
-      Print(`Updating ${#objid+1}/${Length(to_update)}: #${objid}\r`);
   }
-
   IF(options.__progress AND Length(to_update) > 0)
     Print(`\n`);
 

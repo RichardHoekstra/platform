@@ -831,7 +831,10 @@ PUBLIC STATIC OBJECTTYPE CertbotRequest EXTEND TolliumScreenBase
       }
       ELSE
       {
-        work->AddError(result.error || (CellExists(result, "error_data") ? ": " || result.error_data : ""));
+        STRING errordata := CellExists(result, "error_data") ? result.error_data : "";
+        RECORD provider := CellExists(result, "provider") ? result.provider : DEFAULT RECORD;
+        STRING providerstr := RecordExists(provider) ? `${provider.domain} (${provider.id})` : "";
+        work->AddError(GetTid("system:tolliumapps.config.keystore.main.certificaterenewalerror", this->GetTid(".certificateerrors." || result.error, errordata), providerstr));
       }
 
       work->Finish();

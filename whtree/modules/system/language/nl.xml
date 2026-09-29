@@ -1003,7 +1003,7 @@
           <text tid="certificate">Certificaat</text>
           <text tid="certificatedoesnotmatchissuer">De issuer van het vertificaat komt niet overeen met de subject van het ondertekenende certificaat.</text>
           <text tid="certificatenotforthiskey">Dit certificaat behoort niet bij de geselecteerde sleutel.</text>
-          <text tid="certificaterenewalerror">Er is een fout opgetreden bij het vernieuwen van het certificaat.<br/><br/><param p="1"/></text>
+          <text tid="certificaterenewalerror">Er is een fout opgetreden bij het vernieuwen van het certificaat<ifparam p="2" value=""><else/> via provider <param p="2"/></ifparam>.<ifparam p="1" value=""><else/><br/><br/><param p="1"/></ifparam></text>
           <text tid="certificaterenewed">Het certificaat is vernieuwd.</text>
           <text tid="certificatestillvalid">Het certificaat hoeft nog niet vernieuwd te worden.<ifparam p="1" value=""><br/><br/>Wil je het certificaat geforceerd vernieuwen?</ifparam></text>
           <text tid="createselfsignedcert">Zelf-ondertekend certificaat aanmaken</text>

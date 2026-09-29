@@ -1193,7 +1193,7 @@
           <text tid="certificate">Certificate</text>
           <text tid="certificatedoesnotmatchissuer">The certificate issuer does not match the subject of the signing certificate.</text>
           <text tid="certificatenotforthiskey">This certificate does not belong to the selected key.</text>
-          <text tid="certificaterenewalerror">An error occurred while renewing the certificate.<br/><br/><param p="1"/></text>
+          <text tid="certificaterenewalerror">An error occurred while renewing the certificate<ifparam p="2" value=""><else/> using provider <param p="2"/></ifparam>.<ifparam p="1" value=""><else/><br/><br/><param p="1"/></ifparam></text>
           <text tid="certificaterenewed">The certificate is renewed.</text>
           <text tid="certificatestillvalid">The certificate does not have to be renewed yet.<ifparam p="1" value=""><br/><br/>Do you want to force a certificate renewal?</ifparam></text>
           <text tid="createselfsignedcert">Create self-signed certificate</text>
