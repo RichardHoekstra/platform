@@ -499,7 +499,10 @@ class LocalBridge extends EventSource<BridgeEvents> {
   }
 
   private encodeSingleJavaScriptExceptionData(e: Error): JavaScriptExceptionData {
-    const trace = stacktrace_parser.parse(e?.stack ?? "").map(entry => ({
+    // make the stack trace parser starts at the stack, and doesn't parse messages like '(connecting to 127.0.0.1:...)' as file names
+    let stack = e.stack || "";
+    stack = stack.substring(stack.indexOf("\n    at "));
+    const trace = stacktrace_parser.parse(stack).map(entry => ({
       filename: entry.file || "",
       line: entry.lineNumber || 0,
       column: entry.column || 0,
