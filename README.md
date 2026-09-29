@@ -20,6 +20,11 @@ See https://www.webhare.dev/ for developer documentation such as building module
 Documentation about WebHare internals and processes needed to develop on the WebHare platform itself (as opposed to third party modules)
 can be found in the `docs` directory of this repository.
 
+## How to submit an issue
+To submit an issue, please use the [issue tracker](https://github.com/WebHare/platform/issues) on GitHub. Provide a clear and detailed description of the problem, including steps to reproduce it, expected behavior, and any relevant logs or screenshots.
+
+If an issue contains sensitive information (eg security issues) you can email security@webhare.nl instead.
+
 ## How to submit a change/fix
 Fork our repository and send in a merge request. See the [contribution guidelines](CONTRIBUTING.md)
 
