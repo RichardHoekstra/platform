@@ -7,7 +7,7 @@ import { fenceEvents } from "@webhare/services/src/backendevents";
 import bridge from "@mod-system/js/internal/whmanager/bridge";
 import { getPaymentPrivateData, makePaymentProviderValueFromEntitySetting, makePaymentValueFromEntitySetting } from "@webhare/wrd/src/paymentstore";
 import type { IsRequired, WRDAttr, WRDAttributeTypeId, WRDTypeBaseSettingsModern } from "@webhare/wrd/src/types";
-import { Money } from "@webhare/std";
+import { Money, regExpFromWildcards } from "@webhare/std";
 
 async function testSettingReuse() {
   function assertHasSettingIds<T extends object>(obj: T[]): asserts obj is Array<T & { [wrdSettingId]: number }> {
@@ -95,8 +95,9 @@ async function testSettingReuse() {
   // STORY: same array update should not trigger change event
   {
     await fenceEvents();
+    const eventMasks = regExpFromWildcards(await schema.getEventMasks("wrdPerson"));
     let gotEvent = false;
-    const r = bridge.on("event", (evt) => gotEvent = true);
+    const r = bridge.on("event", (evt) => { if (eventMasks.test(evt.name)) gotEvent = true; });
     await whdb.beginWork();
     const data = await schema.getFields("wrdPerson", newPerson, "testArray");
     await schema.update("wrdPerson", newPerson, { testArray: data });
