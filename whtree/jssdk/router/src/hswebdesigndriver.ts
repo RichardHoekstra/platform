@@ -12,6 +12,7 @@ import type { DataLayerEntry, FrontendDataTypes } from "@webhare/frontend";
 import type { ListItem, Thing } from "schema-dts";
 import { getCodeContextHSVM } from "@webhare/harescript/src/contextvm";
 import type { PageMetadata } from "./metadata";
+import type { ExportedTSDescriptor } from "@webhare/hscompat";
 
 type RunPageResultCommon = {
   headers: Array<{ header: string; data: string; always_add: boolean }>;
@@ -28,6 +29,7 @@ export type RunPageResultContent = {
     description: string;
     image: string;
     site_name: string;
+    imageresource: ExportedTSDescriptor | null;
     title: string;
     type: string;
     url: string;
@@ -84,6 +86,8 @@ export function setupRequestFromResult(contReq: ContentPageRequest, result: RunP
     contReq.pageMetadata.openGraph.description = result.opengraph.description;
   if (result.opengraph?.image)
     contReq.pageMetadata.openGraph.image = { url: result.opengraph.image };
+  else if (result.opengraph?.imageresource)
+    contReq.pageMetadata.openGraph.imageResource = result.opengraph?.imageresource;
   if (result.opengraph?.site_name)
     contReq.pageMetadata.openGraph.siteName = result.opengraph.site_name;
   if (result.opengraph?.title)

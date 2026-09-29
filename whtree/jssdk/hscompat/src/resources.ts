@@ -15,7 +15,7 @@ export type ExportedTSDescriptorExplained = {
 };
 
 /** Resize a wrapped blob exported using mod::system/lib/cache.whlib#ExportTSDescriptor */
-export async function resizeTSDescriptor(descriptor: ExportedTSDescriptor, resize: ResizeMethod) {
+export function resizeTSDescriptor(descriptor: ExportedTSDescriptor, resize: ResizeMethod) {
   const d = (descriptor as ExportedTSDescriptorExplained).ts$resourcedescriptor;
   return fromMetaDatatoResized(1, {
     refPoint: d.setting.refpoint,

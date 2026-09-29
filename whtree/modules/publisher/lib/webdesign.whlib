@@ -233,6 +233,8 @@ PUBLIC STATIC OBJECTTYPE WebDesignBase EXTEND WebContext <
 
   /// Share image property. Adds the opengraph plugin without requiring you to explicitly declare it
   PUBLIC PROPERTY ogshareimage(GetOGShareImage, SetOGShareImage);
+  /// Share image resource property. Adds the opengraph plugin without requiring you to explicitly declare it. Setting an image resource is now recommended as it allows WebHare to select proper output format settings. The image source must be a database image.
+  PUBLIC PROPERTY ogshareimageresource(GetOGShareImageResource, SetOGShareImageResource);
   /// Share description property. Adds the opengraph plugin without requiring you to explicitly declare it
   PUBLIC PROPERTY ogsharetitle(GetOGShareTitle, SetOGShareTitle);
   /// Share title property. Adds the opengraph plugin without requiring you to explicitly declare it
@@ -282,21 +284,26 @@ PUBLIC STATIC OBJECTTYPE WebDesignBase EXTEND WebContext <
         ...this->GetInstanceData("platform:web.config"),
         ...this->GetInstanceData("platform:web.metadata")
       ];
-      this->navigationtitle := this->metadata.title ?? this->pvt_targetfolder->title;
+
+      BOOLEAN isindex := this->pvt_targetobject->id = this->pvt_targetfolder->indexdoc; //for indexfiles, it makes sense to look at the folder
+
+      this->navigationtitle := this->metadata.title ?? (isindex ? this->pvt_targetfolder->title : "");
+
       //page_heading is new in WH6.0 and may not exist at startup yet when upgrading, breaking all dynamic pages. work around this:
       this->pageheading := (CellExists(this->_seosettings,'page_heading' ) ? this->_seosettings.page_heading : "") ??  this->navigationtitle;
-      IF(NOT this->pvt_targetobject->isfolder)
-      {
+
+      IF(NOT this->pvt_targetobject->isfolder) {
         this->pagetitle := this->_seosettings.seo_title ?? this->navigationtitle;
-      }
-      ELSE //SEO settings are only offered for files, so don't even read them for folders to avoid confusion
-      {
+      } ELSE { //SEO settings are only offered for files, so don't even read them for folders to avoid confusion
         this->pagetitle := this->navigationtitle;
       }
-      IF(this->pagetitle = "" AND this->pvt_targetfolder->id != this->pvt_targetfolder->parentsite) // try the site root folder's title
-        this->pagetitle := this->pvt_targetsite->rootobject->title;
-      IF(this->pagetitle = "") //still no title
-        this->pagetitle := this->pvt_targetsite->name;
+
+      IF(this->pagetitle = "") { // still no title?
+        IF(isindex AND this->pvt_targetfolder->id != this->pvt_targetfolder->parentsite) // we're an index, but not in the root (we don't want to expose the site name)
+          this->pagetitle := this->pvt_targetfolder->title ?? this->pvt_targetfolder->name;
+        ELSE //fall back to file's name
+          this->pagetitle := this->pvt_targetobject->name;
+      }
 
       this->pagedescription := this->pvt_targetobject->description; //No fallback to folder. a folder's description is unlikely to apply to a file?
       this->pagekeywords := this->pvt_targetobject->keywords;
@@ -406,6 +413,13 @@ PUBLIC STATIC OBJECTTYPE WebDesignBase EXTEND WebContext <
     RETURN ogplugin->ogproperties.image;
   }
 
+  RECORD FUNCTION GetOGShareImageResource() {
+    OBJECT ogplugin := this->GetPlugin("http://www.webhare.net/xmlns/socialite","opengraph");
+    IF(NOT ObjectExists(ogplugin))
+      RETURN DEFAULT RECORD;
+    RETURN ogplugin->ogproperties.imageresource;
+  }
+
   STRING FUNCTION GetOGShareTitle() {
     OBJECT ogplugin := this->GetPlugin("http://www.webhare.net/xmlns/socialite","opengraph");
     IF(NOT ObjectExists(ogplugin))
@@ -447,7 +461,13 @@ PUBLIC STATIC OBJECTTYPE WebDesignBase EXTEND WebContext <
   MACRO SetOGShareImage(STRING newimage) {
     OBJECT ogplugin := this->EnsureOGSharePlugin(newimage != "");
     IF(ObjectExists(ogplugin))
-      ogplugin->ogproperties := CELL[...ogplugin->ogproperties, image := newimage ];
+      ogplugin->ogproperties := CELL[...ogplugin->ogproperties, image := newimage, imageresource := DEFAULT RECORD ];
+  }
+
+  MACRO SetOGShareImageResource(RECORD newimage) {
+    OBJECT ogplugin := this->EnsureOGSharePlugin(RecordExists(newimage));
+    IF(ObjectExists(ogplugin))
+      ogplugin->ogproperties := CELL[...ogplugin->ogproperties, image := "", imageresource := newimage ];
   }
 
   MACRO SetOGShareTitle(STRING newtitle) {

@@ -1,5 +1,7 @@
 ﻿<?wh
 LOADLIB "mod::publisher/lib/webdesign.whlib";
+
+LOADLIB "mod::system/lib/cache.whlib";
 LOADLIB "mod::system/lib/resources.whlib";
 LOADLIB "mod::system/lib/whfs.whlib";
 LOADLIB "wh::internet/urls.whlib";
@@ -7,8 +9,9 @@ LOADLIB "wh::xml/xsd.whlib";
 LOADLIB "mod::publisher/lib/internal/analytics/gtmplugin.whlib";
 LOADLIB "mod::publisher/lib/internal/analytics/gaplugin.whlib";
 
-PUBLIC OBJECTTYPE OpenGraphPlugin EXTEND WebDesignPluginBase
-<
+CONSTANT RECORD defaultmethod := [ method := "fill", setwidth := 1200, setheight := 630, format := "image/jpeg" ];
+
+PUBLIC STATIC OBJECTTYPE OpenGraphPlugin EXTEND WebDesignPluginBase <
   BOOLEAN rendered;
   RECORD settings;
 
@@ -58,6 +61,8 @@ PUBLIC OBJECTTYPE OpenGraphPlugin EXTEND WebDesignPluginBase
            , site_name := site_name
            , admins := admins
            , image := image
+           , imageresource := DEFAULT RECORD
+           , imagemethod := defaultmethod
            , app_id := app_id
            ];
   }
@@ -68,6 +73,8 @@ PUBLIC OBJECTTYPE OpenGraphPlugin EXTEND WebDesignPluginBase
                           , site_name := ""
                           , admins := ""
                           , image := ""
+                          , imageresource := DEFAULT RECORD
+                          , imagemethod := defaultmethod
                           , app_id := ""
                           , ...config
                           , description := ""
@@ -107,12 +114,22 @@ PUBLIC OBJECTTYPE OpenGraphPlugin EXTEND WebDesignPluginBase
     IF (type != "")
       Print('<meta property="og:type" content="' || EncodeValue(type) || '"' || terminal);
 
-    STRING site_name := usenode.site_name ?? webdesign->targetsite->name;
+    STRING site_name := usenode.site_name;
     IF (site_name != "")
       Print('<meta property="og:site_name" content="' || EncodeValue(site_name) || '"' || terminal);
 
-    IF (usenode.image != "")
-      Print('<meta property="og:image" content="' || EncodeValue(usenode.image) || '"' || terminal);
+    STRING imagelink := usenode.image;
+    IF(imagelink = "" AND RecordExists(usenode.imageresource)) {
+      RECORD wrapped := WrapCachedImage(usenode.imageresource, CELL[ baseurl := ResolveToAbsoluteURL(webdesign->targetsite->webroot, webdesign->designcdnrooturl), ...this->settings.imagemethod ]);
+      imagelink := wrapped.link;
+      Print('<meta property="og:image:width" content="' || wrapped.width || '"' || terminal);
+      Print('<meta property="og:image:height" content="' || wrapped.height || '"' || terminal);
+      IF(CellExists(this->settings.imagemethod, 'format') AND this->settings.imagemethod.format LIKE "image/*")
+        Print('<meta property="og:image:type" content="' || EncodeValue(this->settings.imagemethod.format) || '"' || terminal);
+    }
+
+    IF (imagelink != "")
+      Print('<meta property="og:image" content="' || EncodeValue(imagelink) || '"' || terminal);
 
     IF (usenode.admins != "")
       Print('<meta property="fb:admins" content="' || EncodeValue(usenode.admins) || '"' || terminal);
@@ -130,7 +147,8 @@ PUBLIC OBJECTTYPE OpenGraphPlugin EXTEND WebDesignPluginBase
   {
     IF (this->rendered)
       THROW NEW Exception("Robots values cannot be updated after the <meta> tags have been rendered");
-    this->settings := MakeUpdatedRecord(this->settings, props);
+
+    this->settings := CELL[...this->settings, ...props];
   }
 >;
 

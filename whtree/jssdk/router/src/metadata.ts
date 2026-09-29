@@ -2,6 +2,9 @@ import type { ApplySetMetadata } from "@mod-platform/generated/schema/siteprofil
 import { typedEntries, appendToArray } from "@webhare/std";
 import type { DataLayerEntry } from "@webhare/frontend";
 import type { SchemaOrg } from "@webhare/deps";
+import { resizeTSDescriptor, type ExportedTSDescriptor } from "@webhare/hscompat";
+import type { ResourceDescriptor, ResizeMethod } from "@webhare/services";
+
 
 const INITIAL_ROBOTS_TAG = {
   noIndex: false,
@@ -21,7 +24,10 @@ export type OpenGraphMetadata = {
   url?: string | null;
   type?: string;
   siteName?: string;
-  image?: { url: string; type?: string; width?: number; height?: number; alt?: string };
+  image?: { url: string; type?: string; width?: number; height?: number };
+  imageMethod?: ResizeMethod;
+  imageResource?: ResourceDescriptor | ExportedTSDescriptor;
+  imageAlt?: string;
   video?: { url: string; type?: string; width?: number; height?: number };
 };
 
@@ -86,6 +92,9 @@ export class PageMetadata {
         for (const [ogProp, ogValue] of Object.entries(value as Record<string, unknown>)) {
           (this.openGraph as Record<string, unknown>)[ogProp] = ogValue;
         }
+        if (value?.image?.alt)
+          this.openGraph.imageAlt = value.image.alt;
+
         continue;
       }
       if (prop in this && typeof value === typeof this[prop as keyof PageMetadata]) {
@@ -155,11 +164,26 @@ export class PageMetadata {
   }
 }
 
-export function getOpenGraphData(pageMetadata: PageMetadata) {
+function toOpenGraph(res: ExportedTSDescriptor | ResourceDescriptor | undefined, siteBaseURL: string) {
+  if (!res)
+    return null;
+
+  const imageMethod: ResizeMethod = { method: "fill", width: 1200, height: 630, format: "image/jpeg", };
+  let { link: url, width, height } = "ts$resourcedescriptor" in res ? resizeTSDescriptor(res, imageMethod) : res.toResized(imageMethod);
+  if (url.startsWith('/')) //UC link not bound to a domainname yet ?
+    url = new URL(url, siteBaseURL).toString();
+  return { url, width, height, type: "image/jpeg" };
+}
+
+export function getOpenGraphData(pageMetadata: PageMetadata, siteBaseURL: string) {
   const ogData: Array<{ property: string; content: string }> = [];
   const ogUrl = pageMetadata.openGraph.url === null ? "" : (pageMetadata.openGraph.url ?? pageMetadata.canonicalUrl);
-  if (pageMetadata.openGraph.title)
-    ogData.push({ property: "og:title", content: pageMetadata.openGraph.title });
+  const ogTitle = pageMetadata.openGraph.title ?? pageMetadata.title;
+  const ogDescription = pageMetadata.openGraph.description ?? pageMetadata.description;
+  if (ogTitle)
+    ogData.push({ property: "og:title", content: ogTitle });
+  if (ogDescription)
+    ogData.push({ property: "og:description", content: ogDescription });
   if (pageMetadata.openGraph.description)
     ogData.push({ property: "og:description", content: pageMetadata.openGraph.description });
   if (ogUrl)
@@ -169,17 +193,21 @@ export function getOpenGraphData(pageMetadata: PageMetadata) {
   if (pageMetadata.openGraph.type)
     ogData.push({ property: "og:type", content: pageMetadata.openGraph.type });
 
-  if (pageMetadata.openGraph.image?.url) {
-    ogData.push({ property: "og:image", content: pageMetadata.openGraph.image.url });
-    if (pageMetadata.openGraph.image.type)
-      ogData.push({ property: "og:image:type", content: pageMetadata.openGraph.image.type });
-    if (pageMetadata.openGraph.image.width)
-      ogData.push({ property: "og:image:width", content: pageMetadata.openGraph.image.width.toString() });
-    if (pageMetadata.openGraph.image.height)
-      ogData.push({ property: "og:image:height", content: pageMetadata.openGraph.image.height.toString() });
-    if (pageMetadata.openGraph.image.alt)
-      ogData.push({ property: "og:image:alt", content: pageMetadata.openGraph.image.alt });
+
+  const ogImageData = pageMetadata.openGraph.image?.url ? pageMetadata.openGraph.image : toOpenGraph(pageMetadata.openGraph.imageResource, siteBaseURL);
+
+  if (ogImageData) {
+    ogData.push({ property: "og:image", content: ogImageData.url });
+    if (ogImageData.type)
+      ogData.push({ property: "og:image:type", content: ogImageData.type });
+    if (ogImageData.width)
+      ogData.push({ property: "og:image:width", content: ogImageData.width.toString() });
+    if (ogImageData.height)
+      ogData.push({ property: "og:image:height", content: ogImageData.height.toString() });
+    if (pageMetadata.openGraph.imageAlt)
+      ogData.push({ property: "og:image:alt", content: pageMetadata.openGraph.imageAlt });
   }
+
   if (pageMetadata.openGraph.video?.url) {
     ogData.push({ property: "og:video", content: pageMetadata.openGraph.video.url });
     if (pageMetadata.openGraph.video.type)

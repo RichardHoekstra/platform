@@ -19,6 +19,17 @@ export async function renderDynamicPage(request: ContentPageRequest): Promise<We
     else
       return request.renderUsingHareScriptRouter("mod::webhare_testsuite/webdesigns/basetest/pages/basetestpages.whlib#JSRenderedHSRouter", { hsroute: parseInt(url.searchParams.get("hsroute")!) });
 
+  const shareimage = url.searchParams.get("shareimage");
+  if (shareimage === "1") {
+    request.pageMetadata.openGraph.image = {
+      url: request.targetSite.webRoot + "TestPages/rangetestfile.jpeg"
+
+    };
+  } else if (shareimage === "2") {
+    const snowbeagle_avif = await request.targetSite.openFile("photoalbum/snowbeagle.jpg");
+    request.pageMetadata.openGraph.imageResource = snowbeagle_avif.data!;
+  }
+
   return await request.buildWebPage(litty`<p>renderDynamicPage(echo = ${url.searchParams.get("echo") || ''})</p>`);
 }
 

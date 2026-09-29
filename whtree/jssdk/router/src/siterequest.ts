@@ -226,15 +226,20 @@ export class CPageRequest {
     }
 
     //base title for meta-title and pageHeading. folder title is a reasonable fallback for indexdocs but not for other files to prevent dupe titles
-    const baseTitle = (this.isLinkedContent ? this.targetObject.title : this._contentObject.title) || (this.targetFolder.indexDoc === this.targetObject.id ? this.targetFolder.title : "");
+    const isIndex = this.targetFolder.indexDoc === this.targetObject.id;
+    const baseTitle = (this.isLinkedContent ? this.targetObject.title : this._contentObject.title) || (isIndex ? this.targetFolder.title : "");
 
     //initialize the page metadata before returning the rendering function.
     this.pageMetadata.title = baseTitle;
 
     if (!this.targetObject.isFolder && seoSettings?.seoTitle)
       this.pageMetadata.title = seoSettings.seoTitle;
-    if (!this.pageMetadata.title && this.targetFolder.id !== this.targetFolder.parentSite) // Try the site root folder's title
-      this.pageMetadata.title = (await openFolder(this.targetSite.id)).title;
+    if (!this.pageMetadata.title) { // still no title
+      if (isIndex && this.targetFolder.id !== this.targetFolder.parentSite) // we're an index, but not in the root (we don't want to expose the site name)
+        this.pageMetadata.title = this.targetFolder.title || this.targetFolder.name;
+      else //fall back to file's name
+        this.pageMetadata.title = this.targetObject.name;
+    }
 
     this.pageMetadata.description = this.targetObject.description; //No fallback to folder. a folder's description is unlikely to apply to a file?
     this.pageMetadata.pageHeading = seoSettings?.pageHeading || baseTitle; //seoTitle is *not* a valid fallback for the printed title
@@ -584,7 +589,7 @@ export class CPageRequest {
     if (!assetpacksettings)
       throw new Error(`Settings for assetpack '${settings.assetpack}' not found`);
 
-    const ogData = getOpenGraphData(this.pageMetadata);
+    const ogData = getOpenGraphData(this.pageMetadata, this.targetSite.webRoot);
     if (ogData.length)
       this.pageMetadata.registerHTMLPrefix("og", "http://ogp.me/ns#");
 

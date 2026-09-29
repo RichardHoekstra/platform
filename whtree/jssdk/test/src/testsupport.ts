@@ -13,7 +13,6 @@ import type { Thing, WithContext } from "schema-dts";
 import { elements } from "@mod-system/js/internal/generation/xmlhelpers";
 import type * as xmldom from "@xmldom/xmldom";
 import { omit } from "@webhare/std";
-import type { OpenGraphMetadata } from "@webhare/router/src/metadata";
 
 export function reportAssertError(stack: string) {
   const badline = stacktrace_parser.parse(stack)[1];
@@ -190,7 +189,18 @@ export function extractSchemaOrgData(doc: Document | xmldom.Document): Exclude<T
   return omit(things.filter(_ => _["@context"] === "https://schema.org"), ["@context"]) satisfies Exclude<Thing, string>[];
 }
 
-export function extractOpenGraphData(doc: Document | xmldom.Document): OpenGraphMetadata | null {
+type OpenGraphParsedMetadata = {
+  title?: string;
+  description?: string;
+  /** Item URL. Should be an absolute URL. If not set it will fall back to the canonical URL which is almost always what you want. Set to 'null' explicitly to supress the field  */
+  url?: string | null;
+  type?: string;
+  siteName?: string;
+  image?: { url: string; type?: string; width?: number; height?: number; alt?: string };
+  video?: { url: string; type?: string; width?: number; height?: number };
+};
+
+export function extractOpenGraphData(doc: Document | xmldom.Document): OpenGraphParsedMetadata | null {
   const htmlElementPrefixes = (doc as Document).documentElement.getAttribute("prefix") || "";
   if (!htmlElementPrefixes.match(/og: http:\/\/ogp.me\/ns#/))
     return null; //missing the opengraph declaration
@@ -199,7 +209,7 @@ export function extractOpenGraphData(doc: Document | xmldom.Document): OpenGraph
     [K in keyof T]: Extract<T[K], string> extends never ? never : K
   }[keyof T];
 
-  const ogRootMap: Record<string, KeysWithStringValues<OpenGraphMetadata>> = {
+  const ogRootMap: Record<string, KeysWithStringValues<OpenGraphParsedMetadata>> = {
     "og:title": "title",
     "og:description": "description",
     "og:url": "url",
@@ -207,7 +217,7 @@ export function extractOpenGraphData(doc: Document | xmldom.Document): OpenGraph
     "og:site_name": "siteName"
   } as const;
 
-  const ogdata: OpenGraphMetadata = {};
+  const ogdata: OpenGraphParsedMetadata = {};
   for (const meta of elements((doc as Document).getElementsByTagName("meta"))) {
     const property = meta.getAttribute("property");
     const content = meta.getAttribute("content");
