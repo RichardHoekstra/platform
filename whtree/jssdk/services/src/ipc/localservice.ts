@@ -89,6 +89,7 @@ type TransformReturnType<T> = T extends ReturnValueWithTransferList<infer V>
 type PromisifyWorkerFunctionReturnType<T extends ProxyableFunction> = {
   (...a: Parameters<T>): TransformReturnType<ReturnType<T>>;
   callWithTransferList: ((transferList: TransferListItem[], ...a: Parameters<T>) => TransformReturnType<ReturnType<T>>);
+  callWithOptions: ((options: { transferList?: TransferListItem[]; ref?: boolean }, ...a: Parameters<T>) => TransformReturnType<ReturnType<T>>);
 };
 
 type ExportedMethods<BackendHandlerType extends object> = keyof {
@@ -228,6 +229,7 @@ export class LocalServiceProxy<T extends object> implements ProxyHandler<T> {
     if (!this.description || this.description.methods.find(m => m.name === prop)) {
       const func = (...args: unknown[]) => this.remotingFunc({ name: prop }, args);
       func.callWithTransferList = (transferList: TransferListItem[], ...args: unknown[]) => this.remotingFunc({ name: prop, transferList }, args);
+      func.callWithOptions = ({ transferList, ref }: { transferList?: TransferListItem[]; ref?: boolean }, ...args: unknown[]) => this.remotingFunc({ name: prop, transferList, ref }, args);
       return func;
     }
     return undefined;
@@ -249,11 +251,11 @@ export class LocalServiceProxy<T extends object> implements ProxyHandler<T> {
     this.port.close();
   }
 
-  async remotingFunc(method: { name: string; transferList?: TransferListItem[] }, args: unknown[]) {
+  async remotingFunc(method: { name: string; transferList?: TransferListItem[]; ref?: boolean }, args: unknown[]) {
     const id = ++LocalServiceProxy.counter;
     const deferred = Promise.withResolvers<LocalServiceResponse>();
     this.requests[id] = deferred;
-    const lock = this.refs.getLock(`call ${this.name}#${method.name}`);
+    const lock = method.ref === false ? undefined : this.refs.getLock(`call ${this.name}#${method.name}`);
     try {
       const calldata: LocalServiceRequest = {
         type: "callRequest",
@@ -270,7 +272,7 @@ export class LocalServiceProxy<T extends object> implements ProxyHandler<T> {
       else
         throw new Error(`Got wrong response, type ${result.type}`);
     } finally {
-      lock.release();
+      lock?.release();
     }
   }
 }

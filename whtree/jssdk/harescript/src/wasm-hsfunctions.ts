@@ -210,8 +210,8 @@ class HSJob extends OutputObjectBase {
     this.setReadSignalled(false);
     await this.jobobj.start();
     this.isRunning = true;
-    // The job may be closed before
-    this.jobobj.waitDone().then(() => this.jobIsDone()).catch(e => void (false));
+    // Wait for the job is done. When using implicit lifetimes, don't let the process alive for that
+    this.jobobj.waitDone.callWithOptions({ ref: !this.vm.implicitLifetime }).then(() => this.jobIsDone()).catch(e => void (false));
   }
   private jobIsDone() {
     this.setReadSignalled(true);
@@ -943,7 +943,7 @@ export function registerBaseFunctions(wasmmodule: WASMModule) {
 
     if (debugFlags.vmlifecycle && context.jobCachedWorker)
       console.log(`[${vm.currentgroup}] Allocating job for ${JSON.stringify(var_mainscript.getString())}${context.jobCachedWorker ? ", using cached worker" : ", creating new worker"}`);
-    const worker = context.jobCachedWorker ?? new AsyncWorker();
+    const worker = context.jobCachedWorker ?? new AsyncWorker({ ref: false });
     const wasmHsvmPath = path.join(__filename, "../wasm-hsvm.ts");
     if (context.jobCachedWorker) {
       // init a new new worker into the cache, with a small delay
@@ -951,7 +951,7 @@ export function registerBaseFunctions(wasmmodule: WASMModule) {
         if (context.jobCachedWorker) {
           if (debugFlags.vmlifecycle)
             console.log(`[${vm.currentgroup}] Preparing new cached job worker, preload scripts`, context.jobCachedPreloadLibs);
-          context.jobCachedWorker = new AsyncWorker();
+          context.jobCachedWorker = new AsyncWorker({ ref: false });
           context.jobCachedWorker.callRemote(`${wasmHsvmPath}#harescriptWorkerPrepare`, context.jobCachedPreloadLibs, getCachedWebAssemblyModule()).catch(e => logError(e as Error));
         }
       }, 200);

@@ -111,7 +111,7 @@ export function isValidWRDTag(tag: string): boolean {
 
 export function isValidWRDSchemaTag(tag: string): boolean {
   //lightweight check - createSchema does deeper checking and isValidModuleScopedName is too strict to open eg. .bak schemas
-  return Boolean(tag.match(/^.+:.+$/));
+  return Boolean(tag.match(/^[^:]+:.+$/));
 }
 
 export function isValidWRDTypeTag(tag: string): boolean {

@@ -1,8 +1,9 @@
 import { createVM } from "@webhare/harescript";
 import * as test from "@webhare/test";
-import { toFSPath } from "@webhare/services";
+import { broadcast, toFSPath } from "@webhare/services";
 import { storeDiskFile } from "@webhare/system-tools/src/fs";
 import { sleep } from "@webhare/std";
+import { fenceEvents } from "@webhare/services/src/backendevents";
 
 async function testCacheBasics() {
   const whlib_data = `<?wh
@@ -22,6 +23,12 @@ PUBLIC INTEGER FUNCTION GetInfiniteDAta() { RETURN GetAdhocCached([ type := 'Get
     await sleep(50);
     //NOTE this doesn't really crash unfortunately but it produces a lot of 'TimeoutOverflowWarning: 8638292777098454 does not fit into a 32-bit signed integer.' noise if the fix isn't there
     test.eq(24743, await vm.loadlib(resource).GetInfiniteData());
+
+    // Ensure the cache is cleared by the 'system:clearcaches' event
+    broadcast("system:clearcaches", {});
+    await fenceEvents();
+
+    test.eq(24744, await vm.loadlib(resource).GetInfiniteData());
   }
 }
 

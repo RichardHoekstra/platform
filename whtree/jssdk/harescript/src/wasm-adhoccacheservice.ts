@@ -46,6 +46,16 @@ class AdhocCacheData {
   }
 
   gotEvent(data: BridgeEvent) {
+    if (data.name === "system:clearcaches") {
+      this.libraries.clear();
+      this.expiries.clear();
+      if (this.expireCB) {
+        clearTimeout(this.expireCB);
+        this.expireCB = undefined;
+      }
+      return;
+    }
+
     for (const [libraryUri, libraryData] of this.libraries.entries()) {
       for (const [hash, item] of libraryData.items.entries()) {
         if (item.eventMaskRegExp?.exec(data.name)) {

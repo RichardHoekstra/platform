@@ -109,7 +109,7 @@ export class LocalCache<T> {
             key,
             created: now,
             value: createResult.value,
-            masks: regExpFromWildcards(["system:cachereset", ...new Set(createResult.masks)]),
+            masks: regExpFromWildcards(["system:clearcaches", ...new Set(createResult.masks)]),
             expires,
           };
 

@@ -66,7 +66,7 @@ export class AsyncWorker extends EventSource<AsyncWorkerEvents> {
 
   get id() { return this._id; }
 
-  constructor() {
+  constructor(options?: { ref?: boolean }) {
     super();
     const ports = createTypedMessageChannel<WorkerControlLinkRequest, WorkerControlLinkResponse>("AsyncWorker");
     this.port = ports.port1;
@@ -97,13 +97,15 @@ export class AsyncWorker extends EventSource<AsyncWorkerEvents> {
       state.requests[message.id]?.resolve(message);
       delete state.requests[message.id];
     });
-    this.refs = new RefTracker(this.worker, { initialref: false });
-    this.port.unref();
+    this.port.unref(); // worker itself keeps the process alive
+    this.refs = new RefTracker(this.worker, { initialref: true });
     portcloser.register(this, new WeakRef(this.port));
     initializedWorker();
     const weakThis = new WeakRef(this);
     activeWorkers.add(weakThis);
     activeWorkersFinalizationRegistry.register(this, weakThis);
+    if (options?.ref === false)
+      this.refs.dropInitialReference();
   }
 
   private checkClosed() {
