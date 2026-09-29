@@ -25,8 +25,8 @@ export interface AddressValue {
     @cell(string) return.suffix Detail/additional part (eg 'A', '-6')
 */
 export function splitHouseNumber(houseNumber: string): { bareNumber: number; suffix: string } | null {
-  const parts = houseNumber.trim().match(/^(\d+)\s*(.*)$/);
-  return parts ? { bareNumber: parseInt(parts[1]), suffix: parts[2] } : null;
+  const parts = houseNumber.trim().match(/^(\d+)\s*([^\s].*)?$/);
+  return parts ? { bareNumber: parseInt(parts[1]), suffix: parts[2] || "" } : null;
 }
 
 /** Recombines a nr and detail into a single housenumber avoiding ambiguity by inserting a space where both parts are a number

@@ -17,5 +17,5 @@ export function isValidIndexName(name: string): boolean {
 export function isValidIndexSuffix(suffix: string): boolean {
   //We'll try to be safe, but accept things that look like dates (2022-05).
   //64 - 40 - 1(suffix separator) = 23 remaining for the suffix.. let's give it 16 and have headroom left...
-  return /^[a-z0-9]+[-_a-z0-9]+$/.test(suffix) && suffix.length < 16 && !["_", "-"].includes(suffix.at(-1)!);
+  return /^[a-z0-9][-_a-z0-9]+$/.test(suffix) && suffix.length < 16 && !["_", "-"].includes(suffix.at(-1)!);
 }
