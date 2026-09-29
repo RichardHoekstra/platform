@@ -1,16 +1,10 @@
 import * as test from "@webhare/test";
 import { whconstant_wrd_testschema } from "@mod-system/js/internal/webhareconstants";
-import { launchPuppeteer, type Puppeteer } from "@webhare/deps";
-import { debugFlags } from "@webhare/env";
 import { getPaymentApi } from "@webhare/payments";
-
-const headless = !debugFlags["test-showbrowser"];
-
-let puppeteer: Puppeteer.Browser | undefined;
+import { openTestPuppeteer } from "@webhare/test-backend";
 
 export async function puppeteerMollie(payurl: string) {
-  if (!puppeteer)
-    puppeteer = await launchPuppeteer({ headless });
+  const puppeteer = await openTestPuppeteer();
 
   const context = await puppeteer.createBrowserContext(); //separate cookie storage
   const page = await context.newPage();
@@ -30,7 +24,7 @@ export async function puppeteerMollie(payurl: string) {
 
   const jsonresponse = await navresult!.json();
 
-  await puppeteer.close();
+  await context.close();
   return jsonresponse;
 }
 

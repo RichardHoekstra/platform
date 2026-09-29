@@ -189,9 +189,11 @@ PUBLIC STATIC OBJECTTYPE PreviewBrowser EXTEND TolliumFragmentBase <
 
     //Calculate any warnings/messages to give
     IF(isfilelink) {
-      RECORD target := SELECT id, name, type, published, parentsite, indexurl, fullpath, isfolder FROM system.fs_objects WHERe id = selectedfile.filelink AND isactive;
+      RECORD target := SELECT id, name, type, published, parentsite, indexurl, fullpath, isfolder FROM system.fs_objects WHERE id = selectedfile.filelink AND isactive;
       IF(RecordExists(target)) {
-        checkerrorsfor := target;
+        IF(GetErrorFromPublished(selectedfile.published) IN [ 0, 112 ]) //if the selected link file isn't failing (112, site locked, is not considered an error) report any errors on the target
+          checkerrorsfor := target;
+
         RECORD site := SELECT name FROM system.sites WHERE id = target.parentsite;
         STRING message := selectedfile.type = whconstant_whfstype_internallink
                              ? (target.indexurl = "" ? GetHTMLTid("publisher:tolliumcomponents.previewbrowser.internallink-unpublished", (RecordExists(site) ? site.name || ":" : "") || target.fullpath)

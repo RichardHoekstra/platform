@@ -9,7 +9,7 @@ import * as test from "@webhare/test";
 import { beginWork, db } from "@webhare/whdb";
 import { loadlib } from "@webhare/harescript";
 import { lookupURL, openFileOrFolder, openFolder, openSite, type WHFSObject } from "@webhare/whfs";
-import { convertWaitPeriodToDate, isDate, throwError, type WaitPeriod } from "@webhare/std";
+import { convertWaitPeriodToDate, generateRandomId, isDate, throwError, type WaitPeriod } from "@webhare/std";
 import { createSchema, deleteSchema, listSchemas, WRDSchema, type WRDSchemaType } from "@webhare/wrd";
 import { whconstant_wrd_testschema } from "@mod-system/js/internal/webhareconstants";
 import type { SchemaTypeDefinition } from "@webhare/wrd/src/types";
@@ -26,6 +26,10 @@ import { selectFSPublish, selectFSWHFSPath } from "@webhare/whdb/src/functions";
 import type { EventCompletionLink } from "@webhare/whfs/src/finishhandler";
 import { generateTestPageToken } from "./support";
 import { setTestPageToken } from "@webhare/test-frontend";
+import { launchPuppeteer, type Puppeteer } from "@webhare/deps";
+import { debugFlags } from "@webhare/env";
+import { mkdirSync } from "node:fs";
+import { addTestFinalizer } from "@webhare/test/src/testrunner";
 export { profileCPU } from "./profiling";
 
 export const passwordHashes = {
@@ -56,6 +60,8 @@ export interface ResetOptions {
 }
 
 const users: Record<string, TestUserDetails> = {};
+
+let puppeteer: Puppeteer.Browser | undefined;
 
 export function getRandomTestModuleName() {
   return `${tempModuleNamePrefix}${Math.floor(Math.random() * 90000 + 10000)}`;
@@ -401,6 +407,39 @@ export async function deleteTestModule(name: string) {
 
   console.log(`Completed deleting module ${name}`);
 }
+
+export async function openTestPuppeteer(): Promise<Puppeteer.Browser & AsyncDisposable> {
+  const headless = !debugFlags["test-showbrowser"];
+  if (!puppeteer) {
+    puppeteer = await launchPuppeteer({ headless });
+    addTestFinalizer({
+      onCatch: async () => dumpTestPuppeteer(),
+      onDone: async () => {
+        await puppeteer?.close();
+        puppeteer = undefined;
+      }
+    });
+  }
+  return puppeteer;
+}
+
+/** Dump state for disk for post-test insepection */
+export async function dumpTestPuppeteer() {
+  if (!puppeteer)
+    throw new Error("Test puppeteer instance is not running (was openTestPuppeteer run?");
+
+  mkdirSync(`/tmp/jstests`, { recursive: true });
+  const outbase = `/tmp/jstests/puppeteeer.${generateRandomId()}`;
+
+  for (const [contextIdx, context] of puppeteer.browserContexts().entries()) {
+    for (const [pageIdx, page] of (await context.pages()).entries()) {
+      const screenshotFile = `${outbase}.context-${contextIdx}.page-${pageIdx}.png`;
+      console.error(`Saved puppeteer screenshot to ${screenshotFile} (${page.url()})`);
+      await page.screenshot({ path: screenshotFile });
+    }
+  }
+}
+
 
 //Initialize whtest.ts
 setTestPageToken(generateTestPageToken());

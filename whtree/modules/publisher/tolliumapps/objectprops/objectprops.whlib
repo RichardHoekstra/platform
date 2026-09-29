@@ -763,7 +763,7 @@ PUBLIC STATIC OBJECTTYPE ObjectProps EXTEND PublisherEditorBase <
       // The file/folder to link to has changed, update the extension if necessary
       STRING curext := GetExtensionFromPath(^name->value);
       STRING newext := GetExtensionFromPath(linked->name);
-      IF (curext != newext)
+      IF (curext != "" AND curext != newext)
         ^name->value := Left(^name->value, Length(^name->value) - Length(curext)) || newext;
     }
   }

@@ -4,6 +4,13 @@ import { runTests as runFrontendTests } from "@mod-system/js/wh/testframework";
 
 let testscompleted = false;
 
+type TestFinalizer = {
+  onCatch?: () => void | Promise<void>;
+  onDone?: () => void | Promise<void>;
+};
+
+const finalizers = new Array<TestFinalizer>();
+
 function onTestExit(exitCode: number) {
   if (!exitCode && !testscompleted) {
     console.error("Detected early test exit! eventloop thought it didn't need to wait anymore before the tests completed");
@@ -26,7 +33,6 @@ async function asyncRun(tests: TestList, options?: object) {
         continue;
       }
       try {
-
         const result = await test();
         if (typeof result !== "undefined") {
           // this may be accidentally passing a non test-function eg testing `() => myTest` instead of `() => myTest()`
@@ -34,18 +40,32 @@ async function asyncRun(tests: TestList, options?: object) {
         }
       } catch (e) {
         console.error(`Unexpected exception from test #${idx} (function ${test.name}):`, e);
-        throw e; //TODO don't rethrow but *do* mark the tests as failed
+        await Promise.all(finalizers.map(finalizer => finalizer.onCatch?.())).catch(err => {
+          console.error("Ignoring exception from finalizer onCatch:", err);
+        });
+        throw e;
       }
     }
     testscompleted = true;
 
   } finally {
-    // Dump all resources keeping the script alive after 5 seconds after finishing the tests
     if (typeof process !== "undefined") {
+      await Promise.all(finalizers.map(finalizer => finalizer.onDone?.())).catch(err => {
+        console.error("Ignoring exception from finalizer onDone:", err);
+      });
       await triggerGarbageCollection();
+
+      // Dump all resources keeping the script alive after 5 seconds after finishing the tests
       scheduleLingeringProcessCheck();
     }
   }
+}
+
+export function addTestFinalizer(finalizer: TestFinalizer) {
+  if (typeof process === "undefined")
+    throw new Error(`addTestFinalizer is not supported for frontend tests yet`);
+
+  finalizers.push(finalizer);
 }
 
 /** Run tests
@@ -62,6 +82,7 @@ export function runTests(tests: TestList, options?: { onDone?: () => void }): vo
   } else {
     if (options?.onDone)
       throw new Error("onDone is not supported yet in the browser");
+
     runFrontendTests(tests);
   }
 }

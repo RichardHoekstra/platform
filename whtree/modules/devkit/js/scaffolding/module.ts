@@ -73,7 +73,6 @@ export async function createModule(subpath: string, modulename: string, options:
   mkdirSync(destpath, { recursive: true });
 
   if (options.initGit) {
-    //RECORD gitresult := ExecuteGitCommand([ 'init', '--initial-branch=main', destpath ]); //2.28.0 supports this... but Ubuntu 20.04 doesn't have that one yet.
     await simpleGit({ baseDir: destpath }).init();
     if ((await simpleGit({ baseDir: destpath }).branch()).all.length === 0)
       await simpleGit({ baseDir: destpath }).checkout(['-b', 'main']);
