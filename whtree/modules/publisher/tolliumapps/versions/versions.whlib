@@ -76,8 +76,6 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
 
   BOOLEAN have_properties;
 
-  BOOLEAN have_workflow_editor;
-
   // ---------------------------------------------------------------------------
   //
   // Init
@@ -96,7 +94,6 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
     this->liveobject := OpenWHFSObject(targetinfo.snapshotfor ?? data.id);
     this->frame->title := this->GetTid(".dialogtitle", this->liveobject->name);
     this->contexts->applytester := GetApplyTesterForObject(this->liveobject->id);
-    this->have_workflow_editor := RecordExists(this->contexts->applytester->GetWorkflowEditor());
 
     ^include_autosaves->visible := this->frame->flags.issupervisor;
 
@@ -162,7 +159,7 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
              , isactive
              , snapshot
              , cancopy :=         snapshot != 0
-             , canview :=         snapshot != 0 AND this->have_workflow_editor
+             , canview :=         snapshot != 0 AND RecordExists(this->renderer->metatabsconfig.workflowEditor)
           FROM historyitems;
 
     ^versions->rows := rows;

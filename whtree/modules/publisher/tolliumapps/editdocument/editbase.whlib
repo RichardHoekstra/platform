@@ -584,15 +584,7 @@ PUBLIC STATIC OBJECTTYPE MetatabsRenderer <
   }
 >;
 
-/** Create a metatabs renderer
-    @param objdata Configuration record for the metatabs renderer
-    @cell(integer) objdata.objectid
-    @cell(integer) objdata.parent
-    @cell(integer) objdata.isfolder
-    @cell(integer) objdata.type
-    @cell(boolean) objdata.requireworkflow
-*/
-PUBLIC OBJECT FUNCTION CreateMetatabsRenderer(RECORD objdata) {
+PUBLIC RECORD FUNCTION GetMetatabsConfig(RECORD objdata) {
   objdata := ValidateOptions([
     objectid := 0,
     parent := 0,
@@ -606,6 +598,19 @@ PUBLIC OBJECT FUNCTION CreateMetatabsRenderer(RECORD objdata) {
   ]);
 
   RECORD metatabsconfig := CallJS("@mod-publisher/lib/internal/siteprofiles/metatabs.ts#describeMetaTabsForHS", objdata);
+  RETURN metatabsconfig;
+}
+
+/** Create a metatabs renderer
+    @param objdata Configuration record for the metatabs renderer
+    @cell(integer) objdata.objectid
+    @cell(integer) objdata.parent
+    @cell(integer) objdata.isfolder
+    @cell(integer) objdata.type
+    @cell(boolean) objdata.requireworkflow
+*/
+PUBLIC OBJECT FUNCTION CreateMetatabsRenderer(RECORD objdata) {
+  RECORD metatabsconfig := GetMetatabsConfig(objdata);
   OBJECT applytester := RecordExists(metatabsconfig) ? GetApplyTesterForHSInfo(metatabsconfig.__hsinfo) : GetApplyTesterForObject(objdata.objectid); //fallback. test-whfs-history-v4 triggers it
   IF(NOT ObjectExists(applytester))
     THROW NEW Exception("No applytester found for this object");

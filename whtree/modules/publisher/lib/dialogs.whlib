@@ -10,6 +10,7 @@ LOADLIB "mod::publisher/lib/internal/tollium-helpers.whlib";
 LOADLIB "mod::publisher/lib/internal/siteprofiles/reader.whlib";
 LOADLIB "mod::publisher/lib/internal/siteprofiles/widgets.whlib";
 LOADLIB "mod::publisher/lib/internal/files.whlib";
+LOADLIB "mod::publisher/tolliumapps/editdocument/editbase.whlib";
 LOADLIB "mod::publisher/tolliumapps/filemanager/objecteditor.whlib";
 LOADLIB "mod::publisher/lib/internal/forms/results.whlib";
 LOADLIB "mod::publisher/lib/internal/siteprofiles/cache.whlib";
@@ -177,8 +178,8 @@ PUBLIC INTEGER FUNCTION RunNewFSObjectDialog(OBJECT parentscreen, INTEGER parent
 
   IF(NOT options.issite AND createres.template = 0 AND createres.createtype != 0 AND options.isfolder = FALSE)
   {
-    OBJECT applytester := GetApplyTesterForFakeObject(parentfolder,TRUE, createres.createtype);
-    IF(RecordExists(applytester->GetWorkflowEditor())) {
+    RECORD metatabsconfig := GetMetatabsConfig(CELL[ objectid := 0, parent := parentfolder, isfolder := FALSE, type := createres.createtype, mode := "all" ]);
+    IF(RecordExists(metatabsconfig.workfloweditor)) {
       GetPrimary()->BeginWork();
       OBJECt parentobj := OpenWHFSObject(parentfolder);
       OBJECT newfile := parentobj->CreateFile(
@@ -197,6 +198,7 @@ PUBLIC INTEGER FUNCTION RunNewFSObjectDialog(OBJECT parentscreen, INTEGER parent
     IF(RecordExists(typedef) AND typedef.isembeddedobjecttype AND RecordExists(typedef.editor) AND typedef.editor.type = "extension")
     {
       //NEW widget... so go straight to the widget editor
+      OBJECT applytester := GetApplyTesterForFakeObject(parentfolder,TRUE, createres.createtype);
       RECORD embobj := DoEditWidget(parentscreen, DEFAULT OBJECT, typens, DEFAULT RECORD, DEFAULT OBJECT, applytester, FALSE, TRUE, "", DEFAULT RECORD);
       IF(NOT RecordExists(embobj)) // was the data editted? ('Cancel' returns a DEFAULT RECORD)
         RETURN 0;
