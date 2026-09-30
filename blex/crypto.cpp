@@ -445,22 +445,26 @@ void EVPKey::GenerateCertificateRequest(std::vector<uint8_t> *req, SubjectNamePa
         //Generate the certificate request
         X509_REQ    *req_p = NULL;
         STACK_OF(X509_EXTENSION) *exts = NULL;
+        X509_NAME *x509_name = NULL;
         MemBioWrapper membio;
 
         try
         {
                 req_p = X509_REQ_new();
                 exts = sk_X509_EXTENSION_new_null();
-                if (!req_p || !exts)
+                x509_name = X509_NAME_new();
+                if (!req_p || !exts || !x509_name)
                     throw std::bad_alloc();
 
                 if(!X509_REQ_set_version(req_p, 0))
                     throw std::runtime_error("X509 request version setup failed");
 
-                X509_NAME *x509_name = X509_REQ_get_subject_name(req_p);
                 for(unsigned i=0; i < subjectname.size(); ++i)
                   if(!X509_NAME_add_entry_by_txt(x509_name, subjectname[i].first.c_str(), MBSTRING_ASC, (const unsigned char*)subjectname[i].second.c_str(), -1, -1, 0))
                       throw std::runtime_error("X509 request subjectnames failed");
+
+                if(!X509_REQ_set_subject_name(req_p, x509_name))
+                    throw std::runtime_error("X509 request subject name setup failed");
 
                 if(!altnames.empty())
                 {
@@ -484,13 +488,18 @@ void EVPKey::GenerateCertificateRequest(std::vector<uint8_t> *req, SubjectNamePa
                 if(req->size()==0)
                     throw std::runtime_error("X509 request write failed");
 
+                X509_NAME_free(x509_name);
                 sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
                 X509_REQ_free(req_p);
         }
         catch(...)
         {
-                sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
-                X509_REQ_free(req_p);
+                if (x509_name)
+                    X509_NAME_free(x509_name);
+                if (exts)
+                    sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
+                if (req_p)
+                    X509_REQ_free(req_p);
                 throw;
         }
 }
@@ -1650,7 +1659,7 @@ EM_JS(void, supportFillPseudoRandomVector, (uint8_t *to_fill, unsigned to_fill_b
 
 void FillPseudoRandomVector(uint8_t *to_fill, unsigned to_fill_bytes)
 {
-#if defined(__EMSCRIPTEN__) 
+#if defined(__EMSCRIPTEN__)
         supportFillPseudoRandomVector(to_fill, to_fill_bytes);
 #else
         if(RAND_pseudo_bytes(to_fill,to_fill_bytes) != 1)
