@@ -781,12 +781,12 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
 
     //TODO reuse the unitInfo for later password checks
     const passwordValidationChecks = await getUserValidationSettings(this.wrdschema, userInfo.whuserUnit || null);
-    const noExternalLogin = passwordValidationChecks.split(' ').includes("externallogin");
-    if (noExternalLogin
+    const requireExternalLogin = passwordValidationChecks.split(' ').includes("externallogin");
+    if (requireExternalLogin
       || !userInfo?.password
       || !await userInfo.password.verifyPassword(request.password)) {
       const userCode = authsettings.loginIsEmail ? "incorrect-email-password" : "incorrect-login-password";
-      const logCode = noExternalLogin ? "require-external-login" : userCode;
+      const logCode = requireExternalLogin ? "require-external-login" : userCode;
       return await this.returnLoginFail(request, userid, userCode, logCode);
     }
 
