@@ -64,11 +64,28 @@ async function testMetadataReader() {
     }
   ], imgfileMetatabsAsSysopForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
+  await beginWork();
+  const tmpfolder = await test.getTestSiteJSTemp();
+  const seoTitleImage = await tmpfolder.createFile("seotitle-image", { type: "platform:filetypes.image" });
+  test.eq({ seoTitle: false, description: true, keywords: false, pageHeading: false, isUnlisted: false, requireTitle: false, seoTab: false },
+    (await describeMetaTabs(await getApplyTesterForObject(seoTitleImage), { mode: "objectProps" })).baseProperties);
+
+  //An RTD may show seoTitle/description in the Editor, but *not* in objevtprops
+  const seoTitleRTD = await tmpfolder.createFile("seotitle-rtd", { type: "platform:filetypes.richdocument" });
+  test.eq({ seoTitle: true, description: true, keywords: false, pageHeading: false, isUnlisted: false, requireTitle: false, seoTab: true },
+    (await describeMetaTabs(await getApplyTesterForObject(seoTitleRTD), { mode: "editor" })).baseProperties);
+  test.eq({ seoTitle: false, description: false, keywords: false, pageHeading: false, isUnlisted: false, requireTitle: false, seoTab: true },
+    (await describeMetaTabs(await getApplyTesterForObject(seoTitleRTD), { mode: "objectProps" })).baseProperties);
+
+  await commitWork();
+
   const richdocfile = await openFile("site::webhare_testsuite.testsitejs/testpages/staticpage");
   const applytester = await getApplyTesterForObject(richdocfile);
   const metatabs = await describeMetaTabs(applytester, { mode: "editor" });
 
   test.assert(metatabs.workflowEditor);
+  test.eq({ seoTitle: true, description: true, keywords: false, pageHeading: false, isUnlisted: false, requireTitle: false, seoTab: true }, metatabs.baseProperties);
+
   test.eqPartial({
     types: [
       {
@@ -203,6 +220,7 @@ async function testMetadataReader() {
   ], richdocfilelinkMetatabsAsSysopForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
   test.eq(null, richdocfilelinkMetatabsAsSysopForObjectProps.workflowEditor);
+  test.eq({ seoTitle: true, description: true, keywords: false, pageHeading: false, isUnlisted: false, requireTitle: false, seoTab: true }, metatabs.baseProperties);
 }
 
 async function testOverrides() {

@@ -116,6 +116,7 @@ ASYNC MACRO RunSeoTabUITests(BOOLEAN expect_advanced_access) {
   AWAIT ExpectScreenChange(+1, PTR TTClick("props"));
 
   TestEq(FALSE, TT("seotitle", [ findinvisible := TRUE ])->visible, "SEO title is not visible because this doc has workflow and you need to open the editor");
+  TestEq(FALSE, TT("description", [ findinvisible := TRUE ])->visible, "Description is not visible because this doc has workflow and you need to open the editor");
   TestEq(FALSE, TT("page_heading", [ findinvisible := TRUE ])->visible);
 
   AWAIT ExpectScreenChange(-1, PTR TTClick(":OK"));
@@ -126,6 +127,7 @@ ASYNC MACRO RunSeoTabUITests(BOOLEAN expect_advanced_access) {
   AWAIT ExpectScreenChange(+1, PTR TTClick("props"));
 
   TestEq(TRUE, TT("seotitle", [ findinvisible := TRUE ])->visible);
+  TestEq(TRUE, TT("description", [ findinvisible := TRUE ])->visible);
   TestEq(FALSE, TT("page_heading", [ findinvisible := TRUE ])->visible);
   TT("seotitle")->value := "The Contentlink Seo Doc";
 

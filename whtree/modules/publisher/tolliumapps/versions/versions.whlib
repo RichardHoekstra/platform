@@ -16,6 +16,7 @@ LOADLIB "mod::system/lib/internal/whfs/support.whlib";
 
 LOADLIB "mod::publisher/lib/dialogs.whlib";
 LOADLIB "mod::publisher/lib/publisher.whlib";
+LOADLIB "mod::publisher/tolliumapps/editdocument/editbase.whlib";
 LOADLIB "mod::publisher/lib/internal/siteprofiles/cache.whlib";
 LOADLIB "mod::publisher/lib/internal/siteprofiles/reader.whlib";
 LOADLIB "mod::publisher/tolliumapps/editdocument/editbase.whlib";
@@ -51,7 +52,7 @@ RECORD FUNCTION GetHistoryTypes(OBJECT list) {
   RETURN historytypes;
 }
 
-PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
+PUBLIC STATIC OBJECTTYPE History EXTEND PublisherMetadataBase <
   // ---------------------------------------------------------------------------
   //
   // Variables
@@ -72,8 +73,6 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
 
   RECORD historytypes;
 
-  OBJECT renderer;
-
   BOOLEAN have_properties;
 
   // ---------------------------------------------------------------------------
@@ -81,8 +80,11 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
   // Init
   //
 
+  MACRO NEW() : PublisherMetadataBase([mode := "versions"]) {
+  }
+
   MACRO Init(RECORD data) {
-    RECORD targetinfo := SELECT id, snapshotfor FROM system.fs_objects WHERE id = VAR data.id;
+    RECORD targetinfo := SELECT id, snapshotfor, isfolder FROM system.fs_objects WHERE id = VAR data.id;
     IF(NOT RecordExists(targetinfo)) {
       this->tolliumresult := "close";
       RETURN;
@@ -92,6 +94,7 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
     this->frame->flags.issupervisor := this->frame->flags.issysop OR this->tolliumuser->HasRight("system:supervisor");
 
     this->liveobject := OpenWHFSObject(targetinfo.snapshotfor ?? data.id);
+    this->isfolder := targetinfo.isfolder;
     this->frame->title := this->GetTid(".dialogtitle", this->liveobject->name);
     this->contexts->applytester := GetApplyTesterForObject(this->liveobject->id);
 
@@ -182,16 +185,6 @@ PUBLIC STATIC OBJECTTYPE History EXTEND TolliumScreenBase <
       OBJECT fieldobj := GetMember(this, "^" || field);
       fieldobj->value := GetMember(sourceobject, field);
     }
-  }
-
-  MACRO ApplyBaseSettings() {
-    ^name->title := this->liveobject->isfolder ? GetTid("~foldername") : GetTid("~filename");
-    ^description->visible := this->renderer->metatabsconfig.base_properties.description OR IsValueSet(^description->value);
-    ^keywords->visible := this->renderer->metatabsconfig.base_properties.keywords OR IsValueSet(^keywords->value);
-
-    //As these are published, only files that go through a webdesign can show something useful
-    ^seotitle->visible := this->renderer->metatabsconfig.base_properties.seo_title OR IsValueSet(^seotitle->value);
-    ^page_heading->visible := this->renderer->metatabsconfig.base_properties.page_heading OR IsValueSet(^page_heading->value);
   }
 
   MACRO RenderMetadataComponents() {

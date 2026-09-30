@@ -65,8 +65,33 @@ PUBLIC STATIC OBJECTTYPE FieldScope EXTEND YamlScope
   }
 >;
 
-// Base class for ObjectProperties and the Document Editor. Preparing to share common code with objectprops
-PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
+// Base class for Versions and PublisherEditorBase(ObjectProperties and the Document Editor). Preparing to share common code with objectprops
+PUBLIC STATIC OBJECTTYPE PublisherMetadataBase EXTEND TolliumScreenBase <
+  // Metatabs renderer
+  OBJECT renderer;
+  /// Whether the edited (or new) object is a folder
+  BOOLEAN isfolder;
+  /// Mode ("editor", "objectProps", "versions" or "all")
+  STRING mode;
+
+  MACRO NEW(RECORD options) {
+    options := ValidateOptions([ mode := "all" ], options, [ required := [ "mode" ], enums := [ mode := [ "editor", "objectProps", "versions", "all" ] ] ]);
+    this->mode := options.mode;
+  }
+
+  MACRO ApplyBaseSettings() {
+    ^name->title := this->isfolder ? GetTid("~foldername") : GetTid("~filename");
+    ^description->visible := this->renderer->metatabsconfig.base_properties.description;
+    ^keywords->visible := this->renderer->metatabsconfig.base_properties.keywords;
+    ^seotitle->visible := this->renderer->metatabsconfig.base_properties.seo_title;
+    ^page_heading->visible := this->renderer->metatabsconfig.base_properties.page_heading;
+
+    ^seotab_heading->visible := ^seotitle->visible OR ^description->visible OR ^keywords->visible;
+  }
+>;
+
+// Base class for ObjectProperties and the Document Editor.
+PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND PublisherMetadataBase <
   /// Id of edited object, 0 for new or duplicate objects
   INTEGER itemid;
   /// Show version (0 for current)
@@ -75,8 +100,6 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
   // Active experiments
   RECORD experiments;
 
-  // Metatabs renderer
-  OBJECT renderer;
   /// Record definition of current (or new) type for the object
   RECORD curtype;
   /// Can the name follow the title?
@@ -97,8 +120,6 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
   BOOLEAN readonly;
   /// If the user can currently edit the file
   BOOLEAN editable;
-  /// Whether the edited (or new) object is a folder
-  BOOLEAN isfolder;
   /// Whether the object is a new object. It may already live in the user's autosave folder! (TODO EditProps may need to be careful when *actually* requesting props in the /webhare-private/ folder? or just not activate meta apply rules there)
   BOOLEAN isnew;
   /// Parent folder of the new/edited object
@@ -106,8 +127,6 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
   /// Source item (original file for duplications, draft or edited file when editing).
   OBJECT sourceitem;
 
-  /// Mode ("editor", "objectProps", "versions" or "all")
-  STRING mode;
   /// Workflow editor settings, if any
   RECORD workfloweditor;
 
@@ -124,9 +143,7 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
 
   OBJECT workflowmgr;
 
-  MACRO NEW(RECORD options) {
-    options := ValidateOptions([ mode := "all" ], options, [ required := [ "mode" ], enums := [ mode := [ "editor", "objectProps", "all" ] ] ]);
-    this->mode := options.mode;
+  MACRO NEW(RECORD options) : PublisherMetadataBase(options) {
     this->editable := TRUE; //needed as objectproperties.whlib doesn't invoke RefreshReadonly. but once it does we'll have to deal with objectprops ignoring workflow editable
   }
 
@@ -150,12 +167,8 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
     ];
   }
 
-  MACRO SetupBaseSettings()
-  {
+  MACRO SetupBaseSettings() {
     this->seotitle_placeholder := ^seotitle->placeholder;
-    ^name->title := this->isfolder ? GetTid("~foldername") : GetTid("~filename");
-    ^description->visible := this->renderer->metatabsconfig.base_properties.description;
-    ^keywords->visible := this->renderer->metatabsconfig.base_properties.keywords;
     ^isunlisted->visible := this->renderer->metatabsconfig.base_properties.is_unlisted;
     ^title->required := this->renderer->metatabsconfig.base_properties.require_title;
 
@@ -287,17 +300,14 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND TolliumScreenBase <
       extendprop.fsinstance->enabled := this->editable;
 
     // objectprops is not allowed to edit workflow fields when editing existing files which have a true workflow (and document editor)
+    this->ApplyBaseSettings();
+
     BOOLEAN edit_workflow_metadata := this->isnew OR NOT RecordExists(this->workfloweditor) OR this->mode != "objectProps";
-    BOOLEAN needstemplate := this->isfolder ? FALSE : this->contexts->applytester->IsTypeNeedsTemplate();
-    //As these are published, only files that go through a webdesign can show something useful
-    ^seotitle->visible := needstemplate AND this->renderer->metatabsconfig.base_properties.seo_title AND edit_workflow_metadata;
-    ^page_heading->visible := needstemplate AND this->renderer->metatabsconfig.base_properties.page_heading AND edit_workflow_metadata;
     ^title->enabled := this->editable AND ^title->visible AND edit_workflow_metadata;
     ^isunlisted->enabled := this->editable AND ^isunlisted->visible AND edit_workflow_metadata;
     ^description->enabled := this->editable AND ^description->visible AND edit_workflow_metadata;
     ^keywords->enabled := this->editable AND ^keywords->visible AND edit_workflow_metadata;
 
-    ^seotab_heading->visible := ^seotitle->visible OR ^description->visible OR ^keywords->visible;
     this->UpdatePinned();
   }
 
