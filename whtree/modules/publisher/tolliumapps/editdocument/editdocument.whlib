@@ -66,15 +66,15 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
 
   }
 
-  MACRO Init(RECORD data) {
+  UPDATE MACRO Init(RECORD data) {
+    PublisherEditorBase::Init(data);
     data := EnforceStructure( [ assumewriteaccess := FALSE, objeditor := DEFAULT RECORD, showversion := 0 ], data);
+    ^developersmenu->visible := this->frame->flags.isdeveloper;
 
     IF(NOT RecordExists(data.objeditor))
       THROW NEW Exception("EditDocumentApp requires objeditor parameter");
 
-    this->frame->flags.isdeveloper := this->contexts->user->ShowDeveloperOptions();
     this->frame->flags.isdirty := FALSE;
-    ^developersmenu->visible := this->frame->flags.isdeveloper;
     this->contexts->editdocumentapi := NEW EditDocumentAPI(PRIVATE this);
 
     this->frame->flags.canedit := FALSE;

@@ -88,6 +88,10 @@ PUBLIC STATIC OBJECTTYPE PublisherMetadataBase EXTEND TolliumScreenBase <
 
     ^seotab_heading->visible := ^seotitle->visible OR ^description->visible OR ^keywords->visible;
   }
+
+  MACRO DoInspectMetaTabs() {
+    Reflect(this->renderer->metatabsconfig);
+  }
 >;
 
 // Base class for ObjectProperties and the Document Editor.
@@ -145,6 +149,10 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND PublisherMetadataBase <
 
   MACRO NEW(RECORD options) : PublisherMetadataBase(options) {
     this->editable := TRUE; //needed as objectproperties.whlib doesn't invoke RefreshReadonly. but once it does we'll have to deal with objectprops ignoring workflow editable
+  }
+
+  MACRO Init(RECORD data) {
+    this->frame->flags.isdeveloper := this->contexts->user->ShowDeveloperOptions();
   }
 
   MACRO RefreshReadonly() {
@@ -260,10 +268,6 @@ PUBLIC STATIC OBJECTTYPE PublisherEditorBase EXTEND PublisherMetadataBase <
           , workflowtypes
           , options.showversion
           ]);
-  }
-
-  MACRO DoInspectMetaTabs() {
-    Reflect(this->renderer->metatabsconfig);
   }
 
   STRING FUNCTION GetSuggestedSlug(INTEGER parentfolder) {
