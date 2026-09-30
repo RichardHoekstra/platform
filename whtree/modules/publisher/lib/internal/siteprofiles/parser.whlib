@@ -312,8 +312,7 @@ STATIC OBJECTTYPE SiteprofileCompilationContext <
     RETURN ctype;
   }
 
-  RECORD FUNCTION ReadFileType(RECORD ctype, OBJECT ftype)
-  {
+  RECORD FUNCTION ReadFileType(RECORD ctype, OBJECT ftype) {
     ctype := this->ReadFileOrFolderType(ctype, ftype);
 
     ctype.filetype := GetBaseFiletypeRecord();
@@ -375,6 +374,7 @@ STATIC OBJECTTYPE SiteprofileCompilationContext <
     }
 
     ctype.filetype.initialpublish := ctype.filetype.ispublishable AND ParseXSBoolean(ftype->GetAttribute("initialpublish") ?? "true");
+    ctype.contentlink := ParseXSBoolean(ftype->GetAttribute("contentlink"));
     ctype.workflow := ftype->HasAttribute("workflow") ? ParseXSBoolean(ftype->GetAttribute("workflow")) : ctype.filetype.ispublishable AND NOT ctype.filetype.initialpublish AND ctype.filetype.needstemplate;
     RETURN ctype;
   }
@@ -528,6 +528,7 @@ STATIC OBJECTTYPE SiteprofileCompilationContext <
     typeinfo.tolliumicon := ctype->GetAttribute("tolliumicon") ?? ctype->GetAttribute("icon"); //TODO once everyone is 4.30, deprecate tolliumicon= and move everyone back to simple icon=
     typeinfo.cloneoncopy := set_cloneoncopy;
     typeinfo.cloneonarchive := ctype->HasAttribute("cloneonarchive") ? ParseXSBoolean(ctype->GetAttribute("cloneonarchive")) : typeinfo.cloneoncopy;
+    typeinfo.contentlink := ParseXSBoolean(ctype->GetAttribute("contentlink"));
     typeinfo.workflow := ParseXSBoolean(ctype->GetAttribute("workflow"));
     typeinfo.comment := ctype->GetAttribute("comment");
     INSERT CELL members := newmembers.members INTO typeinfo;

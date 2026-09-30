@@ -115,6 +115,7 @@ PUBLIC RECORD FUNCTION MakeBasicTypeInfo(STRING type)
          , orphan := FALSE
          , cloneoncopy := TRUE
          , cloneonarchive := TRUE
+         , contentlink := FALSE
          , workflow := FALSE
          , dynamicexecution := DEFAULT RECORD
          ];

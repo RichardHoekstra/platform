@@ -526,6 +526,7 @@ function parseRtdType(context: SiteProfileParserContext, gid: ResourceParserCont
     comment: type.comment || '',
     cloneonarchive: true,
     cloneoncopy: true,
+    contentlink: false,
     dynamicexecution: null,
     filetype: null,
     foldertype: null,
@@ -1171,6 +1172,7 @@ function parseSiteProfile(context: SiteProfileParserContext, options?: { onTid?:
     const ns = (settings.namespace as WHFSTypeName ?? scopedtype);
     const workflow = settings.workflow === true || settings.clone === "onDraft";
     const ctype: CSPContentType = {
+      contentlink: settings.contentLink === true,
       cloneonarchive: workflow || settings.clone !== "never",
       cloneoncopy: workflow || (settings.clone !== 'never' && settings.clone !== 'onArchive'),
       dynamicexecution: settings.dynamicExecution ? parseDynamicExecution(context, rootParser, settings.dynamicExecution) : null,
