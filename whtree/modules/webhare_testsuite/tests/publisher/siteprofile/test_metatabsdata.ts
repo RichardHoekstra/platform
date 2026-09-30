@@ -68,20 +68,7 @@ async function testMetadataReader() {
   const applytester = await getApplyTesterForObject(richdocfile);
   const metatabs = await describeMetaTabs(applytester, { mode: "editor" });
 
-  const richdocfileMetatabsAsMargeForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfile), { user: test.getUser("marge").auth, mode: "objectProps" });
-  test.eqPartial([], richdocfileMetatabsAsMargeForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
-
-  const richdocfileMetatabsAsSysopForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfile), { user: test.getUser("sysop").auth, mode: "objectProps" });
-  test.eqPartial([
-    {
-      whfsType: 'platform:publisher.lifecycle',
-      extension: 'mod::publisher/tolliumapps/objectprops/extensions.xml#lifecycle',
-      title: 'publisher:siteprofile.internaltypes.lifecycle'
-    }
-  ], richdocfileMetatabsAsSysopForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
-
   test.assert(metatabs.workflowEditor);
-
   test.eqPartial({
     types: [
       {
@@ -192,6 +179,18 @@ async function testMetadataReader() {
       }
     ]
   }, remapForHs(metatabs!));
+
+  const richdocfileMetatabsAsMargeForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfile), { user: test.getUser("marge").auth, mode: "objectProps" });
+  test.eqPartial([], richdocfileMetatabsAsMargeForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
+
+  const richdocfileMetatabsAsSysopForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfile), { user: test.getUser("sysop").auth, mode: "objectProps" });
+  test.eqPartial([
+    {
+      whfsType: 'platform:publisher.lifecycle',
+      extension: 'mod::publisher/tolliumapps/objectprops/extensions.xml#lifecycle',
+      title: 'publisher:siteprofile.internaltypes.lifecycle'
+    }
+  ], richdocfileMetatabsAsSysopForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
 
   const richdocfilelink = await openFile("site::webhare_testsuite.testsitejs/testpages/staticpage-contentlink");
   const richdocfilelinkMetatabsAsSysopForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfilelink), { user: test.getUser("sysop").auth, mode: "objectProps" });
