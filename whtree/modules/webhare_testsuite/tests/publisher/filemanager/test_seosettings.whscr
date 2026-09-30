@@ -19,8 +19,9 @@ RECORD args := ParseArguments(GetConsoleArguments(),
                               [ [ name := "jssite", type := "switch" ]
                               ]);
 
-OBJECT seotestroot, root, noindeximage, seotitlefile, pageheadingfile, noindexfolder, forced_noindex_nofollow_yesfollow_file, seotestfile, seoheadertitlefolder, noindexsubfolder, noindexsubfile,
-       noindexsubfolderindex, nofollowfolder, nofollowsubfolder, nofollowsubfile, forced_noindex_file, forced_nofollow_file, forced_noarchive_file, forced_noindex_nofollow_noarchive_file;
+OBJECT seotestroot, root, noindeximage, seotitlefile, seotitledoc, pageheadingfile, noindexfolder, forced_noindex_nofollow_yesfollow_file, seotestfile, seoheadertitlefolder, noindexsubfolder, noindexsubfile,
+       noindexsubfolderindex, nofollowfolder, nofollowsubfolder, nofollowsubfile, forced_noindex_file, forced_nofollow_file, forced_noarchive_file, forced_noindex_nofollow_noarchive_file,
+       clink_seotitlefile, clink_seotitledoc;
 
 MACRO PrepIt()
 {
@@ -37,6 +38,9 @@ MACRO PrepIt()
   seotestroot := testfolder->CreateFolder([name := "seotab"]);
   seotestfile := seotestroot->CreateFile([name := "seotestfile", type := usetype->id, publish := TRUE ]);
   seotitlefile := seotestroot->CreateFile([name := "seotitlefile", type := usetype->id, publish := TRUE, title := "navtitle seotitlefile" ]);
+  seotitledoc := seotestroot->CreateFile([name := "seotitledoc", typens := "platform:filetypes.richdocument", publish := TRUE, title := "navtitle seotitleod" ]);
+  clink_seotitlefile := seotestroot->CreateFile([name := "clink_seotitlefile", typens := "platform:filetypes.contentlink", publish := TRUE, title := "contentlink to seotitlefile", filelink := seotitlefile->id ]);
+  clink_seotitledoc := seotestroot->CreateFile([name := "clink_seotitledoc", typens := "platform:filetypes.contentlink", publish := TRUE, title := "contentlink to seotitledoc", filelink := seotitledoc->id ]);
   pageheadingfile := seotestroot->CreateFile([name := "pageheadingfile", type := usetype->id, publish := TRUE, title := "navtitle pageheadingfile" ]);
   seoheadertitlefolder := seotestroot->CreateFolder([name := "seotitle-headertitle-folder" ]);
 
@@ -92,6 +96,38 @@ ASYNC MACRO RunSeoTabUITests(BOOLEAN expect_advanced_access) {
   TestEq(TRUE, TT("seotitle", [ findinvisible := TRUE ])->visible);
   TestEq(FALSE, TT("page_heading", [ findinvisible := TRUE ])->visible);
   TT("seotitle")->value := "The Seo Title";
+
+  AWAIT ExpectScreenChange(-1, PTR TTClick(":OK"));
+  AWAIT ExpectScreenChange(-1, PTR TTEscape); //exit publisher
+
+  // STORY: Open contentlink to contentlisting. This should still be showing SEO properties just like the file itself
+  AWAIT ExpectScreenChange(+1, PTR TTLaunchApp("publisher:app", [ calltype := "direct", params := STRING[ `${basefolder}clink_seotitlefile` ] ]));
+  AWAIT ExpectScreenChange(+1, PTR TTClick("props"));
+
+  TestEq(TRUE, TT("seotitle", [ findinvisible := TRUE ])->visible);
+  TestEq(FALSE, TT("page_heading", [ findinvisible := TRUE ])->visible);
+  TT("seotitle")->value := "The Contentlink Seo Title";
+
+  AWAIT ExpectScreenChange(-1, PTR TTClick(":OK"));
+  AWAIT ExpectScreenChange(-1, PTR TTEscape); //exit publisher
+
+  // STORY: Open RTD. This should still not be showing SEO properties
+  AWAIT ExpectScreenChange(+1, PTR TTLaunchApp("publisher:app", [ calltype := "direct", params := STRING[ `${basefolder}seotitledoc` ] ]));
+  AWAIT ExpectScreenChange(+1, PTR TTClick("props"));
+
+  TestEq(FALSE, TT("seotitle", [ findinvisible := TRUE ])->visible, "SEO title is not visible because this doc has workflow and you need to open the editor");
+  TestEq(FALSE, TT("page_heading", [ findinvisible := TRUE ])->visible);
+
+  AWAIT ExpectScreenChange(-1, PTR TTClick(":OK"));
+  AWAIT ExpectScreenChange(-1, PTR TTEscape); //exit publisher
+
+  // STORY: Open contentlink to RTD. This should still be showing SEO properties unlike the RTD props itself
+  AWAIT ExpectScreenChange(+1, PTR TTLaunchApp("publisher:app", [ calltype := "direct", params := STRING[ `${basefolder}clink_seotitledoc` ] ]));
+  AWAIT ExpectScreenChange(+1, PTR TTClick("props"));
+
+  TestEq(TRUE, TT("seotitle", [ findinvisible := TRUE ])->visible);
+  TestEq(FALSE, TT("page_heading", [ findinvisible := TRUE ])->visible);
+  TT("seotitle")->value := "The Contentlink Seo Doc";
 
   AWAIT ExpectScreenChange(-1, PTR TTClick(":OK"));
   AWAIT ExpectScreenChange(-1, PTR TTEscape); //exit publisher

@@ -122,6 +122,7 @@ function determineComponent(constraints: ValueConstraints | null, setComponent: 
 async function getFilteredExtendProps(applytester: WHFSApplyTester, user: AuthorizationInterface | undefined, editWorkflowMetadata: boolean, editNonWorkflowMetadata: boolean, editNonCloneOnCopy: boolean): Promise<Pick<MetaTabs, 'extendProps' | 'issues'>> {
   const extendProps: MetaTabs['extendProps'] = [];
   const issues: string[] = [];
+  const isContentLink = applytester["objinfo"].obj?.type === "platform:filetypes.contentlink";
 
   for (const prop of await applytester.getExtendProps()) {
     if (prop.requireRight && (!user || !await user.hasRightOn(prop.requireRight, applytester.getRightsTarget() ?? "all"))) {
@@ -141,16 +142,20 @@ async function getFilteredExtendProps(applytester: WHFSApplyTester, user: Author
     }
 
     if (matchtype.workflow && !editWorkflowMetadata) {
-      issues.push(`Type ${prop.whfsType} is defined for workflow, but this context cannot edit workflow controlled fields`);
+      issues.push(`Type ${prop.whfsType} is defined for workflow but this context cannot edit workflow controlled fields`);
+      continue;
+    }
+    if (matchtype.workflow && isContentLink) {
+      issues.push(`Type ${prop.whfsType} is defined for workflow but contentlinks ignore workflow controlled fields`);
       continue;
     }
 
     if (!matchtype.workflow && !editNonWorkflowMetadata) {
-      issues.push(`Type ${prop.whfsType} is not defined for workflow, but this context requires workflow`);
+      issues.push(`Type ${prop.whfsType} is not defined for workflow but this context requires workflow`);
       continue;
     }
     if (!matchtype.cloneoncopy && !matchtype.cloneonarchive && !editNonCloneOnCopy) {
-      issues.push(`Type ${prop.whfsType} is not cloneOnCopy or cloneOnArchive, may not be shown in versions context`);
+      issues.push(`Type ${prop.whfsType} is not cloneOnCopy or cloneOnArchive - may not be shown in versions context`);
       continue;
     }
 
@@ -197,7 +202,7 @@ export async function describeMetaTabs(applytester: WHFSApplyTester, options: {
     types: [],
     extendProps: aboutExtendProps.extendProps,
     issues: aboutExtendProps.issues,
-    [hsinfo]: applytester.__getHSInfo(),
+    [hsinfo]: applytester["getHSInfo"](),
     workflowEditor: null,
     policies: await getPoliciesForObject(applytester, ["getFallbackMetaTitle"]),
     baseProperties: {

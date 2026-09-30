@@ -1756,7 +1756,7 @@ PUBLIC OBJECT FUNCTION GetApplyTesterForFakeObject(INTEGER parentfolder, BOOLEAN
 
 PUBLIC OBJECT FUNCTION GetApplyTesterForHSInfo(RECORD __hsinfo)
 {
-  /* see __getHSInfo
+  /* see getHSInfo
       ismocked:
       objectid:
       parentfolder:

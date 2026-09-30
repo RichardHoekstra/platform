@@ -192,6 +192,18 @@ async function testMetadataReader() {
       }
     ]
   }, remapForHs(metatabs!));
+
+  const richdocfilelink = await openFile("site::webhare_testsuite.testsitejs/testpages/staticpage-contentlink");
+  const richdocfilelinkMetatabsAsSysopForObjectProps = await describeMetaTabs(await getApplyTesterForObject(richdocfilelink), { user: test.getUser("sysop").auth, mode: "objectProps" });
+  test.eqPartial([
+    {
+      whfsType: 'platform:publisher.lifecycle',
+      extension: 'mod::publisher/tolliumapps/objectprops/extensions.xml#lifecycle',
+      title: 'publisher:siteprofile.internaltypes.lifecycle'
+    }
+  ], richdocfilelinkMetatabsAsSysopForObjectProps.extendProps.toSorted((a, b) => a.extension.localeCompare(b.extension)));
+
+  test.eq(null, richdocfilelinkMetatabsAsSysopForObjectProps.workflowEditor);
 }
 
 async function testOverrides() {
