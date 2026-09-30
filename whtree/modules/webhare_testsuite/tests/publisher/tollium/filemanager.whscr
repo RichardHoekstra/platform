@@ -90,6 +90,7 @@ ASYNC MACRO WalkTheTree() {
   OBJECT crashfile := GetTestsuiteTempFolder()->CreateFile([ name := "crash.rtd", typens := "http://www.webhare.net/xmlns/publisher/richdocumentfile", publish := TRUE ]);
   OBJECT crashlink := GetTestsuiteTempFolder()->CreateFile([ name := "crash.link", typens := "http://www.webhare.net/xmlns/publisher/internallink", publish := TRUE, filelink := crashfile->id ]);
   OBJECT disconnectedlink := GetTestsuiteTempFolder()->CreateFile([ name := "disconnectedlink", typens := "http://www.webhare.net/xmlns/publisher/internallink", publish := TRUE ]);
+  OBJECT hashexternallink := GetTestsuiteTempFolder()->CreateFile([ name := "hashexternallink", typens := "platform:filetypes.externallink", publish := FALSE, externallink := "#", ]);
 
   // to simulate the situation where a file/folder has a type that is no longer a valid file/folder type... (which the DB can't currently prevent) we'll force a file of type 'sitesettings'
   OBJECT invalidfile := GetTestsuiteTempFolder()->CreateFile( [ name := "invalidfiletype", type := 0, publish := TRUE ]);
@@ -299,6 +300,14 @@ ASYNC MACRO WalkTheTree() {
   TestEq("x-webhare:placeholder", pvs.browserurl);
   TestEq(TRUE, pvs.showingmessages);
   TestEqLike(`This external link does not seem to be linked to an existing file.<br />Errors have occurred during publication. <a href="preview:showerrors">Click here to view the errors.</a>`, pvs.messages);
+
+  TT("filelist")->value := SELECT AS INTEGER ARRAY id FROM TT("filelist")->rows WHERE name="hashexternallink";
+  TestEq(TRUE, RecordExists(TT("filelist")->selection));
+  pvs := TT("previewbrowser")->GetPreviewState();
+  TestEq("#", pvs.displayurl);
+  TestEq("x-webhare:placeholder", pvs.browserurl);
+  TestEq(TRUE, pvs.showingmessages);
+  TestEqLike(`This external link links to URL '#'*This file is not published.`, pvs.messages);
 
   TT("foldertree")->selection := SELECT * FROM TT("foldertree")->rows WHERE name = "TestPages";
   TT("filelist")->value := SELECT AS INTEGER ARRAY id FROM TT("filelist")->rows WHERE name="staticpage-internallink";
