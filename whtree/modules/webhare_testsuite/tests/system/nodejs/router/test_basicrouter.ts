@@ -1,6 +1,6 @@
 import * as test from "@mod-webhare_testsuite/js/wts-backend.ts";
 import * as services from "@webhare/services";
-import { createRedirectResponse } from "@webhare/router";
+import { createRedirectResponse, getAssetPackIntegrationCode } from "@webhare/router";
 import { coreWebHareRouter } from "@webhare/router/src/corerouter";
 import { decodeHSON } from "@webhare/hscompat/src/hscompat";
 import { IncomingWebRequest, newForwardedWebRequest, newWebRequestFromInfo } from "@webhare/router/src/request";
@@ -34,6 +34,16 @@ async function testRouterAPIs() {
   test.eq('https://www.example.org/suburl', (await newWebRequestFromInfo({ ...baseinfo, headers: { referer: "https://www.example.com/somesite", origin: "https://www.example.org" } })).getOriginURL('suburl'));
   test.eq('https://www.example.org/suburl', (await newWebRequestFromInfo({ ...baseinfo, headers: { referer: "https://www.example.com/somesite", ORIGIN: "https://www.example.org" } })).getOriginURL('/suburl'));
   test.eq(null, (await newWebRequestFromInfo({ ...baseinfo, headers: { referer: "https://www.example.com/somesite", ORIGIN: "https://www.example.org" } })).getOriginURL('https://nu.nl'));
+
+  //Test getAssetPackIntegrationCode
+  test.eq(`<link rel="stylesheet" href="/.wh/ea/ap/platform.tollium/ap.css"><script src="/.wh/ea/ap/platform.tollium/ap.mjs" async type="module"></script>`,
+    getAssetPackIntegrationCode("platform:tollium"));
+  test.eq(`<link rel="stylesheet" href="/!123/.wh/ea/ap/platform.tollium/ap.css"><script src="/!123/.wh/ea/ap/platform.tollium/ap.mjs" async type="module"></script>`,
+    getAssetPackIntegrationCode("platform:tollium", { cacheBuster: "123" }));
+  test.eq(`<link rel="stylesheet" href="https://beta.webhare.net/.wh/ea/ap/platform.tollium/ap.css"><script src="https://beta.webhare.net/.wh/ea/ap/platform.tollium/ap.mjs" crossorigin="anonymous" async type="module"></script>`,
+    getAssetPackIntegrationCode("platform:tollium", { designRoot: "https://beta.webhare.net/" }));
+  test.eq(`<link rel="stylesheet" href="https://beta.webhare.net/!456/.wh/ea/ap/platform.tollium/ap.css"><script src="https://beta.webhare.net/!456/.wh/ea/ap/platform.tollium/ap.mjs" crossorigin="anonymous" async type="module"></script>`,
+    getAssetPackIntegrationCode("platform:tollium", { designRoot: "https://beta.webhare.net/", cacheBuster: "456" }));
 }
 
 function testWebRequest() {

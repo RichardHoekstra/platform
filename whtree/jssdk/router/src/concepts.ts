@@ -14,15 +14,15 @@ export function encodeAttr(s: string): string {
 export function getAssetPackIntegrationCode(assetpack: string, options?: { designRoot?: string | null; cacheBuster?: string }) {
   let bundleBaseUrl = getAssetPackBase(assetpack);
   let scriptsettings = '';
+  if (options?.cacheBuster)
+    bundleBaseUrl = "/!" + encodeURIComponent(options.cacheBuster) + bundleBaseUrl;
+
   if (options?.designRoot) {
     scriptsettings += ' crossorigin="anonymous"';
     bundleBaseUrl = new URL(bundleBaseUrl, options.designRoot).toString();
   }
 
   scriptsettings += ' async type="module"';
-
-  if (options?.cacheBuster)
-    bundleBaseUrl = "/!" + encodeURIComponent(options.cacheBuster) + bundleBaseUrl;
 
   return `<link rel="stylesheet" href="${encodeAttr(bundleBaseUrl)}ap.css">`
     + `<script src="${encodeAttr(bundleBaseUrl)}ap.mjs"${scriptsettings}></script>`;
