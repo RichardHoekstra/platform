@@ -47,11 +47,25 @@ PUBLIC STATIC OBJECTTYPE CustomLinkHandler EXTEND TolliumLinkHandlerBase
 
 PUBLIC STATIC OBJECTTYPE CustomLinkHandler2 EXTEND TolliumLinkHandlerBase
 <
+  OBJECT subobject;
+
   MACRO NEW()
   {
     this->title := "custom link handler2";
   }
 
+  UPDATE PUBLIC OBJECT ARRAY FUNCTION CreateComponents(OBJECT screen)
+  {
+    //we need to retrigger the fragment loader to hit the unsaved-SetLocalRefs bug
+    this->subobject := screen->CreateTolliumComponent("textedit");
+    this->subobject->title := "asdf";
+    this->subobject->placeholder := "customlinkhandler2";
+    RETURN [ this->subobject ];
+  }
+  UPDATE PUBLIC MACRO DestroyComponents()
+  {
+    this->subobject->DeleteComponent();
+  }
   UPDATE PUBLIC BOOLEAN FUNCTION SetLinkRecordIfSupported(RECORD inlink)
   {
     RETURN inlink.internallink = 1 AND inlink.append="#test";
