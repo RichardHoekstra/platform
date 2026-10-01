@@ -20,6 +20,10 @@ defaults:
   run:
     shell: bash
 
+concurrency: # cancel older workflows when a new push is done on a branch
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   buildcontainer:
     name: Build container
