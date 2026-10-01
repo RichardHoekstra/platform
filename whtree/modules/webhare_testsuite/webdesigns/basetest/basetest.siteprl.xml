@@ -931,7 +931,7 @@
 
   <!-- This is mostly propertyeditor/objectprops basic testing. Not sure if it really adds anything anymore on top of all
        our other tests ...  -->
-  <contenttype namespace="http://www.webhare.net/xmlns/beta/test" workflow="true" title="Beta Test Contenttype">
+  <contenttype namespace="http://www.webhare.net/xmlns/beta/test" workflow="true" title="Beta Test Contenttype" contentlink="true">
     <string name="stringtest" />
     <array name="arraytest">
       <string name="textcell" />

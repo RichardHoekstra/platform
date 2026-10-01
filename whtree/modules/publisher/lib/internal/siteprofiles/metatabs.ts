@@ -119,43 +119,47 @@ function determineComponent(constraints: ValueConstraints | null, setComponent: 
   };
 }
 
-async function getFilteredExtendProps(applytester: WHFSApplyTester, user: AuthorizationInterface | undefined, editWorkflowMetadata: boolean, editNonWorkflowMetadata: boolean, editNonCloneOnCopy: boolean): Promise<Pick<MetaTabs, 'extendProps' | 'issues'>> {
+interface ExtensionFilter {
+  isContentLink: boolean;
+  user: AuthorizationInterface | undefined;
+  editWorkflowMetadata: boolean;
+  editNonWorkflowMetadata: boolean;
+  editNonCloneOnCopy: boolean;
+}
+
+function validateTypeAgainstFilter(contenttype: string, filter: ExtensionFilter): CSPContentType | string {
+  const matchtype = getType(contenttype);
+  if (!matchtype)
+    return `No such type ${contenttype}`;
+
+  if (matchtype.workflow && !filter.editWorkflowMetadata)
+    return `Type ${contenttype} is defined for workflow but this context cannot edit workflow controlled fields`;
+
+  if (filter.isContentLink && !matchtype.contentlink)
+    return `Type ${contenttype} is not enabled for content links`;
+
+  if (!matchtype.workflow && !filter.editNonWorkflowMetadata)
+    return `Type ${contenttype} is not defined for workflow but this context requires it`;
+
+  if (!matchtype.cloneoncopy && !matchtype.cloneonarchive && !filter.editNonCloneOnCopy)
+    return `Type ${contenttype} is not cloneOnCopy or cloneOnArchive - may not be shown in versions context`;
+
+  return matchtype;
+}
+
+async function getFilteredExtendProps(applytester: WHFSApplyTester, filter: ExtensionFilter): Promise<Pick<MetaTabs, 'extendProps' | 'issues'>> {
   const extendProps: MetaTabs['extendProps'] = [];
   const issues: string[] = [];
-  const isContentLink = applytester["objinfo"].obj?.type === "platform:filetypes.contentlink";
 
   for (const prop of await applytester.getExtendProps()) {
-    if (prop.requireRight && (!user || !await user.hasRightOn(prop.requireRight, applytester.getRightsTarget() ?? "all"))) {
+    if (prop.requireRight && (!filter.user || !await filter.user.hasRightOn(prop.requireRight, applytester.getRightsTarget() ?? "all"))) {
       issues.push(`No rights to extendProps editor for type ${prop.whfsType}`);
       continue;
     }
 
-    if (!prop.whfsType) {
-      issues.push(`Not considering property editor '${prop.extension}' without a whfsType`);
-      continue; //when not working for objectprops we require a type
-    }
-
-    const matchtype = getType(prop.whfsType);
-    if (!matchtype) {
-      issues.push(`No such type ${prop.whfsType}`);
-      continue;
-    }
-
-    if (matchtype.workflow && !editWorkflowMetadata) {
-      issues.push(`Type ${prop.whfsType} is defined for workflow but this context cannot edit workflow controlled fields`);
-      continue;
-    }
-    if (matchtype.workflow && isContentLink) {
-      issues.push(`Type ${prop.whfsType} is defined for workflow but contentlinks ignore workflow controlled fields`);
-      continue;
-    }
-
-    if (!matchtype.workflow && !editNonWorkflowMetadata) {
-      issues.push(`Type ${prop.whfsType} is not defined for workflow but this context requires workflow`);
-      continue;
-    }
-    if (!matchtype.cloneoncopy && !matchtype.cloneonarchive && !editNonCloneOnCopy) {
-      issues.push(`Type ${prop.whfsType} is not cloneOnCopy or cloneOnArchive - may not be shown in versions context`);
+    const matchtype = validateTypeAgainstFilter(prop.whfsType, filter);
+    if (typeof matchtype === "string") {
+      issues.push(matchtype);
       continue;
     }
 
@@ -197,7 +201,14 @@ export async function describeMetaTabs(applytester: WHFSApplyTester, options: {
   const editWorkflowMetadata = applytester.isMocked() || options.mode !== "objectProps" || !setContentEditor?.documentEditor;
   const editNonWorkflowMetadata = options.mode !== "editor";
   const editNonCloneOnCopy = options.mode !== "versions";
-  const aboutExtendProps = await getFilteredExtendProps(applytester, options?.user, editWorkflowMetadata, editNonWorkflowMetadata, editNonCloneOnCopy);
+  const filter: ExtensionFilter = {
+    user: options?.user,
+    editWorkflowMetadata,
+    editNonWorkflowMetadata,
+    editNonCloneOnCopy,
+    isContentLink: applytester["objinfo"].obj?.type === "platform:filetypes.contentlink",
+  };
+  const aboutExtendProps = await getFilteredExtendProps(applytester, filter);
   const metasettings: MetaTabsWithHSInfo = {
     types: [],
     extendProps: aboutExtendProps.extendProps,
@@ -219,27 +230,17 @@ export async function describeMetaTabs(applytester: WHFSApplyTester, options: {
 
   if (setContentEditor?.documentEditor)
     metasettings.workflowEditor = {};
+  else if (options.mode === "editor")
+    throw new Error("Cannot invoke describeMetaTabs with mode === 'editor' if this object doesn't actually require a workflowEditor");
 
   for (const [contenttype, extendproperties] of Object.entries(pertype)) {
-    const matchtype = getType(contenttype);
-    if (!matchtype) {
-      metasettings.issues.push(`No such type ${contenttype}`);
+    const matchtype = validateTypeAgainstFilter(contenttype, filter);
+    if (typeof matchtype === "string") {
+      metasettings.issues.push(matchtype);
       continue;
     }
     if (!matchtype?.yaml) {
       metasettings.issues.push(`Type ${contenttype} must be defined by a YAML siteprofile`);
-      continue;
-    }
-    if (matchtype.workflow && !editWorkflowMetadata) {
-      metasettings.issues.push(`Type ${contenttype} is defined for workflow, but this context cannot edit workflow controlled fields`);
-      continue;
-    }
-    if (!matchtype.workflow && !editNonWorkflowMetadata) {
-      metasettings.issues.push(`Type ${contenttype} is not defined for workflow, but this context requires workflow`);
-      continue;
-    }
-    if (!matchtype.cloneoncopy && !matchtype.cloneonarchive && !editNonCloneOnCopy) {
-      metasettings.issues.push(`Type ${contenttype} is not cloneOnCopy or cloneOnArchive, may not be shown in versions context`);
       continue;
     }
 
