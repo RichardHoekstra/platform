@@ -133,9 +133,26 @@ jobs:
           path: artifacts/
           if-no-files-found: ignore
 
+  # we need this step for our GitHub approval settings to have some clear check they can require
+  all-tests-passed:
+    name: All tests passed
+    needs: [buildcontainer, test-vscode-extension, testcontainers, test-devkit]
+    # The gate must run even when a dependency fails so the required check reports failure rather than skipped.
+    if: always()
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Verify all tests passed
+        if: >-
+          needs.buildcontainer.result != 'success' ||
+          needs.test-vscode-extension.result != 'success' ||
+          needs.testcontainers.result != 'success' ||
+          needs.test-devkit.result != 'success'
+        run: exit 1
+      - run: echo "All tests passed successfully."
+
   deploy:
     name: Deploy container
-    needs: [buildcontainer, test-vscode-extension, testcontainers, test-devkit]
+    needs: [all-tests-passed]
     if: github.ref == 'refs/heads/main' && !inputs.scheduled
     runs-on: ubuntu-26.04
     steps:
@@ -158,7 +175,7 @@ jobs:
 
   update-testscripts:
     name: Update test scripts
-    needs: deploy
+    needs: [all-tests-passed]
     if: github.ref == 'refs/heads/main' && !inputs.scheduled
     runs-on: ubuntu-26.04
     steps:
