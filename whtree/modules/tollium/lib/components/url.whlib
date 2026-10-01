@@ -14,6 +14,9 @@ PUBLIC OBJECTTYPE TolliumURL EXTEND TolliumFragmentBase
 
   UPDATE PUBLIC PROPERTY title(GetTitle, SetTitle);
 
+  /** Automatically close the QR dialog after the url is opened (this will show a QR code a different url than the previewurl value*/
+  PUBLIC BOOLEAN autocloseqr;
+
   MACRO NEW()
   {
     EXTEND this BY TolliumIsComposable;
@@ -26,6 +29,7 @@ PUBLIC OBJECTTYPE TolliumURL EXTEND TolliumFragmentBase
     TolliumFragmentBase::StaticInit(def);
     this->value := def.value;
     this->title := def.title;
+    this->autocloseqr := def.autocloseqr;
     ^previewurl->width := def.width;
     ^previewurl->minwidth := def.minwidth;
   }
@@ -45,7 +49,7 @@ PUBLIC OBJECTTYPE TolliumURL EXTEND TolliumFragmentBase
 
   MACRO DoQRLink()
   {
-    RunQRDialog(this->owner, ^previewurl->value);
+    RunQRDialog(this->owner, ^previewurl->value, [ autoclose := this->autocloseqr ]);
   }
 
   MACRO OnOpenLink(OBJECT urlreceiver)

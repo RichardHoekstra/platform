@@ -4256,6 +4256,7 @@ To change a <xs:attribute /> for adding descriptions
     <xs:attributeGroup ref="ComposableComponentBase" />
     <xs:attributeGroup ref="sc:TidOrTitle" />
     <xs:attribute name="value" type="xs:string" />
+    <xs:attribute name="autocloseqr" type="xs:boolean" />
   </xs:complexType>
 
   <xs:complexType name="Slider">

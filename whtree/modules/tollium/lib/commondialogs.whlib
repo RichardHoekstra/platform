@@ -8,29 +8,16 @@
     @cell(string) options.title The QR window title
     @cell(string) options.description The QR window description text below the code, set to empty string to remove the
                                       description from the window
+    @cell(boolean) options.autoclose Automatically close the window after the url is opened
 */
 PUBLIC MACRO RunQRDialog(OBJECT parent, STRING url, RECORD options DEFAULTSTO DEFAULT RECORD) {
-  parent->contexts->opener->RunScreen("mod::tollium/screens/commondialogs.xml#qrcallback", CELL[ url, options := options ]);
-}
-MACRO RunQRPromise(OBJECT parent, RECORD options, FUNCTION PTR resolve, FUNCTION PTR reject)
-{
-  options := MakeReplacedRecord([ data := DEFAULT RECORD
-                                , title := ""
-                                , description := ""
-                                ], options);
-  OBJECT dlg := parent->LoadScreen("tollium:commondialogs.qrcallback", options.data);
-  dlg->oncallback := PTR OnQRCallback(resolve, #1);
-  dlg->frame->title := options.title ?? dlg->frame->title;
-  dlg->description->value := options.description ?? dlg->description->value;
-  dlg->description->visible := dlg->description->value != "";
-  STRING result := dlg->RunModal();
-  // The result is set to ok when the callback is run, i.e. when the code was scanned and the url openend
-  IF (result != "ok")
-    reject(NEW Exception(result));
-}
-MACRO OnQRCallback(FUNCTION PTR resolve, OBJECT handler)
-{
-  resolve(handler);
+  options := ValidateOptions([
+    data := DEFAULT RECORD,
+    title := "",
+    description := "",
+    autoclose := FALSE
+  ], options);
+  parent->contexts->opener->RunScreen("mod::tollium/screens/commondialogs.xml#qrcallback", CELL[ url, options ]);
 }
 
 OBJECTTYPE OrderingDialog
