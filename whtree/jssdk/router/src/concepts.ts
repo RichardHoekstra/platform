@@ -5,17 +5,24 @@ export function encodeAttr(s: string): string {
   return encodeString(s, "attribute");
 }
 
-export function getAssetPackIntegrationCode(assetpack: string, { designRoot = '', cacheBuster = '' } = {}) {
-  let scriptsettings = '';
-  if (designRoot !== "")
-    scriptsettings += ' crossorigin="anonymous"';
-  scriptsettings += ' async type="module"';
-
+/** Get the link and script tags needed to add a specific assetpack
+ * @param assetpack The name of the asset pack to integrate.
+ * @param options.designRoot The design root URL to resolve relative asset paths.
+ * @param options.cacheBuster A string to append as a cache buster to the asset URLs.
+ * @returns The HTML string to include the asset pack's CSS and JavaScript.
+ */
+export function getAssetPackIntegrationCode(assetpack: string, options?: { designRoot?: string | null; cacheBuster?: string }) {
   let bundleBaseUrl = getAssetPackBase(assetpack);
-  if (cacheBuster)
-    bundleBaseUrl = "/!" + encodeURIComponent(cacheBuster) + bundleBaseUrl;
-  if (designRoot)
-    bundleBaseUrl = new URL(bundleBaseUrl, designRoot).toString();
+  let scriptsettings = '';
+  if (options?.cacheBuster)
+    bundleBaseUrl = "/!" + encodeURIComponent(options.cacheBuster) + bundleBaseUrl;
+
+  if (options?.designRoot) {
+    scriptsettings += ' crossorigin="anonymous"';
+    bundleBaseUrl = new URL(bundleBaseUrl, options.designRoot).toString();
+  }
+
+  scriptsettings += ' async type="module"';
 
   return `<link rel="stylesheet" href="${encodeAttr(bundleBaseUrl)}ap.css">`
     + `<script src="${encodeAttr(bundleBaseUrl)}ap.mjs"${scriptsettings}></script>`;

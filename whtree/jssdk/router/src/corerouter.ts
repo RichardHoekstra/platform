@@ -141,6 +141,7 @@ export async function executeContentPageRequestHS(targetId: number, options?: {
 
   const targetObject = await whfs.openFileOrFolder(targetId, { allowHistoric: true });
   const whfsreq = await createContentPageRequest(targetObject, { webRequest, statusCode: options?.errorcode, isPublisherPreview: options?.ispublisherpreview, timings });
+  whfsreq.applyToCurrentContext();
   if (options?.errorcode) {
     //FIXME We need to create proper error page body. Pass sufficient info to the webdesign?
     const resp = await whfsreq.buildWebPage(litty`Errorcode ${options.errorcode}`);

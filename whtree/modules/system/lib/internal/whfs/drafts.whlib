@@ -12,18 +12,17 @@ LOADLIB "mod::system/lib/internal/whfs/events.whlib";
 LOADLIB "mod::system/lib/internal/whfs/history.whlib" ;
 LOADLIB "mod::system/lib/internal/webhareconstants.whlib" ;
 
-LOADLIB "mod::publisher/lib/internal/siteprofiles/cache.whlib";
-
 PUBLIC CONSTANT STRING ARRAY workflow_controlled_fields := ["DATA", "TITLE", "DESCRIPTION", "KEYWORDS" ];
 
 RECORD FUNCTION StringVersionToParts(STRING stringversion)
 {
-  STRING ARRAY toks := Tokenize(stringversion, '.');
-  IF(Length(toks) != 2)
+  STRING ARRAY toks := Tokenize(stringversion || '.0', '.'); //append .0 so we can always find a patch
+  IF(Length(toks) < 3)
     RETURN DEFAULT RECORD;
 
   RETURN CELL[ major := ToInteger(toks[0], 0)
              , minor := ToInteger(toks[1], 0)
+             , patch := ToInteger(toks[2], 0)
              ];
 }
 
@@ -36,12 +35,13 @@ PUBLIC RECORD FUNCTION GetLastSnapshotVersion(INTEGER source)
   currentversions := SELECT *, parts := StringVersionToParts(version) FROM currentversions;
   RETURN (SELECT AS RECORD CELL[ parts.major
                                , parts.minor
+                               , parts.patch
                                , userdata := DecodeHSONOrJSONRecord(userdata)
                                ] FROM currentversions
                                 WHERE RecordExists(parts)
-                                ORDER parts.major DESC, parts.minor DESC
+                                ORDER parts.major DESC, parts.minor DESC, parts.patch DESC
                                 LIMIT 1)
-         ?? [ userdata := DEFAULT RECORD, major := 0, minor := 0 ];
+         ?? [ userdata := DEFAULT RECORD, major := 0, minor := 0, patch := 0 ];
 }
 
 PUBLIC INTEGER FUNCTION CreateFullSnapshot(DATETIME now, INTEGER baseobjectid, INTEGER modifiedby) {
@@ -194,8 +194,7 @@ PUBLIC OBJECT FUNCTION OpenWHFSDraft(INTEGER draftid) __ATTRIBUTES__(DEPRECATED 
 
 /** Start a workflow update (create an autosave to have an object that can receive a RTD being updated)
     @param objid - The ID of the object we're updating. Draft or final object id */
-PUBLIC INTEGER FUNCTION StartWorkflowUpdate(OBJECT baseobject, INTEGER objid, RECORD metadata, RECORD options DEFAULTSTO DEFAULT RECORD) {
-  options := ValidateOptions([ user := DEFAULT OBJECT, workflowtypes := INTEGER[] ], options);
+PUBLIC INTEGER FUNCTION StartWorkflowUpdate(OBJECT baseobject, INTEGER objid, RECORD metadata, OBJECT user, INTEGER ARRAY workflowtypes, STRING setversion) {
 
   // Set up the new object (the 'autosave', or at least it will be an autosave as soon as we start writing data from editdocument here)
   DATETIME now := GetCurrentDateTime();
@@ -209,20 +208,20 @@ PUBLIC INTEGER FUNCTION StartWorkflowUpdate(OBJECT baseobject, INTEGER objid, RE
               , ...PickCells(metadata, workflow_controlled_fields)
               , type := baseobject->type
               , snapshotfor := baseobject->id
-              , modifiedby := ObjectExists(options.user) ? options.user->authobjectid : 0
+              , modifiedby := ObjectExists(user) ? user->authobjectid : 0
               ] INTO system.fs_objects;
 
-  CopyWorkflowInstances(objid, destid, options.workflowtypes, FALSE);
+  CopyWorkflowInstances(objid, destid, workflowtypes, FALSE);
 
   INSERT CELL [ fs_object := baseobject->id
-              , user := ObjectExists(options.user) ? options.user->authobjectid : 0
-              , userdata := EncodeHSON(ObjectExists(options.user) ? options.user->GetUserDataForLogging() : DEFAULT RECORD)
+              , user := ObjectExists(user) ? user->authobjectid : 0
+              , userdata := EncodeHSON(ObjectExists(user) ? user->GetUserDataForLogging() : DEFAULT RECORD)
               , type := whconstant_historytype_autosave
               , when := now
               , snapshot := destid
               , currentname := metadata.name
+              , version := setversion
               ] INTO system_internal.fs_history;
-
 
   IF(metadata.name != "" ) {
     OBJECT typeobj := OpenWHFSType("http://www.webhare.net/xmlns/publisher/draftmetadata");

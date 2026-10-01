@@ -201,9 +201,13 @@ PUBLIC STATIC OBJECTTYPE WorkflowManager <
     this->EnsureStartOfHistory();
 
     //The autosave must be linked to the file we're editing, but we should grab instance data from the draft if it exists, otherwise we miss uncached data (as __FlushInstanceData won't see it)
+    RECORD curversion := GetLastSnapshotVersion(this->baseobject->id);
+    STRING setversion := `${curversion.major}.${curversion.minor}.${curversion.patch + 1}`;
     INTEGER autosave := StartWorkflowUpdate(this->baseobject, ObjectExists(this->currentdraft) ? this->currentdraft->id : this->baseobject->id,
           this->GetMetadata(),
-          [ user := this->options.user, workflowtypes := SELECT AS INTEGER ARRAY id FROM this->workflowtypes ]);
+          this->options.user,
+          (SELECT AS INTEGER ARRAY id FROM this->workflowtypes),
+          setversion);
 
     this->EnsureMetadataUpToDate(FALSE);
     IF(NOT ObjectExists(this->currentautosave) OR this->currentautosave->id != autosave)

@@ -664,7 +664,7 @@ PUBLIC STATIC OBJECTTYPE EditDocumentApp EXTEND PublisherEditorBase <
       this->contexts->editdocumentapi->onpreview(openhandler, this->GetPreviewObject(FALSE), FALSE);
     ELSE {
       //ADDME Can we create a previewurl that ONLY works for the currentuser, as long as he's logged in ?
-      STRING url := this->workflowmgr->GetPreviewLink("draft");
+      STRING url := this->workflowmgr->GetPreviewLink("draft", [ share := "mostrecentversion" ]);
       IF(url != "")
         openhandler->SendURL(url);
     }

@@ -610,8 +610,7 @@ export class CPageRequest {
       IF(cachebuster !== "")
         bundlebaseurl := "/!" || EncodeURL(cachebuster) || bundlebaseurl;
     */
-
-      rawLitty(getAssetPackIntegrationCode(settings.assetpack))}
+      rawLitty(getAssetPackIntegrationCode(settings.assetpack, { designRoot: this.targetSite.cdnBaseURL }))}
     ${this.__insertions["dependencies-bottom"] ? await this.__renderInserts("dependencies-bottom") : ''}
     ${this.pageMetadata.description ? litty`<meta name="description" content="${this.pageMetadata.description}">` : ''}
     ${this.pageMetadata.keywords ? litty`<meta name="keywords" content="${this.pageMetadata.keywords}">` : ''}
