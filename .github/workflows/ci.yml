@@ -140,7 +140,6 @@ jobs:
 
   # we need this step for our GitHub approval settings to have some clear check they can require
   all-tests-passed:
-    name: All tests passed
     needs: [buildcontainer, test-vscode-extension, testcontainers]
     # The gate must run even when a dependency fails so the required check reports failure rather than skipped.
     if: always()
@@ -150,8 +149,7 @@ jobs:
         if: >-
           needs.buildcontainer.result != 'success' ||
           needs.test-vscode-extension.result != 'success' ||
-          needs.testcontainers.result != 'success' ||
-          needs.test-devkit.result != 'success'
+          needs.testcontainers.result != 'success'
         run: exit 1
       - run: echo "All tests passed successfully."
 
