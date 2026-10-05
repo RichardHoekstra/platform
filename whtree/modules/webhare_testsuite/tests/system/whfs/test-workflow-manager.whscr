@@ -636,6 +636,18 @@ MACRO DraftingTestWithCancel() {
 
   testfw->CommitWork();
   VerifyTSHistory(testfile->id);
+
+  //Verify cleanup code
+  TestEq(TRUE, CallJS([ camelcase := TRUE ], "@webhare/whfs/src/maintenance.ts#doRemoveObsoleteDrafts", [ max_recycle_days := 0, fs_objects := INTEGER[testfile->id] ]), "Obsolete drafts should be cleaned up");
+
+  history := ListObjectHistory(testfile->id,[include_autosaves := TRUE]);
+  TestEqMembers([ [ type := "created",            version := "0.1", user := testfw->GetUserAuthobjectId("marge"), name := "withcancel" ]
+                , [ type := "saved",              version := "0.2", user := testfw->GetUserAuthobjectId("marge"), name := "withcancel" ]
+                , [ type := "saved",              version := "0.3", user := testfw->GetUserAuthobjectId("marge"), name := "withcancel" ]
+                , [ type := "abandoned-draft",    version := "",    user := testfw->GetUserAuthobjectId("marge"), name := "" ]
+                ], history, "*");
+
+  VerifyTSHistory(testfile->id);
 }
 
 ASYNC MACRO AutosaveClockTest() {
