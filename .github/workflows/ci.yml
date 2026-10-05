@@ -2,7 +2,7 @@ name: WebHare CI
 
 on:
   push:
-  workflow_dispatch: # Used by scheduld-ci.yml
+  workflow_dispatch: # Used by scheduled-ci.yml
     inputs:
       scheduled:
         description: Skip deployment steps for scheduled CI runs
