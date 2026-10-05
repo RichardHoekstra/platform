@@ -11,7 +11,4 @@
     <jstest file="testwrdauth-authpages-nl.ts" tags="wrdauth" />
     <jstest file="testwrdauth-externallogin.ts" tags="wrdauth" />
   </group>
-  <group skipautotests="true">
-    <jstest file="testwrdauth-framelogin.ts" tags="wrdauth" />
-  </group>
 </group>

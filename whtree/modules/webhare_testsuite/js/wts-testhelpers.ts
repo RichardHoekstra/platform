@@ -20,8 +20,6 @@ export type TestSetupData =
 export async function invokeSetupForTestSetup(options?:
   {
     createsysop?: boolean;
-    requirealternatesite?: boolean;
-    protectroot?: boolean;
     onpeerserver?: boolean;
     preprtd?: boolean;
   }): Promise<TestSetupData> {

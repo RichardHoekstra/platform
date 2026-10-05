@@ -5,7 +5,7 @@ import { join } from "path";
 import { backendConfig, toFSPath } from "@webhare/services";
 import { listStoredKeyPairs } from "@mod-platform/js/webserver/keymgmt";
 import { runCli } from "@webhare/cli";
-import { openFolder } from "@webhare/whfs";
+import { openFolder, openSite } from "@webhare/whfs";
 import { runInWork } from "@webhare/whdb";
 
 // TODO tikacache should perhaps be droppable too, but it has little churn and we're not guaranteed to quickly recover opensearch databases right now..
@@ -50,5 +50,10 @@ runCli({
     const fallbackkey = (await listStoredKeyPairs()).find(key => key.name === "fallback");
     if (fallbackkey)
       await runInWork(async () => (await openFolder(fallbackkey.id)).recycle());
+
+    // WH6.1: site webhare_testsuite.althost is no longer needed
+    const altsite = await openSite("webhare_testsuite.althost", { allowMissing: true });
+    if (altsite)
+      await runInWork(async () => (await altsite.openFolder("/")).recycle());
   }
 });

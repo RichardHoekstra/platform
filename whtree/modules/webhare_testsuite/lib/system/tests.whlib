@@ -27,11 +27,6 @@ PUBLIC OBJECT FUNCTION GetTestsuiteJSTempFolder()
   RETURN OpenTestsuiteJSSite()->OpenByPath("tmp");
 }
 
-PUBLIC OBJECT FUNCTION OpenTestsuiteAltSite()
-{
-  RETURN OpenSiteByName("webhare_testsuite.althost");
-}
-
 PUBLIC MACRO EnsureUserMgmtStateClean(BOOLEAN expect_clean)
 {
   testfw->BeginWork();

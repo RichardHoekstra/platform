@@ -291,7 +291,7 @@
     <node name="tests">
       <obsoletekey name="ingenicomode" />
       <string name="response" />
-      <string name="alttestsitehost" />
+      <obsoletekey name="alttestsitehost" />
       <string name="hashedpassword" />
       <string name="secondhareinterface" />
       <string name="secondharetesttoken" />

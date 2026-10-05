@@ -1547,8 +1547,6 @@ PUBLIC RECORD FUNCTION TestInvoke_SetupConsilioTest(RECORD options DEFAULTSTO DE
 PUBLIC RECORD FUNCTION TestInvoke_SetupForTestSetup(RECORD options DEFAULTSTO DEFAULT RECORD) {
   options := ValidateOptions([ createsysop := FALSE
                              , preprtd := FALSE
-                             , requirealternatesite := FALSE
-                             , protectroot := FALSE
                              , prepmodule := FALSE
                              , onpeerserver := FALSE
                              ], options);
@@ -1594,24 +1592,6 @@ PUBLIC RECORD FUNCTION TestInvoke_SetupForTestSetup(RECORD options DEFAULTSTO DE
       ];
   }
 
-  IF(options.requirealternatesite)
-  {
-    OBJECT altsite := OpenTestsuiteAltSite();
-    IF(NOT ObjectExists(altsite) OR altsite->outputweb = 0)
-      THROW NEW Exception(`Site '${altsite->name}' must be published to an alternate root!`);
-
-    IF(NOT ObjectExists(altsite))
-      ABORT("No server hosting the alternate site");
-    retval.alternatesite := altsite->webroot;
-
-    // Add accessrule protecting /staticprotected/ with login into portal1 schema, via staticlogin
-    GetPrimary()->BeginWork();
-    DELETE FROM system.access WHERE description = "altsite access rule" AND webserver = altsite->outputweb;
-    INSERT INTO system.access(description,webserver,path,matchtype,authtype,authrequirement) ////apply source: OpenTestsuiteSite()->rootobject->OpenByPath("portal1")->id
-           VALUES ("altsite access rule",altsite->outputweb,options.protectroot ? "/" : "/requirewhaccount/",1/*initial match*/,1/*any webhare user*/,TRUE);
-    GetPrimary()->CommitWork();
-    RefreshGlobalWebserverConfig();
-  }
   IF(options.prepmodule)
   {
     testfw->SetupTestModule();
