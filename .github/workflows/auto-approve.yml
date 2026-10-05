@@ -25,6 +25,8 @@ jobs:
       - name: Auto-Approve if PR is Internal
         if: env.WEBHARE_BOT_APPID != ''
         uses: actions/github-script@v7
+        env:
+          BOT_LOGIN: ${{ steps.generate-token.outputs.app-slug }}[bot]
         with:
           github-token: ${{ steps.generate-token.outputs.token }}
           script: |
@@ -55,9 +57,8 @@ jobs:
               pull_number: prNumber,
             });
 
-            const botUser = await github.rest.users.getAuthenticated();
             const alreadyApproved = reviews.some(
-              r => r.user.login === botUser.data.login && r.state === 'APPROVED'
+              r => r.user.login === process.env.BOT_LOGIN && r.state === 'APPROVED'
             );
 
             if (alreadyApproved) {
