@@ -19,6 +19,17 @@ PUBLIC STATIC OBJECTTYPE ConditionValidationException EXTEND Exception
   }
 >;
 
+//needed to use FC Api
+OBJECTTYPE FormVariableMockObject
+<
+  PUBLIC STRING name;
+  PUBLIC STRING conditionname;
+  MACRO NEW(STRING objname)
+  {
+    this->name := objname;
+    this->conditionname := objname;
+  }
+>;
 
 /** @short Create a form condition checking if the value of a select field is one of a given list of values
     @param field The field to match
@@ -30,7 +41,7 @@ PUBLIC STATIC OBJECTTYPE ConditionValidationException EXTEND Exception
 */
 PUBLIC RECORD FUNCTION FCMatch(OBJECT field, STRING matchtype, VARIANT value, RECORD options DEFAULTSTO DEFAULT RECORD)
 {
-  RETURN ValidateFormCondition(CELL[ field := field->conditionname, matchtype, value, options ]);
+  RETURN ValidateFormCondition(CELL[ field := field->conditionname, matchtype, value, options, fieldtype := field EXTENDSFROM FormVariableMockObject ? "formvariable" : "field" ]);
 }
 
 /** @short Create a form condition checking if a field value is set
@@ -43,7 +54,7 @@ myform->^shipping_address->visiblecondition := FCIsSet(myform->^separate_shippin
 */
 PUBLIC RECORD FUNCTION FCIsSet(OBJECT field, RECORD options DEFAULTSTO DEFAULT RECORD)
 {
-  RETURN ValidateFormCondition(CELL[ field := field->conditionname, matchtype := "HASVALUE", value := TRUE, options ]);
+  RETURN ValidateFormCondition(CELL[ field := field->conditionname, matchtype := "HASVALUE", value := TRUE, options, fieldtype := field EXTENDSFROM FormVariableMockObject ? "formvariable" : "field" ]);
 }
 
 /** @short Create a form condition that matches if all of the given conditions match
@@ -98,4 +109,8 @@ PUBLIC RECORD FUNCTION FCNot(RECORD condition, RECORD options DEFAULTSTO DEFAULT
   IF (RecordExists(condition) AND condition.matchtype = "HASVALUE")
     RETURN CELL[ ...condition, value := NOT condition.value ];
   RETURN ValidateFormCondition(CELL[ matchtype := "NOT", condition, options ]);
+}
+
+PUBLIC OBJECT FUNCTION FCFormVariable(STRING formvariablename) {
+  RETURN NEW FormVariableMockObject(formvariablename);
 }

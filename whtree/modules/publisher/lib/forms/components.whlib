@@ -236,9 +236,9 @@ PUBLIC OBJECTTYPE FormFieldBase
     this->groupdataset := field.groupdataset;
     this->groupclasses := field.groupclasses;
     this->autocomplete := field.autocomplete;
-    this->pvt_requiredcondition := field.requiredcondition;
-    this->pvt_enabledcondition := field.enabledcondition;
-    this->pvt_visiblecondition := field.visiblecondition;
+    this->requiredcondition := field.requiredcondition;
+    this->enabledcondition := field.enabledcondition;
+    this->visiblecondition := field.visiblecondition;
     this->pvt_formgroup := field.formgroup;
     this->infotext := field.infotext;
 

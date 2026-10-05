@@ -97,6 +97,7 @@
       <checkbox name="condition_not" title="NOT" />
       <textedit name="condition_not_enabled" title="NOT enabled" />
       <textedit name="condition_not_required" title="NOT required" />
+      <textedit name="condition_formvar_x_set" title="formvar x set" />
       <select name="condition_options" type="pulldown" rowkeytype="integer" title="Conditional options">
         <option rowkey="1" title="Eins selected" />
         <option rowkey="2" tid=".zwei" />
@@ -114,6 +115,7 @@
         </richtext>
       </group>
       <hidden name="hidden" title="" value="value-xml" />
+      <hidden name="vars_of_form" title="" value="{}" />  <!-- for storing form variables state for toggles -->
     </page>
   </form>
 
@@ -363,7 +365,7 @@
       <array name="contacts" max="2" min="1" title="Contacts">
         <hidden name="row_uid" title="Row UID" />
         <textedit name="name" required="true" title="Name" />
-        <textedit name="email" validationchecks="email" title="Email" />
+        <textedit name="email" title="Email" validationchecks="email" />
         <imgedit name="photo" title="Photo" />
         <upload name="upload" title="Upload" />
         <select name="gender" type="pulldown" rowkeytype="integer" title="Gender" />

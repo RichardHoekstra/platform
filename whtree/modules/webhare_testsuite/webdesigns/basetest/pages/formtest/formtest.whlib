@@ -125,6 +125,12 @@ PUBLIC STATIC OBJECTTYPE CoreTestForm EXTEND FormBase
 
     BOOLEAN nocheckboxselect := IsRequest() AND GetFormWebVariable("nocheckboxselect") = "1";
 
+    this->formvariables := [
+      x := "1",
+    ];
+
+    ^vars_of_form->value := EncodeJSON(this->formvariables);
+
     ^invisible->visible := FALSE;
     TestEq('formtest', this->formcontext->targetobject->name);
     TestEq('nl', this->formcontext->languagecode);
@@ -305,6 +311,8 @@ PUBLIC STATIC OBJECTTYPE CoreTestForm EXTEND FormBase
     ^condition_not_enabled->enabledcondition := FCNot(FCNot(FCIsSet(^condition_not)));
     ^condition_not_required->requiredcondition := FCIsSet(^condition_not);
 
+    ^condition_formvar_x_set->enabledcondition := FCIsSet(FCFormVariable("x"));
+
     // Don't make the field conditionally required on the HTML only page
     ^condition_not_enabled->required := TRUE;
 
@@ -355,6 +363,12 @@ PUBLIC STATIC OBJECTTYPE CoreTestForm EXTEND FormBase
 
     ^email->value := ^email->value LIKE "*@*" ? Substitute(^email->value,'@','+test@') : "arnold@example.nl";
     ^dateofbirth->value := MakeDate(2000,1,1);
+  }
+
+  PUBLIC MACRO RPC_ToggleFormVarX() {
+    this->formvariables := DecodeJSON(^vars_of_form->value);
+    this->formvariables.x := this->formvariables.x = "" ? "1" : "";
+    ^vars_of_form->value := EncodeJSON(this->formvariables);
   }
 
   PUBLIC RECORD FUNCTION Submit(RECORD extradata)

@@ -204,6 +204,16 @@ export default class RPCFormBase<DataShape extends object = Record<string, unkno
 
   /* Override this to implement support for incoming field messages */
   processFieldMessage(field: string, prop: string, value: unknown) {
+    if (field === "#form") {
+      if (prop === "dataset") {
+        for (const [key, keyValue] of Object.entries(value || {})) {
+          this.node.setAttribute(`data-${key}`, String(keyValue));
+        }
+        return;
+      }
+      console.warn("Message for non-existing form field: %s, prop: %s, value: %s", field, prop, String(value));
+      return;
+    }
     if (field.startsWith("#page.")) {
       const matchpage = field === "#page.thankyou" ? this.node.querySelector<HTMLElement>(`.wh-form__page[data-wh-form-pagerole=thankyou]`) : null;
       if (!matchpage) { //we currently don't have anything to edit on other pages than thankyou
@@ -262,6 +272,7 @@ export default class RPCFormBase<DataShape extends object = Record<string, unkno
     for (const msg of messages) {
       this.processFieldMessage(msg.field, msg.prop, msg.data);
     }
+    this.refreshConditions();
   }
 
   async _flushPendingRPCs() {

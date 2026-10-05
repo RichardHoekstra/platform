@@ -310,6 +310,7 @@ PUBLIC STATIC OBJECTTYPE FormBase <
   STRING __formlanguagecode;
   OBJECT __formlastwork;
   OBJECT __addressapi;
+  RECORD __formvariables;
 
   /// Callbacks that may add to the form dataset
   FUNCTION PTR ARRAY __formattributescallbacks;
@@ -372,8 +373,10 @@ PUBLIC STATIC OBJECTTYPE FormBase <
   /// Label for 'submit' buttoon
   PUBLIC STRING formsubmitlabel;
 
-  /// 'Fixed' form variables, used for conditions
-  PUBLIC RECORD formvariables;
+  /** Form variables, used for conditions. Updated in frontend when modified dynamically (but not when
+      initialized differently than the last load of the form)
+  */
+  PUBLIC PROPERTY formvariables(__formvariables, SetFormVariables);
 
   /// Form submittype (new or edit)
   PUBLIC STRING formsubmittype;
@@ -449,6 +452,11 @@ PUBLIC STATIC OBJECTTYPE FormBase <
   STRING FUNCTION __GetFormURL()
   {
     RETURN (IsRequest() ? GetFormRequestURL() : "") ?? (ObjectExists(this->formcontext) ? this->formcontext->baseurl : "");
+  }
+
+  MACRO SetFormVariables(RECORD newvalue) {
+    this->__formvariables := newvalue;
+    this->__SendFormMessage("#form", "dataset", GetFormVariablesAsDataset(newvalue));
   }
 
   // ---------------------------------------------------------------------------
@@ -545,6 +553,8 @@ PUBLIC STATIC OBJECTTYPE FormBase <
         RECORD match := SELECT * FROM this->ListFields() WHERE guid = condition_field;
         IF(RecordExists(match))
           condition.field := match.obj->conditionname || extra_field;
+        IF (condition.fieldtype = "formvariable" AND NOT CellExists(this->formvariables, condition.field))
+          THROW NEW Exception(`Form variable '${condition.field}' does not exist`);
 
         // Convert array values to string (JavaScript checks <input> values, which are always strings)
         IF (TypeID(condition.value) != TypeID(STRING ARRAY) AND IsTypeIDArray(TypeID(condition.value)))

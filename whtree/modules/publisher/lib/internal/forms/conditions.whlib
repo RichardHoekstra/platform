@@ -19,6 +19,10 @@ PUBLIC RECORD FUNCTION ValidateFormCondition(RECORD condition)
         THROW NEW Exception(`Form '${condition.matchtype}' condition without field or value`);
       IF (NOT IsTypeIDArray(TypeID(condition.value)))
         THROW NEW Exception(`Form '${condition.matchtype}' condition requires an array value`);
+      IF (NOT CellExists(condition, "fieldtype"))
+        INSERT CELL fieldtype := "field" INTO condition;
+      ELSE IF (condition.fieldtype NOT IN ["field", "formvariable"])
+        THROW NEW Exception(`Form '${condition.matchtype}' condition has invalid fieldtype '${condition.fieldtype}'`);
       IF (CellExists(condition, "options"))
         ValidateOptions([ matchcase := TRUE, checkdisabled := FALSE, extrafield := "" ], condition.options);
     }
@@ -28,6 +32,10 @@ PUBLIC RECORD FUNCTION ValidateFormCondition(RECORD condition)
         THROW NEW Exception(`Form '${condition.matchtype}' condition without field or value`);
       IF (TypeID(condition.value) != TYPEID(INTEGER))
         THROW NEW Exception(`Form '${condition.matchtype}' condition requires an integer value`);
+      IF (NOT CellExists(condition, "fieldtype"))
+        INSERT CELL fieldtype := "field" INTO condition;
+      ELSE IF (condition.fieldtype NOT IN ["field", "formvariable"])
+        THROW NEW Exception(`Form '${condition.matchtype}' condition has invalid fieldtype '${condition.fieldtype}'`);
       IF (CellExists(condition, "options"))
         ValidateOptions([ checkdisabled := FALSE, extrafield := "" ], condition.options);
     }
@@ -37,6 +45,10 @@ PUBLIC RECORD FUNCTION ValidateFormCondition(RECORD condition)
         THROW NEW Exception("Form 'HASVALUE' condition without field or value");
       IF(TYPEID(condition.value) != TYPEID(BOOLEAN))
         THROW NEW Exception("Form 'HASVALUE' requires a boolean value");
+      IF (NOT CellExists(condition, "fieldtype"))
+        INSERT CELL fieldtype := "field" INTO condition;
+      ELSE IF (condition.fieldtype NOT IN ["field", "formvariable"])
+        THROW NEW Exception(`Form '${condition.matchtype}' condition has invalid fieldtype '${condition.fieldtype}'`);
       IF (CellExists(condition, "options"))
         ValidateOptions([ checkdisabled := FALSE, extrafield := "" ], condition.options);
     }
