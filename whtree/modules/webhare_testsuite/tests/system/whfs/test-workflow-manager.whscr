@@ -2,6 +2,7 @@
 
 LOADLIB "wh::datetime.whlib";
 LOADLIB "wh::files.whlib";
+LOADLIB "wh::javascript.whlib";
 LOADLIB "wh::regex.whlib";
 
 LOADLIB "mod::system/lib/database.whlib";
@@ -139,8 +140,17 @@ MACRO DraftingTest() {
   TestEq(0, GetLastPublicDraft(testfile->id), "An autosave is not a draft");
   TestEq([ version := "0.1.1", liveversion := testfile->id ], GetCurrentVersion(ListObjectHistory(testfile->id, [include_autosaves := TRUE])[1].snapshot));
   TestEq([ name := "", title := "Test!", keywords := "my new keywords", description := "d", data := StringToBlob("This just went into a temporary draft"), isunlisted := FALSE ], workflowmgr->GetMetadata());
+  testfw->CommitWork();
+
+  //Ensure RemoveObsoleteDrafts doesn't delete young autosaves
+  TestEq(TRUE, CallJS("@webhare/whfs/src/maintenance.ts#doRemoveObsoleteDrafts"));
+
+  TestEqMembers([ [ name := "", type := "created", snapshot := 0, version := "0.1", user := testfw->GetUserAuthobjectId("marge")]
+                , [ name := "", type := "autosave", version := "0.1.1", user := testfw->GetUserAuthobjectId("marge")]
+                ], ListObjectHistory(testfile->id, [include_autosaves := TRUE]), "*");
 
   //Unclaimed instances cannot be managed through the workflow
+  testfw->BeginWork();
   TestThrowsLike("*not*workflow*", PTR workflowmgr->SetInstanceData("webhare_testsuite:global.type_clone_never", [ never_string := "pvt_draft_0_1" ]));
   workflowmgr->SetInstanceData("webhare_testsuite:global.type_clone_ondraft", [ on_draft_string := "pvt_draft_0_1" ]);
   TestThrowsLike("*not*workflow*", PTR workflowmgr->SetInstanceData("webhare_testsuite:global.type_clone_oncopy", [ on_copy_string := "pvt_draft_0_1" ]));
