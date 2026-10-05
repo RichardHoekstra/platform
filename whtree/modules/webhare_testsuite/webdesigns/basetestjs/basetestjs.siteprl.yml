@@ -17,6 +17,7 @@ types:
     namespace: http://www.webhare.net/xmlns/webhare_testsuite/basetestprops
     title: WTS base test
     workflow: true
+    contentLink: true
     members:
       anyField:
         type: string

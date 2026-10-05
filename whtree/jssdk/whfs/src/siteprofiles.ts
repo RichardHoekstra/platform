@@ -86,6 +86,7 @@ export type CSPWidgetRenderer = {
 
 
 export interface CSPContentType {
+  contentlink: boolean;
   cloneoncopy: boolean;
   cloneonarchive: boolean;
   comment: string;

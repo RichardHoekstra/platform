@@ -8,10 +8,11 @@
           height="40x"
           minwidth="70x"
           allowresize="true"
-          flags="issupervisor issysop"
+          flags="issupervisor issysop isdeveloper"
           gid=".dialog"
           savestate="size"
-          title="">
+          title=""
+          menubar="menubar">
     <actions>
       <action name="createcopy" ellipsis="true" tid="~copyto">
         <enableon source="versions" min="1" max="1" checkflags="cancopy" onexecute="DoCopy" />
@@ -28,9 +29,19 @@
         <enableon source="versionevents" min="1" max="1" />
       </action>
       -->
+      <action name="inspectmetatabs" frameflags="isdeveloper" onexecute="doinspectmetatabs" tid="tolliumapps.editdocument.editdocumentapp.inspectmetatabs" />
+      <action name="close" tid="~close" onexecute="cancel" />
     </actions>
 
     <menus>
+      <menu name="menubar">
+        <item action="view" />
+        <item action="createcopy" />
+        <divider />
+        <item action="inspectmetatabs" disablemode="hidden"/>
+        <divider />
+        <item tid="~close" action="close" />
+      </menu>
       <menu name="context">
         <item action="view" />
         <item action="createcopy" />

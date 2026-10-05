@@ -369,7 +369,7 @@ export class WHFSApplyTester {
     return true;
   }
 
-  __getHSInfo() {
+  private getHSInfo() {
     return {
       ismocked: this.isMocked(),
       objectid: this.objinfo.obj?.id ?? 0,
@@ -508,6 +508,9 @@ export class WHFSApplyTester {
   }
 
   async getObjectEditor() {
+    if (this.objinfo.obj?.type === "platform:filetypes.contentlink") //a contentlink should ignore any objecteditor settings
+      return null;
+
     let name = '';
     for (const apply of await this.getMatchingRules('setobjecteditor')) {
       name = apply.setobjecteditor.name;

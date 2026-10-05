@@ -1,12 +1,14 @@
 <?wh
+
+/* This test is about the *deprecated* socialite SEO tab. test_soesettings RunSeoTabUITests tests modern settings */
+
 LOADLIB "mod::publisher/lib/dialogs.whlib";
 LOADLIB "mod::publisher/lib/publisher.whlib";
 LOADLIB "mod::publisher/lib/testframework.whlib";
 LOADLIB "mod::system/lib/testframework.whlib";
 LOADLIB "mod::tollium/lib/testframework.whlib";
 
-OBJECT ASYNC FUNCTION TestSEOTab()
-{
+OBJECT ASYNC FUNCTION TestSEOTab() {
   OBJECT siteroot := testfw->GetTestSite()->rootobject;
   OBJECT image := siteroot->OpenByName("bob.jpg");
   OBJECT seotab;

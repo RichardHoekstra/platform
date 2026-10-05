@@ -2260,6 +2260,7 @@
         <text tid="deleted">Verwijderd</text>
         <text tid="deletedtext"><param p="1"/><ifparam p="2" value=""><else/> door <param p="2"/></ifparam></text>
         <text tid="description-placeholder">Samenvattende beschrijving voor onder andere zoekresultaten.</text>
+        <text tid="developeroptions">Ontwikkelaaracties</text>
         <text tid="editfile-title">Eigenschappen van bestand '<param p="1"/>'</text>
         <text tid="editfolder-title">Eigenschappen van map '<param p="1"/>'</text>
         <text tid="editsite-title">Eigenschappen van site '<param p="1"/>'</text>

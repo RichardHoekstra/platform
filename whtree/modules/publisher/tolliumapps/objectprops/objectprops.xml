@@ -9,7 +9,7 @@
           minwidth="70x"
           allowresize="true"
           defaultbutton="ok_button"
-          flags="ispinned"
+          flags="ispinned isdeveloper"
           savestate="size"
           title="">
     <actions>
@@ -22,6 +22,7 @@
       </action>
       <action name="gotopublishedurl" onexecute="dogotopublishedurl" title="" />
       <action name="refreshname" onexecute="dorefreshname" tid="tolliumapps.objectprops.objectprops.refreshname" />
+      <action name="inspectmetatabs" frameflags="isdeveloper" onexecute="doinspectmetatabs" tid="tolliumapps.editdocument.editdocumentapp.inspectmetatabs" />
     </actions>
 
     <compositions>
@@ -205,6 +206,11 @@
                           showcounter="true"
                           title="" />
               </line>
+              <box name="developeroptions" hr="false">
+                <line>
+                  <button action="inspectmetatabs" />
+                </line>
+              </box>
             </tab>
           </tabs>
         </cell>

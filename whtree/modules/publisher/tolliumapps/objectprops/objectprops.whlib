@@ -194,7 +194,10 @@ PUBLIC STATIC OBJECTTYPE ObjectProps EXTEND PublisherEditorBase <
     this->showpinning := this->showdeveloperoptions OR this->tolliumuser->HasRight("publisher:pinning");
   }
 
-  MACRO Init(RECORD data) {
+  UPDATE MACRO Init(RECORD data) {
+    PublisherEditorBase::Init(data);
+    ^developeroptions->visible := this->frame->flags.isdeveloper;
+
     this->startdata := data;
     this->isduplicate := this->startdata.why = "duplicate";
     this->pending_errors := SELECT AS STRING ARRAY `Extension '${extension}' is not loaded, because it caused an error while loading:\n${error}`

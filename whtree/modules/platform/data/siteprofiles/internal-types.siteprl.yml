@@ -161,7 +161,7 @@ types:
     tid: publisher:siteprofile.internaltypes.lifecycle
     comment: Lifecycle management. Designed to be copied/synced so we can't accidentally drop lifetime info after a WHFS sync.
     clone: onArchive
-    workflow: false
+    contentLink: true
     members:
       deletion:
         type: instant

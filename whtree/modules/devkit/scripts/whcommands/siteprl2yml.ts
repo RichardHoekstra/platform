@@ -273,6 +273,8 @@ function importCtype(ctxt: ImportContext, ct: CSPContentType): Type {
     retval.members = getMembers(ct.members);
   if (ct.workflow)
     retval.clone = "onDraft";
+  if (ct.contentlink)
+    retval.contentLink = true;
 
   return retval;
 }
