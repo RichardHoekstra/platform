@@ -1,4 +1,5 @@
 /* Global page setup */
+@use "../../../web/ui/js/modalitylayer/modalitylayer-mixins.scss" as *;
 
 html
 {
@@ -198,4 +199,9 @@ header div.navlevel nav li a.selected
       margin-top:-1px;
     }
   }
+}
+
+html.dompack--busymodal .wh-backend__formmodality {
+  @include tolliummodalitylayer-showbusy;
+  @include tolliummodalitylayer-delayshow;
 }

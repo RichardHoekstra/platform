@@ -56,8 +56,10 @@ PUBLIC STATIC OBJECTTYPE WebInterfaceDesign EXTEND WebDesignBase
     // For the common auth pages, retrieve the login background. The application portal router also sets this property when
     // the login page is shown.
     STRING mainbackgroundcss;
+    BOOLEAN formmodalitylayer;
     IF(IsRequest() AND UnpackURL(GetRequestURL()).urlpath LIKE ".wh/common/authpages/*")
     {
+      formmodalitylayer := TRUE;
       OBJECT loginbg := OpenWHFSObjectByPath("/webhare-private/system/backend/loginbackground");
       IF (ObjectExists(loginbg))
         mainbackgroundcss := WrapCachedImage(loginbg->GetWrapped(), [ method := "none" ]).css;
@@ -72,6 +74,7 @@ PUBLIC STATIC OBJECTTYPE WebInterfaceDesign EXTEND WebDesignBase
           , iconsvg := GetModuleResourceURL("mod::tollium/webdesigns/webinterface/web/img/favicon/" || dtapstage || "/favicon.svg")
           , webmanifest := GetModuleResourceURL("mod::tollium/webdesigns/webinterface/web/img/favicon/" || dtapstage || "/site.webmanifest")
           ]
+        , formmodalitylayer
         , banner
         , mainbackgroundcss
         ];

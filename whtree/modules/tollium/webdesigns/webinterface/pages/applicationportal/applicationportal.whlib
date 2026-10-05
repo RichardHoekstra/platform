@@ -894,7 +894,7 @@ PUBLIC OBJECT FUNCTION TolliumPortalRouter(OBJECT webdesign) {
         OBJECT loginbg := OpenWHFSObjectByPath("/webhare-private/system/backend/loginbackground");
         IF (ObjectExists(loginbg))
           webdesign->pageconfig.mainbackgroundcss := WrapCachedImage(loginbg->GetWrapped(), [ method := "none" ]).css;
-
+        webdesign->pageconfig.formmodalitylayer := TRUE;
         RETURN page;
       }
     }
