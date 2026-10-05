@@ -110,10 +110,6 @@ MACRO Setup()
                            )
          VALUES(testport.webserverid, "/webserver-beta-testing/subdir3/", 1/*initial*/,2/*alt dir*/, testfile_diskbase);
 
-  //directory requests must match index.shtml (test by verifying authentication is properly required)
-  INSERT INTO system.access(webserver, path, matchtype, authrequirement, authtype)
-         VALUES(testport.webserverid, "/webserver-beta-testing/index.shtml", 0/*exact*/, TRUE, 1);
-
   INSERT INTO system.access(webserver, path, matchtype, hostingsrc, hostingpath)
          VALUES(testport.webserverid, "/webserver-beta-testing/recurse/", 1/*initial*/, 2/*alt dir*/, testfile_diskbase);
 
