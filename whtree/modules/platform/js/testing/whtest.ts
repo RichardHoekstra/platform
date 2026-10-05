@@ -6,7 +6,7 @@
 import type { TestService } from "@mod-system/web/systemroot/jstests/testsuite";
 import { dispatchCustomEvent } from "@webhare/dompack";
 import { createClient } from "@webhare/jsonrpc-client";
-import { parseTyped, stringify, throwError } from "@webhare/std";
+import { attempt, parseTyped, stringify, throwError } from "@webhare/std";
 
 //By definition we re-export all of @webhare/test
 export * from "@webhare/test";
@@ -92,7 +92,9 @@ interface RawExtractedMailResult { //See HS ProcessExtractedMail
 
 const jstestsrpc = createClient<TestService>("system:jstests");
 
-let testpagetoken = typeof window !== "undefined" ? window.top?.__testframework?.getTestPageToken() : '';
+let testpagetoken = '';
+if (typeof window !== "undefined")
+  testpagetoken = attempt(() => window.top?.__testframework?.getTestPageToken() || '', '');
 
 /** Invoke any remote function as long as its name starts with TESTFW_. This allows you to quickly run code in the backend without having to set up explicit RPCs
  * @param libfunc - `<library>#TESTFW_<function>` to call
