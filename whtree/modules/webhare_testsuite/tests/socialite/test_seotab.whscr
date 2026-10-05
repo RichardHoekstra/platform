@@ -1,6 +1,6 @@
 <?wh
 
-/* This test is about the *deprecated* socialite SEO tab. test_soesettings RunSeoTabUITests tests modern settoings */
+/* This test is about the *deprecated* socialite SEO tab. test_soesettings RunSeoTabUITests tests modern settings */
 
 LOADLIB "mod::publisher/lib/dialogs.whlib";
 LOADLIB "mod::publisher/lib/publisher.whlib";
