@@ -9,11 +9,13 @@ LOADLIB "mod::system/lib/webserver/whdebug.whlib";
 LOADLIB "mod::publisher/lib/siteapi.whlib";
 LOADLIB "mod::publisher/lib/internal/forms/support.whlib";
 LOADLIB "mod::publisher/lib/internal/forms/opener.whlib";
+LOADLIB "mod::publisher/lib/internal/siteprofiles/cache.whlib";
 LOADLIB "mod::publisher/lib/internal/siteprofiles/reader.whlib";
 LOADLIB "mod::publisher/lib/internal/siteprofiles/support.whlib";
 
 LOADLIB "mod::system/lib/internal/whfs/base.whlib";
 LOADLIB "mod::system/lib/internal/whfs/support.whlib";
+LOADLIB "mod::system/lib/internal/webhareconstants.whlib";
 
 PUBLIC RECORD __pageinfo;
 
@@ -165,18 +167,25 @@ PUBLIC STATIC OBJECTTYPE WebContext <
     RETURN pluginobj;
   }
 
-  /** Get instance data from the relevant content/target object. Added since WH5.8.2 and should generally be used over this->contentobject/targetobject->GetInstanceData() */
-  PUBLIC RECORD FUNCTION GetInstanceData(STRING ns) {
-    IF(this->pvt_historic_contentobject) {
-      RECORD typeinfo := SELECT * FROM this->pvt_contentinstances WHERE namespace = VAR ns OR scopedtype = VAR ns;
-      //Workflowed instances come from the draft
-      IF(RecordExists(typeinfo) AND typeinfo.workflow)
-        RETURN this->contentobject->GetInstanceData(ns);
-      ELSE
-        RETURN this->targetobject->GetInstanceData(ns);
+  STRING FUNCTION GetSourceFor(STRING ns) {
+    RECORD typeinfo := SELECT * FROM this->pvt_contentinstances WHERE namespace = VAR ns OR scopedtype = VAR ns;
+    IF(NOT RecordExists(typeinfo) OR NOT typeinfo.workflow)
+      RETURN "target";
+
+    //If it's a workflow type, doublecheck we shouldn't still get it from the target if this is a content link
+    IF(ObjectExists(this->targetobject) AND this->targetobject->type = whconstant_whfstype_contentlink) {
+      RECORD typedscr := LookupContentTypeById(typeinfo.fstype);
+      IF(RecordExists(typedscr) AND typedscr.contentlink)
+        RETURN "target";
     }
 
-    RETURN (this->contentobject ?? this->targetobject ?? this->targetfolder)->GetInstanceData(ns);
+    RETURN "content";
+  }
+
+  /** Get instance data from the relevant content/target object. Added since WH5.8.2 and should generally be used over this->contentobject/targetobject->GetInstanceData() */
+  PUBLIC RECORD FUNCTION GetInstanceData(STRING ns) {
+    OBJECT source := this->GetSourceFor(ns) = "target" ? this->targetobject : this->contentobject;
+    RETURN source->GetInstanceData(ns);
   }
 
   PUBLIC OBJECT ARRAY FUNCTION GetPluginsByFeature(STRING featurename)
@@ -243,11 +252,7 @@ PUBLIC STATIC OBJECTTYPE WebContext <
     IF(ObjectExists(this->pvt_targetobject)) {
       IF(RecordExists(this->__config) AND ObjectExists(this->__config.override_contentobject)) {
         this->pvt_contentobject := this->__config.override_contentobject;
-        this->pvt_historic_contentobject := IsRecycleOrHistoryWHFSPath(this->pvt_contentobject->whfspath);
-        IF(this->pvt_historic_contentobject) {
-          this->pvt_contentinstances := ListInstances(this->pvt_contentobject->id);
-        }
-      } ELSE IF(this->pvt_targetobject->type=20) { //contentlink
+      } ELSE IF(this->pvt_targetobject->type = whconstant_whfstype_contentlink) {
         this->pvt_contentobject := OpenWHFSObject(this->pvt_targetobject->filelink);
         IF(NOT ObjectExists(this->pvt_contentobject))
           THROW NEW Exception("Contentlink #" || this->pvt_targetobject->id || " links to an nonexisting file");
@@ -257,6 +262,11 @@ PUBLIC STATIC OBJECTTYPE WebContext <
           THROW NEW Exception("Contentlink #" || this->pvt_targetobject->id || " links to deleted file #" || this->pvt_targetobject->filelink);
       } ELSE {
         this->pvt_contentobject := this->pvt_targetobject;
+      }
+
+      this->pvt_historic_contentobject := IsRecycleOrHistoryWHFSPath(this->pvt_contentobject->whfspath);
+      IF(this->pvt_historic_contentobject) {
+        this->pvt_contentinstances := ListInstances(this->pvt_contentobject->id);
       }
     }
 

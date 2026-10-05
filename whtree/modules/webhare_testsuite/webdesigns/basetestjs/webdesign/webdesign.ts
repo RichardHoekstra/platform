@@ -94,11 +94,13 @@ export async function baseTestJSPageBuilder(req: PageBuildRequest): Promise<WebR
   const comments = null; // TODO ObjectExists(GetForumPluginForWebdesign(this)) ? PTR GetForumPluginForWebdesign(this)->EmbedComments() : DEFAULT MACRO PTR
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sharedblocks: any[] = []; // TODO sharedblocks := (SELECT AS MACRO PTR ARRAY PTR this->RenderSharedBlock(usewidgets) FROM usewidgets)
+  const betatestprops = await req.getInstance("webhare_testsuite:base_test.base_test_props");
   return req.render({
     body: litty`
       <div id="basetitle">${getTid("webhare_testsuite:basetest.title")}</div>
       <div id="whfspath">${req.targetObject.whfsPath}</div>
       <div id="content" data-targetobjectpath="${req.targetObject.whfsPath}"
+                        data-betatestprops-anyfield="${betatestprops.anyField}"
                         ${getTidLanguage() === 'nl' ? 'data-sitelanguage-nl' : ''}
                         ${getTidLanguage() === 'en' ? 'data-sitelanguage-en' : ''}
                         ${getTidLanguage() === 'ps' ? 'data-sitelanguage-ps' : ''}

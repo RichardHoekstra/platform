@@ -98,7 +98,9 @@ MACRO RunPublisherPreview(RECORD targetobject, RECORD contentobject, BOOLEAN isp
 
   RECORD sourceinfo := GetSystemRedirectInfo(targetobject.id); //TODO this one redoes applytester?
   IF(CellExists(sourceinfo,'js') AND sourceinfo.js) {
-    DoWHFSExecuteJS(contentobject.id, [ ispublisherpreview := TRUE ]);
+    // For versions, send the contentid of that version - but for contentlinks we need the contentlink itself instead:
+    INTEGER toexecute := targetobject.type = whconstant_whfstype_contentlink ? targetobject.id : contentobject.id;
+    DoWHFSExecuteJS(toexecute, [ ispublisherpreview := TRUE ]);
     ABORT("this should never be reached - ExecuteWebResponse in DoWHFSExecuteJS implies SendWebFile and terminates");
   }
   IF(sourceinfo.success)
@@ -108,9 +110,8 @@ MACRO RunPublisherPreview(RECORD targetobject, RECORD contentobject, BOOLEAN isp
   }
 
   INSERT CELL pagefolder := GetDirectoryFromPath(Tokenize(webdesigninfo.renderinfo.objectname,'#')[0]) INTO __pageinfo;
-  IF(webdesigninfo.renderinfo.onrendercontent != "" AND webdesigninfo.renderinfo.objectname = "") //If we're in HS but have no choice, we'll have TS run the page for us
-  {
-    RECORD capturedpage := CallJS("mod::publisher/js/internal/capturejsdesign.ts#captureJSPage", contentobject.id, targetobject.id);
+  IF(webdesigninfo.renderinfo.onrendercontent != "" AND webdesigninfo.renderinfo.objectname = "") { //If we're in HS but have no choice, we'll have TS run the page for us
+    RECORD capturedpage := CallJS("mod::publisher/js/internal/capturejsdesign.ts#captureJSPage", contentobject.id);
     SendWebFile(capturedpage.body);
   }
   ELSE IF(webdesigninfo.renderinfo.objectname = "")
