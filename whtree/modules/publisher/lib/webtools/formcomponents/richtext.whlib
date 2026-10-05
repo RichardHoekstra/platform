@@ -6,6 +6,7 @@
 LOADLIB "wh::files.whlib";
 LOADLIB "wh::filetypes/html.whlib";
 
+LOADLIB "mod::publisher/lib/publisher.whlib";
 LOADLIB "mod::publisher/lib/forms/components.whlib";
 LOADLIB "mod::publisher/lib/forms/editor.whlib";
 LOADLIB "mod::publisher/lib/internal/forms/webtool.whlib";
@@ -147,10 +148,18 @@ PUBLIC STATIC OBJECTTYPE RichTextField EXTEND ValuelessFormFieldBase
 
   MACRO SetRichValue(RECORD value)
   {
-    IF (RecordExists(value))
+    IF (RecordExists(value)) {
       this->__richvalue := [ data := ValidateRichDocument(value) ];
-    ELSE
+    } ELSE
       this->__richvalue := DEFAULT RECORD;
+
+    IF (NOT this->form->formisinitialrender) {
+      /* Outside of the initial render there is only a WebContext available, not a full WebDesign
+         For now, just use a simplified rendering instead of instantiating the WebDesign for rendering
+      */
+      STRING rendered := RecordExists(this->__richvalue) ? BlobToString(GetRichDocumentAsHtmlFragment(this->__richvalue.data, [ stripbodytags := TRUE ])) : "";
+      this->form->__SendFormMessage(this->field.name, "richvalue", rendered);
+    }
   }
 
   UPDATE PUBLIC MACRO RenderFieldSearchPreview(RECORD previewsettings, OBJECT context)

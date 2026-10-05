@@ -371,6 +371,10 @@ PUBLIC STATIC OBJECTTYPE CoreTestForm EXTEND FormBase
     ^vars_of_form->value := EncodeJSON(this->formvariables);
   }
 
+  PUBLIC MACRO RPC_UpdateRichTextTid() {
+    ^richtexttid->richvalue := [ htmltext := StringToBlob(`<html><body><p class="normal">Updated richtext</p></body></html>`) ];
+  }
+
   PUBLIC RECORD FUNCTION Submit(RECORD extradata)
   {
     IF(this->formref != "CORE-TEST-FORM")

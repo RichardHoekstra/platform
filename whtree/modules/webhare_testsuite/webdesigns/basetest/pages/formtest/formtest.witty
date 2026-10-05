@@ -15,6 +15,7 @@
       [! the unnamed input is there to catch it being transmitted or returned !]
       <input id="unnamedcheckbox" type="checkbox" checked required>AGREE!<br/>
       <button type="button" class="toggleformvarbutton">Toggle formvar X</button>
+      <button type="button" class="updaterichtextbutton">Update richtext</button>
       <button type="button" class="prefillbutton">Prefill</button>
       <button type="button" class="validatebutton">Validate</button>
       <button type="submit" id="submitbutton" name="button" value="submitbutton">Submit</button>

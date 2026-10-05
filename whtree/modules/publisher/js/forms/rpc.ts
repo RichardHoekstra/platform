@@ -217,7 +217,7 @@ export default class RPCFormBase<DataShape extends object = Record<string, unkno
     if (field.startsWith("#page.")) {
       const matchpage = field === "#page.thankyou" ? this.node.querySelector<HTMLElement>(`.wh-form__page[data-wh-form-pagerole=thankyou]`) : null;
       if (!matchpage) { //we currently don't have anything to edit on other pages than thankyou
-        console.warn("Message for non-page field: " + field + ", prop: " + prop + ", value: " + String(value));
+        console.warn("Message for non-page field: %s, prop: %s, value: %s", field, prop, String(value));
         return;
       }
 
@@ -229,15 +229,23 @@ export default class RPCFormBase<DataShape extends object = Record<string, unkno
     } else {
       const fieldnode = this.node.querySelector<HTMLElement>(`*[name="${CSS.escape(field)}"], *[data-wh-form-name="${CSS.escape(field)}"]`);
       if (!fieldnode) {
-        console.warn("Message for non-existent field: " + field + ", prop: " + prop + ", value: " + String(value));
+        console.warn("Message for non-existent field: %s, prop: %s, value: %s", field, prop, String(value));
         return;
       }
       if (prop === 'value') {
         this.setFieldValue(fieldnode, value);
         return;
+      } else if (prop === 'richvalue') {
+        if (!fieldnode.classList.contains("wh-form__richtext"))
+          console.warn("Message for non-richtext field: %s, prop: %s, value: %s", field, prop, String(value));
+        else {
+          fieldnode.innerHTML = value as string;
+          dompack.registerMissed(fieldnode);
+        }
+        return;
       }
     }
-    console.warn("Unknown field message: field: " + field + ", prop: " + prop + ", value: " + String(value));
+    console.warn("Unknown field message: field: %s, prop: %s, value: %s", field, prop, String(value));
   }
 
   //Override this function to easily submit extra fields
