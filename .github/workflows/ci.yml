@@ -156,7 +156,7 @@ jobs:
   deploy:
     name: Deploy container
     needs: [all-tests-passed]
-    if: github.ref == 'refs/heads/main' && !inputs.scheduled
+    if: github.event_name == 'push' && !inputs.scheduled
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
