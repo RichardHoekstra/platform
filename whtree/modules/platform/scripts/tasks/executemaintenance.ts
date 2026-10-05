@@ -10,6 +10,7 @@ import { getFetchResourceCacheCleanups } from "@webhare/services/src/fetchresour
 import { convertWaitPeriodToDate } from "@webhare/std";
 import { deleteRecursive, listDirectory } from "@webhare/system-tools";
 import { beginWork, commitWork, db, runInWork } from "@webhare/whdb";
+import { doRemoveObsoleteDrafts } from "@webhare/whfs/src/maintenance";
 import { listSchemas, wrd } from "@webhare/wrd";
 import { unlink, rm } from "fs/promises";
 
@@ -124,6 +125,9 @@ async function runMaintenance() {
   await expireOldUsers();
   await expireOldKeys();
   await rotateLogs();
+
+  if (!await doRemoveObsoleteDrafts())
+    process.exitCode = 1;
 }
 
 void runMaintenance();
