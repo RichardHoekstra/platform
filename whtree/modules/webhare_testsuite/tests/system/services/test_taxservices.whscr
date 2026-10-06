@@ -78,6 +78,14 @@ MACRO TestVies()
     TestEq(TRUE, result.valid);
     TestEq("DE129274202", result.vatnumber);
   }
+
+  result := CheckViesVATCode("XI 123456789"); //Northern Ireland
+  TestEq("XI123456789", result.vatnumber);
+  IF(NOT result.serviceunavailable)
+  {
+    TestEq(FALSE, result.valid);
+    TestEq("Invalid VAT number", result.error);
+  }
 }
 
 RunTestframework([ PTR TestVies
