@@ -650,6 +650,12 @@ test.runTests(
       test.eq(0, JSON.parse(test.qR('#coreformsubmitresponse').textContent!).form.numberemptyvalue);
     },
 
+    'Test form reset',
+    async function () {
+      const formhandler = getFormHandler(test.qR('#coreform'));
+      await formhandler.reset(); //this crashed when a form wasn't using pages
+    },
+
     'Test unlocking disabled fields',
     async function () {
       await test.load(test.getTestSiteRoot() + 'testpages/formtest/?' + urlappend);

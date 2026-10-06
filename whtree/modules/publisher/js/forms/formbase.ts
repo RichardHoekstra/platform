@@ -8,7 +8,7 @@ import * as merge from './internal/merge';
 import './internal/requiredstyles.css';
 import { type SetFieldErrorData, getValidationState, setFieldError, setupValidator, updateFieldError } from './internal/customvalidation';
 import { generateRandomId, isPromise, wrapSerialized } from '@webhare/std';
-import { debugFlags, isLive, navigateTo, type NavigateInstruction } from '@webhare/env';
+import { debugFlags, dtapStage, navigateTo, type NavigateInstruction } from '@webhare/env';
 import { getFieldDisplayName, isFieldNativeErrored, isRadioOrCheckbox, isRadioNodeList, type ConstrainedRadioNodeList, parseCondition, getFormElementCandidates, isFormFieldLike, queryFormFieldLike, getFieldName } from '@webhare/forms/src/domsupport';
 import { rfSymbol } from '@webhare/forms/src/registeredfield';
 import type { FormAnalyticsEventData, FormAnalyticsSubEvents, FormCondition, FormFileValue, RPCFormMessage } from '@webhare/forms/src/types';
@@ -1304,7 +1304,7 @@ export default class FormBase<DataShape extends object = Record<string, unknown>
   }
 
   private ensureLegacyWarning(field: HTMLElement) {
-    if (!this.didLegacyWarning && !isLive)
+    if (!this.didLegacyWarning && dtapStage !== "production")
       console.warn(`[form] ${getFieldDisplayName(field)} is using wh:form-getvalue/wh:form-setvalue events. It should switch to JSFormElement`);
 
     this.didLegacyWarning = true;
@@ -1687,8 +1687,9 @@ export default class FormBase<DataShape extends object = Record<string, unknown>
     }
   }
 
-  reset() {
+  async reset() {
     this.node.reset();
-    this.gotoPage(0);
+    if (this.getCurrentPageNumber() > 0)
+      await this.gotoPage(0);
   }
 }

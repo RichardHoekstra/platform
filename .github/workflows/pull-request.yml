@@ -13,6 +13,7 @@ permissions:
 jobs:
   # Job 1: Run pre-requisite steps & capture credentials into outputs
   setup:
+    if: github.event.pull_request.head.repo.fork == true
     runs-on: ubuntu-26.04
     environment: external-ci # 🔐 Pauses here for maintainer approval before fetching credentials
 
