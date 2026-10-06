@@ -66,7 +66,7 @@ export async function doRemoveObsoleteDrafts(options?: {
 
     await db<PlatformDB>().deleteFrom("system.fs_history")
       .where("type", "in", [whconstant_historytype_autosave, whconstant_historytype_abandoned_autosave])
-      .where("when", "<", cutoff) //this part was commented out in HS too, leaving it so during refactor
+      .where("when", "<", cutoff)
       .$if(Boolean(options?.fsObjects), qb => qb.where("fs_object", "in", options!.fsObjects!))
       .execute();
   }
