@@ -335,6 +335,11 @@ MACRO TestGUID()
   TestEq(0, persontype->Search("WRD_GUID", "WRD:0123456789ABCDEF0123456789ABCDE0"));
   TestEq(0, persontype->Search("WRD_GUID", "wrd:0123456789abcdef0123456789abcde0"));
 
+  // uuid style lookup
+  TestEq("01234567-89ab-cdef-0123-456789abcde0", WRDGuidToUUID("wrd:0123456789ABCDEF0123456789ABCDE0"));
+  TestEq(id, persontype->Search("WRD_GUID", "01234567-89ab-cdef-0123-456789abcde0"));
+
+
   // No value IN
   TestEq(DEFAULT RECORD ARRAY, persontype->RunQuery(
               [ outputcolumns := [ "WRD_ID" ]
