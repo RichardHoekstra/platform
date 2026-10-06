@@ -1,4 +1,5 @@
 # we need two approvals inside the organization, one being from a reviewer. as you can't self-approve a PR, the WebHare Bot should send in the second approval
+# Uses the https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#create-a-review-for-a-pull-request API
 name: Auto Approve Internal PRs
 
 on:
@@ -9,6 +10,7 @@ jobs:
   auto-approve:
     runs-on: ubuntu-latest
     permissions:
+      contents: write # Our PR Approval was interpreted as 'Approved these changes with read-only permissions' - will this fix it?
       pull-requests: write
     env:
       WEBHARE_BOT_APPID: ${{ secrets.WEBHARE_BOT_APPID }}
