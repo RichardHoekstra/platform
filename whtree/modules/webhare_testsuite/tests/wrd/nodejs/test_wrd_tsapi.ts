@@ -391,7 +391,7 @@ async function testNewAPI() {
   const secondPersonGuid = generateRandomId("uuidv4"); //verify we're allowed to set the guid
   const secondperson = await schema.insert("wrdPerson", { ...basePerson, wrdFirstName: "second", wrdLastName: "lastname2", wrdContactEmail: "second@beta.webhare.net", testRecord: testrecorddata as TestRecordDataInterface, testJsonRequired: { mixedCase: [randomData] }, wrdGuid: secondPersonGuid, wrdGender: "female" });
 
-  const temporalNow = Temporal.Now.instant();
+  const temporalNow = Temporal.Now.instant().round({ smallestUnit: "milliseconds" });
   const deletedperson = await schema.insert("wrdPerson", { ...basePerson, wrdFirstName: "deleted", wrdLastName: "lastname3", wrdContactEmail: "deleted@beta.webhare.net", testRecord: testrecorddata as TestRecordDataInterface, testJsonRequired: { mixedCase: [1, "yes!"] }, wrdClosed: temporalNow, wrdGender: "other" });
   test.eq({ wrdCreated: Temporal.Instant.from("2026-01-01T00:00:00Z"), wrdClosed: temporalNow }, await schema.getFields("wrdPerson", deletedperson, ["wrdCreated", "wrdClosed"], { historyMode: "all" }));
 

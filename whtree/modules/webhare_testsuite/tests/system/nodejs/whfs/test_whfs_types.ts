@@ -503,7 +503,7 @@ async function testInstanceData() {
   await test.throws(/Illegal money value/, () => testtype.set(testfile.id, { price: 'a' }));
   //@ts-expect-error TS also recognized the bad type
   await test.throws(/Incorrect type/, () => testtype.set(testfile.id, { aFloat: "a" }));
-  await test.throws(/Cannot parse: a/, () => testtype.set(testfile.id, { aDateTime: "a" }));
+  await test.throws(/Invalid character/, () => testtype.set(testfile.id, { aDateTime: "a" }));
   //@ts-expect-error TS also recognized the bad type
   await test.throws(/Incorrect type/, () => testtype.set(testfile.id, { strArray: 1 }));
   //@ts-expect-error TS also recognized the bad type
