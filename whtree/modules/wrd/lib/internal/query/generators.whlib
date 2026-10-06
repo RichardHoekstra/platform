@@ -179,12 +179,14 @@ RECORD FUNCTION GetWRDGuidQueryEngineData(STRING value, BOOLEAN match_case, BOOL
       , need_afterfiltering     := TRUE
       ];
 
-  IF (jsmode ? NOT IsValidUUID(value) : NOT ValidateWRDGuid(value))
+  BOOLEAN is_uuid := IsValidUUID(value);
+  BOOLEAN is_wrd_guid := is_uuid = FALSE AND ValidateWRDGUID(value);
+  IF(NOT is_uuid AND NOT is_wrd_guid)
     RETURN result;
 
   IF (match_case)
   {
-    IF(jsmode)
+    IF(is_uuid)
     {
       IF (ToLowercase(value) != value)
         RETURN result;
@@ -202,7 +204,7 @@ RECORD FUNCTION GetWRDGuidQueryEngineData(STRING value, BOOLEAN match_case, BOOL
 
   result.valid := TRUE;
   result.need_afterfiltering := FALSE;
-  result.value := DecodeWRDGuid(jsmode ? UUIdToWRDGuid(value) : value);
+  result.value := DecodeWRDGuid(is_uuid ? UUIdToWRDGuid(value) : value);
 
   RETURN result;
 }
