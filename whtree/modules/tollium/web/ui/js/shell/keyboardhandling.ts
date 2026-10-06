@@ -4,8 +4,10 @@ import type { IndyShell } from "../shell";
 
 
 function globalKeyHander(ev: KeyboardEvent, shell: IndyShell) {
+  const inEditControl = ev.target instanceof Element && isEditControl(ev.target);
+
   // Prevent cmd|control arrows from navigating the browser
-  if (!(ev.target instanceof Element && isEditControl(ev.target)) && (ev.key === "ArrowLeft" || ev.key === "ArrowRight") && isMultiSelectKey(ev)) {
+  if (!inEditControl && (ev.key === "ArrowLeft" || ev.key === "ArrowRight") && isMultiSelectKey(ev)) {
     // Note that all major browsers don't bind Backspace to 'back' nowadays so we're no longer bothering to intercept it (as we also need to figure out if a focused control would still respond)
     ev.preventDefault();
     return;
@@ -23,7 +25,8 @@ function globalKeyHander(ev: KeyboardEvent, shell: IndyShell) {
       }
     }
 
-    if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
+    //Some users ctrl+shift+arrow in textedits to select words in textedits. so disable this shortcut inside edit controls
+    if ((ev.key === "ArrowLeft" || ev.key === "ArrowRight") && !inEditControl) {
       // Ctrl+Shift+ArrowLeft/Right to navigate between applications
       shell.applicationbar?._gotoApp('relative', ev.key === "ArrowLeft" ? -1 : +1);
       ev.preventDefault();

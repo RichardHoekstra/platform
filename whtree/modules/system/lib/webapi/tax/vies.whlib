@@ -1,115 +1,15 @@
 <?wh
 
-LOADLIB "wh::adhoccache.whlib";
-LOADLIB "wh::internet/soap.whlib";
-LOADLIB "mod::system/lib/configure.whlib";
+LOADLIB "wh::javascript.whlib";
 LOADLIB "mod::system/lib/logging.whlib";
 LOADLIB "mod::system/lib/services.whlib";
-
-/* Hardcoded test values (only work on TEST and DEVELOPMENT dtap stages!)
-   NL999996514B01 - always throws with temporary unavailable
-   NL999996514B02 - always succeeds
-   NL999996514B03 - always fails
-
-   BE9999999901 - always throws with temporary unavailable
-   BE9999999902 - always succeeds
-   BE9999999903 - always fails
-*/
-
-RECORD FUNCTION DoViesVatLookup(STRING vatnumber, RECORD retval, INTEGER timeout)
-{
-  IF((vatnumber LIKE "NL999996514B0?" OR vatnumber LIKE "BE999999990?") AND NOT IsDtapLive())
-  {
-    IF(Right(vatnumber,1)="1")
-      THROW NEW Exception("Temporary unavailable");
-
-    IF(Right(vatnumber,1)="2")
-    {
-      retval.valid := TRUE;
-      retval.address := vatnumber LIKE "NL*" ? "\nHENGELOSESTRAAT 00296\n7521AM ENSCHEDE" : "Brusselstraat 12345\n12345 Brussel";
-      retval.name :=  vatnumber LIKE "NL*" ? "TEST COMPANY BV" : "Happy VZW";
-      RETURN retval;
-    }
-
-    IF(Right(vatnumber,1)="3")
-    {
-      retval.valid := FALSE;
-      retval.error := "Invalid VAT number";
-      RETURN retval;
-    }
-  }
-
-  OBJECT sc := NEW SoapClient;
-  LogRPCForSoapClient("system:taxservices.vies", "", sc);
-  sc->webbrowser->timeout := timeout;
-  sc->LoadWSDLFromURL("http://ec.europa.eu/taxation_customs/vies/checkVatService.wsdl");
-
-  OBJECT viesinterface := sc->GetInterface();
-  STRING countrycode := Left(vatnumber,2);
-  vatnumber := Substring(vatnumber,2);
-
-  RECORD vatinfo := viesinterface->checkVat([body:=[parameters:=CELL[countrycode,vatnumber]]]);
-  retval.rawresponse := vatinfo;
-
-  IF(NOT vatinfo.body.parameters.valid)
-  {
-    retval.valid := FALSE;
-    retval.error := "Invalid VAT number";
-  }
-  ELSE
-  {
-    retval.valid := TRUE;
-    retval.address := vatinfo.body.parameters.address;
-    retval.name := vatinfo.body.parameters.name;
-  }
-  RETURN retval;
-}
-
-RECORD FUNCTION GetCacheableViesCheck(STRING vatnumber, INTEGER timeout)
-{
-  RECORD retval := [ valid := FALSE
-                   , serviceunavailable := FALSE
-                   , vatnumber := vatnumber
-                   , address := ""
-                   , name := ""
-                   , error := ""
-                   , rawresponse := DEFAULT RECORD
-                   ];
-
-  STRING prefix := Left(vatnumber,2);
-  IF(prefix NOT IN GetValidViesPrefixes())
-  {
-    retval.error := `Invalid VAT number prefix '${prefix}'`;
-    RETURN [ ttl := 1, value := retval ]; //FIXME ttl 0 but that's not supported yet. - https://gitlab.com/webhare/platform/-/issues/25
-  }
-
-  TRY
-  {
-    retval := DoViesVatLookup(vatnumber, retval, timeout);
-  }
-  CATCH(OBJECT e)
-  {
-    //For exception code explanation, see http://ec.europa.eu/taxation_customs/vies/checkVatService.wsdl
-    LogHarescriptException(e);
-    retval.error := "Exception: " || e->what;
-    retval.serviceunavailable := TRUE;
-  }
-
-  RECORD hitinfo := [ extra := CELL[ vatnumber, retval.rawresponse ] ];
-  LogAccountingHit("system:taxservices", CELL[...hitinfo, error := retval.error ]);
-  DELETE CELL rawresponse FROM retval;
-
-  RETURN CELL[ ttl := retval.serviceunavailable ? 5000 : 15 * 60 * 1000
-             , value := retval
-             ];
-}
 
 /** Get acceptable VIES country prefiexs
     @return A list of valid country codes in the EU VAT system, plus "XI" for Northern Ireland
 */
 PUBLIC STRING ARRAY FUNCTION GetValidViesPrefixes()
 {
-  RETURN [ "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI", "FR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE", "SI", "SK", "XI" ];
+  RETURN CallJS("mod::platform/js/services/vies-vat.ts#getValidViesPrefixes");
 }
 
 /** Verify a vat number with the VIES service
@@ -125,6 +25,35 @@ PUBLIC RECORD FUNCTION CheckViesVATCode(STRING vatnumber, RECORD options DEFAULT
   vatnumber := Substitute(vatnumber,' ','');
   vatnumber := Substitute(vatnumber,'.','');
 
-  //don't hammer the service, auto-cache
-  RETURN GetAdhocCached([vatnumber := vatnumber], PTR GetCacheableViesCheck(vatnumber, options.timeout));
+  RECORD retval := [ valid := FALSE
+                   , serviceunavailable := FALSE
+                   , vatnumber := vatnumber
+                   , address := ""
+                   , name := ""
+                   , error := ""
+                   ];
+
+  STRING prefix := Left(vatnumber,2);
+  IF(prefix NOT IN GetValidViesPrefixes())
+  {
+    retval.error := `Invalid VAT number prefix '${prefix}'`;
+    RETURN retval;
+  }
+
+  TRY
+  {
+    RECORD result := CallJS("mod::platform/js/services/vies-vat.ts#lookupViesVatCode", vatnumber, CELL[ options.timeout ]);
+    retval.valid := result.valid;
+    retval.address := result.address;
+    retval.name := result.name;
+    IF(NOT result.valid)
+      retval.error := "Invalid VAT number";
+  }
+  CATCH(OBJECT e)
+  {
+    LogHarescriptException(e);
+    retval.error := "Exception: " || e->what;
+    retval.serviceunavailable := TRUE;
+  }
+  RETURN retval;
 }
