@@ -82,11 +82,11 @@ PUBLIC OBJECT FUNCTION OpenFormFileResults(OBJECT formfile, RECORD options DEFAU
   RETURN OpenWebtoolFormResultsForFormdef(formfile, /*formdef->ListFields(), */options.formname, formdef, CELL[ options.initcustomform ]);
 }
 
-PUBLIC OBJECT FUNCTION __DoOpenWebtoolForm(OBJECT formobject, STRING formname, OBJECT webcontext, OBJECT applytester, INTEGER targetid, STRING formref, BOOLEAN prepareforfrontend)
+PUBLIC OBJECT FUNCTION __DoOpenWebtoolForm(OBJECT formobject, STRING formname, OBJECT webcontext, OBJECT applytester, INTEGER targetid, STRING formref, BOOLEAN prepareforfrontend, BOOLEAN isinitialrender)
 {
   //FIXME switching by name is dangerous! keep better track of how the form was opened, but for now we're experimenting whether a simple 'formtarget' is even possible. and we may need a full republish everywhere to even complete the transition for formwidgets
   IF(formname != "webtoolform")
-    RETURN OpenFormWithContext(webcontext, formname, CELL[ formref, prepareforfrontend]);
+    RETURN OpenFormWithContext(webcontext, formname, CELL[ formref, prepareforfrontend, isinitialrender ]);
 
   OBJECT formdefs := OpenWHFSFormDefinitionsFile(formobject);
   OBJECT mainform := formdefs->OpenFormDefinition(formname);
@@ -101,7 +101,7 @@ PUBLIC OBJECT FUNCTION __DoOpenWebtoolForm(OBJECT formobject, STRING formname, O
   IF(parseresult.objectname = "")
     parseresult.objectname := "mod::publisher/lib/internal/forms/webtool.whlib#WebtoolFormBase";
 
-  RETURN OpenFormByDef(parseresult, CELL[ webcontext, applytester, targetid, incontext := webcontext->targetobject->id, formref, prepareforfrontend ]);
+  RETURN OpenFormByDef(parseresult, CELL[ webcontext, applytester, targetid, incontext := webcontext->targetobject->id, formref, prepareforfrontend, isinitialrender ]);
 }
 
 /** @short Open a webtool form directly
@@ -114,6 +114,7 @@ PUBLIC OBJECT FUNCTION OpenWebtoolForm(INTEGER formid, RECORD options DEFAULTSTO
                              , webcontext := DEFAULT OBJECT
                              , formref := ""
                              , prepareforfrontend := TRUE
+                             , isinitialrender := TRUE
                              , __formname := "webtoolform" //TODO not sure if we should make this a parameter OR if OpenFormByTarget should not use OpenWebtoolForm directly
                              , __applycontext := FALSE //Used for the RPC path as some inits need to be done *just* before form opening
                              , __incontext := 0 //TODO not sure if we should make this a parameter OR if OpenFormByTarget should not use OpenWebtoolForm directly
@@ -134,7 +135,7 @@ PUBLIC OBJECT FUNCTION OpenWebtoolForm(INTEGER formid, RECORD options DEFAULTSTO
     SetTidLanguage(options.webcontext->languagecode);
   }
 
-  OBJECT form := __DoOpenWebtoolForm(OpenWHFSObject(formid), options.__formname, options.webcontext, options.applytester, options.targetid ?? formid, options.formref, options.prepareforfrontend);
+  OBJECT form := __DoOpenWebtoolForm(OpenWHFSObject(formid), options.__formname, options.webcontext, options.applytester, options.targetid ?? formid, options.formref, options.prepareforfrontend, options.isinitialrender);
   IF(NOT ObjectExists(form))
     THROW NEW Exception(`Cannot open form for fsobject #${formid}`);
 
@@ -151,6 +152,7 @@ PUBLIC OBJECT FUNCTION OpenFormByTarget(STRING formtarget, RECORD options DEFAUL
                              , webcontext := DEFAULT OBJECT
                              , __applycontext := FALSE
                              , prepareforfrontend := TRUE
+                             , isinitialrender := TRUE
                              ], options);
 
   RECORD targetinfo := DecryptForThisServer("publisher:formtarget", formtarget);

@@ -279,9 +279,11 @@ STATIC OBJECTTYPE FormPage <
   }
 
   MACRO UpdatePage() {
-    //FIXME setup guids for form pages so we can robustly refer to them, even with eg. captcha partway inserts
-    STRING pagename := "#page." || (this->role ?? ToString(SELECT AS INTEGER #page FROM this->form->GetFormPages() AS page WHERE page.page = this));
-    this->form->__SendFormMessage(pagename, 'data', CELL[ this->redirect, this->exitbutton ]);
+    IF (NOT this->form->formisinitialrender) {
+      //FIXME setup guids for form pages so we can robustly refer to them, even with eg. captcha partway inserts
+      STRING pagename := "#page." || (this->role ?? ToString(SELECT AS INTEGER #page FROM this->form->GetFormPages() AS page WHERE page.page = this));
+      this->form->__SendFormMessage(pagename, 'data', CELL[ this->redirect, this->exitbutton ]);
+    }
   }
 >;
 
@@ -390,6 +392,9 @@ PUBLIC STATIC OBJECTTYPE FormBase <
   /// Whether to do a rate limit check at first BeginWork. Enabled by external submissions
   PUBLIC BOOLEAN formcheckratelimits;
 
+  /// Whether this is the initial render of the form (FALSE within submit / RPC calls)
+  PUBLIC PROPERTY formisinitialrender(this->__form.isinitialrender, -);
+
   // ---------------------------------------------------------------------------
   //
   // Constructor
@@ -456,7 +461,8 @@ PUBLIC STATIC OBJECTTYPE FormBase <
 
   MACRO SetFormVariables(RECORD newvalue) {
     this->__formvariables := newvalue;
-    this->__SendFormMessage("#form", "dataset", GetFormVariablesAsDataset(newvalue));
+    IF (NOT this->formisinitialrender)
+      this->__SendFormMessage("#form", "dataset", GetFormVariablesAsDataset(newvalue));
   }
 
   // ---------------------------------------------------------------------------

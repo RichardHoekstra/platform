@@ -44,6 +44,7 @@ PUBLIC OBJECT FUNCTION OpenFormByDef(RECORD formdef, RECORD options DEFAULTSTO D
                              , incontext := 0
                              , targetid := 0
                              , prepareforfrontend := TRUE
+                             , isinitialrender := TRUE
                              ], options);
 
   RECORD parsed := CELL[ ...formdef
@@ -54,6 +55,7 @@ PUBLIC OBJECT FUNCTION OpenFormByDef(RECORD formdef, RECORD options DEFAULTSTO D
                        , options.nocustomformbase
                        , options.incontext
                        , options.targetid
+                       , options.isinitialrender
                        ];
 
   RECORD savesettings := __passthrough;

@@ -21,7 +21,8 @@ PUBLIC STATIC OBJECTTYPE HiddenField EXTEND FormFieldBase
   MACRO SetValue(VARIANT newval)
   {
     this->__value := newval;
-    this->form->__SendFormMessage(this->field.name, 'value', this->__value);
+    IF (NOT this->form->formisinitialrender)
+      this->form->__SendFormMessage(this->field.name, 'value', this->__value);
   }
 
   UPDATE PUBLIC MACRO RenderField()
