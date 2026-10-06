@@ -47,17 +47,7 @@
 
 [component totp]  [! this form is used to complete a totp CHALLENGE !]
   <div class="wh-wrdauth-form wh-wrdauth-totp">
-    <form class="wh-form wh-styledinput wh-wrdauth-totp__form" [form.formattributes]>
-      <div class="wh-form__page">
-        [form.intro.render]
-        [form.token.render]
-        [form.totp.render]
-      </div>
-      <div class="wh-form__buttongroup wh-form__navbuttons">
-        [! TODO back button? tollium has one but we might not know where to go back to !]
-        <button type="submit" class="wh-form__button wh-form__button--submit wh-wrdauth-completeaccount__changebutton">[gettid site.forms.authpages.login-button]</button>
-      </div>
-    </form>
+    [form.formrender]
     [if backlink]
       <div class="wh-wrdauth-backlinkholder">
         <a class="wh-wrdauth-backlink" href="[backlink]">[gettid site.forms.authpages.back]</a>

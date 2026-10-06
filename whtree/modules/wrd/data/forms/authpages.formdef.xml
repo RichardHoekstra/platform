@@ -9,11 +9,19 @@
     </page>
   </form>
 
-  <form name="totp" library="mod::wrd/lib/internal/pages/authpages.whlib" objectname="TotpForm">
-    <page>
+  <form name="totp"
+        library="mod::wrd/lib/internal/pages/authpages.whlib"
+        objectname="TotpForm"
+        submitlabeltid="site.forms.authpages.login-button">
+    <page name="totp_page">
       <hidden name="token" title="" />
       <richtext name="intro" groupclasses="wh-wrdauth-totp__intro" title="" />
       <textedit name="totp" autocomplete="one-time-code" required="1" tid=".totp" />  <!-- FIXME type=tel ? -->
+      <richtext name="warning" groupclasses="wh-wrdauth-totp__warning" title="" />
+    </page>
+
+    <page name="errorpage" role="thankyou">
+      <richtext name="finalerror" title="" />
     </page>
   </form>
 

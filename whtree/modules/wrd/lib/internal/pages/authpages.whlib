@@ -1,5 +1,6 @@
 <?wh
 
+LOADLIB "wh::datetime.whlib";
 LOADLIB "wh::javascript.whlib";
 LOADLIB "wh::files.whlib";
 LOADLIB "wh::witty.whlib";
@@ -228,8 +229,11 @@ PUBLIC OBJECT FUNCTION GetLoginPage(OBJECT webdesign, RECORD options) {
 
 
 PUBLIC STATIC OBJECTTYPE TotpForm EXTEND FormBase <
+  RECORD decryptedchallenge;
+
   MACRO NEW() {
-    OBJECT wrdschema := this->formcontext->GetWRDAuthPlugin()->wrdschema;
+    OBJECT authplugin := this->formcontext->GetWRDAuthPlugin();
+    OBJECT wrdschema := authplugin->wrdschema;
     RECORD ARRAY authpages_texts := GetWRDSetting(wrdschema, "authpages_texts");
     RECORD introtext := SELECT AS RECORD text FROM authpages_texts WHERE tag = "totp-intro" AND language = this->formlanguagecode;
     IF (RecordExists(introtext))
@@ -240,43 +244,166 @@ PUBLIC STATIC OBJECTTYPE TotpForm EXTEND FormBase <
               `<h2 class="heading2">${GetTid("wrd:site.forms.authpages.totp-title")}</h2>
               <p class="normal">${GetTid("wrd:site.forms.authpages.totp-intro")}</p>`)
           ];
+
+    this->formvariables := CELL[ fatalerror := FALSE, showwarning := FALSE, ...this->formvariables ];
+
+    ^finalerror->visiblecondition := FCMatch(FCFormVariable("fatalerror"), "IN", [ TRUE ]);
+    ^warning->visiblecondition := FCMatch(FCFormVariable("showwarning"), "IN", [ TRUE ]);
   }
 
   UPDATE PUBLIC MACRO PrepareForFrontend() {
-    ^token->value := GetWebVariable("token"); //insert the POST variable, formapi's variable-based prefilling is client side so it can't use POST content
     FormBase::PrepareForFrontend();
+
+    // Only do this for the initial render, RPC's will go through SetFormValues
+    IF (this->formisinitialrender) {
+      ^token->value := GetWebVariable("token"); //insert the POST variable, formapi's variable-based prefilling is client side so it can't use POST content
+      this->DecryptChallenge();
+      IF (RecordExists(this->decryptedchallenge))
+        this->ProcessState();
+    }
+  }
+
+  UPDATE PUBLIC MACRO SetFormValues(RECORD ARRAY vals, RECORD options DEFAULTSTO DEFAULT RECORD) {
+    FormBase::SetFormValues(vals, options);
+    this->DecryptChallenge();
+  }
+
+  MACRO DecryptChallenge() {
+    this->decryptedchallenge := DecryptForThisServer("platform:totpchallenge", ^token->value, [ fallback := DEFAULT RECORD]);
+    IF (NOT RecordExists(this->decryptedchallenge)) {
+      this->ShowErrorPage("invaliddata");
+    }
+  }
+
+  /* Check the decrypted challenge and the second factor state */
+  BOOLEAN FUNCTION ProcessState() {
+    OBJECT wrdschema := this->formcontext->GetWRDAuthPlugin()->wrdschema;
+    IF (this->decryptedchallenge.validuntil <= GetCurrentDateTime()) {
+      this->ShowErrorPage("sessionexpired");
+      RETURN FALSE;
+    }
+    RECORD secondfactorstate := GetSecondFactorState(wrdschema, this->decryptedchallenge.userid);
+    IF (IsDefaultValue(secondfactorstate) OR IsDefaultValue(secondfactorstate.curinit)) {// no active second factor or second factor session?
+      this->ShowErrorPage("sessionexpired");
+      RETURN FALSE;
+    } ELSE IF (secondfactorstate.curinit.data.challenge != this->decryptedchallenge.challenge) {
+      this->ShowErrorPage("sessionexpired");
+      RETURN FALSE;
+    } ELSE
+      this->DisplayStateWarnings(secondfactorstate);
+    RETURN TRUE;
+  }
+
+  MACRO DisplayStateWarnings(RECORD secondfactorstate) {
+    IF (secondfactorstate.totpattemptsleft <= 0 OR secondfactorstate.totplocked) {
+      this->formvariables := CELL[ ...this->formvariables, showwarning := TRUE ];
+      ^warning->richvalue := [ htmltext := StringToBlob(GetHTMLTid("wrd:site.forms.authpages.totp-locked")) ];
+    } ELSE IF (secondfactorstate.totpfailures > 0) {
+      this->formvariables := CELL[ ...this->formvariables, showwarning := TRUE ];
+      ^warning->richvalue := [ htmltext := StringToBlob(GetHTMLTid("wrd:site.forms.authpages.totp-attemptsleft", ToString(secondfactorstate.totpattemptsleft))) ];
+    }
+  }
+
+  MACRO ShowErrorPage(STRING errorcode) {
+    STRING message;
+    SWITCH (errorcode) {
+      CASE "invaliddata" { message := GetHTMLTid("wrd:site.forms.authpages.totp-invaliddata"); }
+      CASE "sessionexpired" { message := GetHTMLTid("wrd:site.forms.authpages.totp-sessionexpired"); }
+      DEFAULT {
+        THROW NEW Exception(`Invalid error code ${EncodeJSON(errorcode)}`);
+      }
+    }
+    ^finalerror->richvalue := [ htmltext := StringToBlob(
+        `<h2 class="heading2">${GetTid("wrd:site.forms.authpages.totp-title")}</h2>
+        <p class="normal">${message}</p>`)
+    ];
+    // If no fatal error occurred, don't transition to the thankyoupage upon succesfull login
+    // If a fatal error occurred on init, hide the TOTP page to enable auto-switch to thankyou page
+    // If it occurs on form submission, auto-transition to the thankyou page
+    this->formvariables := CELL[ ...this->formvariables, fatalerror := TRUE ];
+    ^totp_page->visible := FALSE;
+
+    // setup the redirect and exitbutton text of the thankyou page
+    OBJECT authplugin := this->formcontext->GetWRDAuthPlugin();
+    FOREVERY (RECORD rec FROM this->GetFormPages()) {
+      IF (rec.role = "thankyou") {
+        RECORD state := DecryptForThisServer("platform:totpchallenge", GetFormWebVariable("token") ?? ^token->value, [ fallback := DEFAULT RECORD]);
+        STRING url;
+        IF (RecordExists(state))
+          url := state.returnto;
+        ELSE {
+          // We've lost the state (and returnTo url), just return to the login page
+          IF ("login" IN authplugin->routerfeatures) {
+            url := UpdateURLVariables(ResolveToAbsoluteUrl("/.wh/common/authpages", GetFormRequestUrl()), [
+              wrd_pwdaction := "login",
+              pathname := GetFormWebVariable("pathname")
+            ]);
+          } ELSE {
+            url := authplugin->__GetLoginPageURL() ?? this->formcontext->baseurl;
+          }
+        }
+        rec.page->redirect := CELL[ type := "redirect", url ];
+        rec.page->exitbutton := GetTid("wrd:site.forms.authpages.totp-retry-login");
+      }
+    }
   }
 
   PUBLIC RECORD FUNCTION Submit(RECORD extradata) {
-    RECORD state := DecryptForThisServer("platform:totpchallenge", GetFormWebVariable("token") ?? ^token->value, [ fallback := DEFAULT RECORD]);
-    IF(NOT RecordExists(state))
-      THROW NEW Exception("Invalid token"); //FIXME redirect/exit to login?
+    OBJECT lock := OpenLockManager()->LockMutex(`wrd:auth.2fa.${this->decryptedchallenge.userid}`);
+    TRY {
+      OBJECT work := this->BeginWork([ database := FALSE ]);
 
-    OBJECT work := this->BeginWork([database := FALSE]);
+      // Check the state, if this returns false the thankyou page will display an error, so let the submit go there
+      IF (NOT this->ProcessState()) {
+        work->Finish();
+        RETURN DEFAULT RECORD;
+      }
 
-    //TODO quick format checks/rate limiting, avoid actual lock as long as we can ?
-    OBJECT wrdschema := this->formcontext->GetWRDAuthPlugin()->wrdschema;
-    RECORD result := ValidateSecondFactor(wrdschema, state.userid, "totp", CELL[ code := ^totp->value ], state);
-    IF(NOT result.success) {
-      work->AddErrorFor(^totp, GetTid("wrd:site.forms.authpages.totp-invalid"));
-    }
+      OBJECT wrdschema := this->formcontext->GetWRDAuthPlugin()->wrdschema;
+      RECORD result := ValidateSecondFactor(wrdschema, this->decryptedchallenge.userid, "totp", CELL[ code := ^totp->value ], this->decryptedchallenge);
 
-    IF(work->HasFailed()){
+      SWITCH (result.code) {
+        CASE "OK" {
+        }
+        CASE "TOTPINVALIDDATA" {
+          this->ShowErrorPage("invaliddata");
+        }
+        CASE "SESSIONEXPIRED" {
+          this->ShowErrorPage("sessionexpired");
+        }
+        CASE "TOTPLOCKED", "TOTPINVALIDCODE" {
+          work->AddErrorFor(^totp, GetTid("wrd:site.forms.authpages.totp-invalid"));
+          this->DisplayStateWarnings(result);
+        }
+        CASE "TOTPREUSEDCODE" {
+          work->AddErrorFor(^totp, GetTid("wrd:site.forms.authpages.totp-reusedcode"));
+        }
+        CASE "TOTPREUSEDBACKUPCODE" {
+          work->AddErrorFor(^totp, GetTid("wrd:site.forms.authpages.totp-reusedbackupcode"));
+        }
+        DEFAULT {
+          THROW NEW Exception(`Unexpected second factor result code: ${EncodeJSON(result.code)}`);
+        }
+      }
+
+      IF (work->HasFailed() OR result.code != "OK") {
+        work->Finish();
+        RETURN DEFAULT RECORD;
+      }
+
+      IF(NOT work->HasFailed()) {
+        RECORD checkresult := CalLJS("@mod-platform/js/auth/harescript.ts#verifyPasswordComplianceForHS", this->formcontext->GetWRDAuthPlugin()->__WRDAuthPluginSettings_HS(), this->decryptedchallenge.userid, this->decryptedchallenge.password, GetFormWebVariable("pathname"), this->decryptedchallenge.returnto, GetEnrichedAuditContext());
+
+        IF(CellExists(checkresult,'navigateto'))
+          RETURN work->Finish() ? [ submitinstruction := checkresult.navigateto ] : DEFAULT RECORD;
+
+        work->AddErrorFor(^totp, checkresult.error); //FIXME use 'code' for translateable error
+      }
+
       work->Finish();
       RETURN DEFAULT RECORD;
-    }
-
-    IF(NOT work->HasFailed()) {
-      RECORD checkresult := CalLJS("@mod-platform/js/auth/harescript.ts#verifyPasswordComplianceForHS", this->formcontext->GetWRDAuthPlugin()->__WRDAuthPluginSettings_HS(), state.userid, state.password, GetFormWebVariable("pathname"), state.returnto, GetEnrichedAuditContext());
-
-      IF(CellExists(checkresult,'navigateto'))
-        RETURN work->Finish() ? [ submitinstruction := checkresult.navigateto ] : DEFAULT RECORD;
-
-      work->AddErrorFor(^totp, checkresult.error); //FIXME use 'code' for translateable error
-    }
-
-    work->Finish();
-    RETURN DEFAULT RECORD;
+    } FINALLY
+      lock->Close();
   }
 >;
 

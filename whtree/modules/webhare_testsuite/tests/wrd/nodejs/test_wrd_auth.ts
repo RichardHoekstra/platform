@@ -1,6 +1,6 @@
 import * as whdb from "@webhare/whdb";
 import * as test from "@mod-webhare_testsuite/js/wts-backend";
-import { createFirstPartyToken, type LookupUsernameParameters, type OpenIdRequestParameters, type AuthCustomizer, type JWTPayload, type ReportedUserInfo, type ClientConfig, registerRelyingParty, initializeIssuer, prepareFrontendLogin, writeAuthAuditEvent, type AuthEventData } from "@webhare/auth";
+import { createFirstPartyToken, type LookupUsernameParameters, type OpenIdRequestParameters, type AuthCustomizer, type JWTPayload, type ReportedUserInfo, type ClientConfig, registerRelyingParty, initializeIssuer, prepareFrontendLogin, writeAuthAuditEvent, getAuditEvents, type AuthEventData } from "@webhare/auth";
 import { AuthenticationSettings, createSchema, describeEntity, extendSchema, getSchemaSettings, updateSchemaSettings, wrd, type WRDSchemaLike } from "@webhare/wrd";
 import { createSigningKey, createJWT, verifyJWT, IdentityProvider, compressUUID, decompressUUID, decodeJWT, createCodeVerifier, type FrontendAuthResult, type FrontendLoginRequest } from "@webhare/auth/src/identity";
 import { createCodeChallenge, retrieveTokens, returnAuthorizeFlow, startAuthorizeFlow, type CodeChallengeMethod } from "@mod-platform/js/auth/openid.ts";
@@ -9,6 +9,7 @@ import { decryptForThisServer, readLogLines, toResourcePath } from "@webhare/ser
 import type { NavigateInstruction } from "@webhare/env/src/navigation";
 import type { SchemaTypeDefinition } from "@webhare/wrd/src/types";
 import { rpc } from "@webhare/rpc";
+import { loadlib } from "@webhare/harescript";
 import { calculateWRDSessionExpiry, defaultWRDAuthLoginSettings, prepAuthForURL } from "@webhare/auth/src/support";
 import type { PublicAuthData } from "@webhare/frontend/src/auth";
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
@@ -28,6 +29,7 @@ declare module "@webhare/auth" {
     "webhare_testsuite:nodataevent": null;
     "webhare_testsuite:badevent": number;
     "webhare_testsuite:badarrayevent": number[];
+    "wrd:authsettings.setuptotp": null;
   }
 }
 
@@ -666,6 +668,89 @@ async function testAuthAPI() {
   test.assert(lastLoginAfterPrepLogin && lastLoginAfterPrepLogin.epochMilliseconds > lastLoginAfterImpersonation.epochMilliseconds, "whuserLastlogin should be updated when not impersonated");
 }
 
+async function testSecondFactorAttempts() {
+  const url = (await test.getTestSiteJS()).webRoot ?? throwError("No webroot for JS testsite");
+  const rawPrepped = await prepAuthForURL(url, null);
+  if ("error" in rawPrepped)
+    throw new Error(rawPrepped.error);
+  const prepped = rawPrepped;
+
+  const secret = "OQHJFTFMNSC6WLMVHUNAGVA2AE6FAAMK";
+  const authSettings = `hson:{"passwords":ra[{"passwordhash":${JSON.stringify(test.passwordHashes.secret$)},"validfrom":d""}],"totp":{"backupcodes":ra[],"locked":d"","url":"otpauth://totp/beta.webhare.net:totpuser%40beta.webhare.net?secret=${secret}&issuer=beta.webhare.net"},"version":1}`;
+  const testUnit = await whdb.runInWork(() => oidcAuthSchema.insert("whuserUnit", { wrdTitle: "totpTestUnit" }));
+  const testuser = await whdb.runInWork(() => oidcAuthSchema.insert("wrdPerson", {
+    wrdContactEmail: "totpuser@beta.webhare.net",
+    whuserUnit: testUnit,
+    wrdauthAccountStatus: { status: "active" },
+    whuserPassword: AuthenticationSettings.fromHSON(authSettings)
+  }));
+
+
+  async function getFreshLoginState() {
+    //The password step hands out a TOTP challenge token
+    const provider = new IdentityProvider(oidcAuthSchema);
+    const loginResult = await provider.handleFrontendLogin({
+      settings: { ...prepped.settings, reportedCookieName: null, secureRequest: url.startsWith("https:") },
+      loginHost: url,
+      login: "totpuser@beta.webhare.net",
+      password: "secret$",
+      tokenOptions: { authAuditContext: { clientIp: "1.2.3.4", browserTriplet: "ios-safari-1" } }
+    });
+    if (loginResult.loggedIn || !("navigateTo" in loginResult) || loginResult.navigateTo.type !== "form")
+      throw new Error("Expected the password step to redirect to the TOTP form");
+    const token = loginResult.navigateTo.form.vars.find(v => v.name === "token")?.value ?? throwError("No TOTP token");
+    return decryptForThisServer("platform:totpchallenge", token);
+  }
+
+  let state = await getFreshLoginState();
+
+  //Validate codes the way the TOTP authpage does
+  const hsSchema = await loadlib("mod::wrd/lib/api.whlib").OpenWRDSchema("webhare_testsuite:testschema");
+  const validate = async (code: string) => await loadlib("mod::wrd/lib/internal/auth/legacy-api.whlib").ValidateSecondFactor(hsSchema, testuser, "totp", { code }, state) as { success: boolean; code: string; totpattemptsleft: number };
+  const getCode = async (offset = 0) => (await loadlib("mod::webhare_testsuite/lib/tollium/login.whlib").TestInvoke_GetTOTPCode({ secret, offset })).code as string;
+
+  const validCode = await getCode();
+  test.eqPartial({ success: true, code: "OK" }, await validate(validCode));
+  state = await getFreshLoginState();
+  test.eqPartial({ success: false, code: "TOTPREUSEDCODE" }, await validate(validCode), "An accepted code may not be used again");
+
+  const nearbyCodes = await Promise.all([-90, -60, -30, 0, 30, 60, 90].map(offset => getCode(offset)));
+  let wrongCode = "000000";
+  while (nearbyCodes.includes(wrongCode))
+    wrongCode = String(parseInt(wrongCode, 10) + 1).padStart(6, "0");
+
+  //A successful login restarts the count
+  test.eqPartial({ success: false, code: "TOTPINVALIDCODE", totpattemptsleft: 5 }, await validate(wrongCode));
+  test.eqPartial({ success: false, code: "TOTPINVALIDCODE", totpattemptsleft: 4 }, await validate(wrongCode));
+  const usedCodes = [validCode];
+  const pickUnusedCode = async () => (await Promise.all([-30, 0, 30].map(offset => getCode(offset)))).find(code => !usedCodes.includes(code)) ?? throwError("No unused TOTP code");
+  const secondCode = await pickUnusedCode();
+  usedCodes.push(secondCode);
+  test.eqPartial({ success: true, code: "OK" }, await validate(secondCode));
+
+  state = await getFreshLoginState();
+  for (let attemptsLeft = 5; attemptsLeft >= 1; --attemptsLeft)
+    test.eqPartial({ success: false, code: "TOTPINVALIDCODE", totpattemptsleft: attemptsLeft }, await validate(wrongCode));
+  test.eqPartial({ success: false, code: "TOTPLOCKED", totpattemptsleft: 0 }, await validate(wrongCode));
+  test.eqPartial({ success: false, code: "TOTPLOCKED" }, await validate(await getCode()), "A locked TOTP should refuse valid codes too");
+
+  const events = await getAuditEvents(oidcAuthSchema, { user: testuser, type: "platform:secondfactor.failed" });
+  test.eq(10, events.length, "1 reused, 8 invalid (the last one locks), 1 refused while locked");
+
+  //Setting up TOTP again (as the authentication settings dialog does) clears the lock and restarts the count
+  await whdb.runInWork(async () => {
+    await oidcAuthSchema.update("wrdPerson", testuser, { whuserPassword: AuthenticationSettings.fromHSON(authSettings) });
+    await writeAuthAuditEvent(oidcAuthSchema, { entity: testuser, type: "wrd:authsettings.setuptotp" });
+  });
+  state = await getFreshLoginState();
+  test.eqPartial({ success: true, code: "OK" }, await validate(await pickUnusedCode()), "The failures before the new setup should no longer count");
+
+  await whdb.runInWork(async () => {
+    await oidcAuthSchema.delete("wrdPerson", testuser);
+    await oidcAuthSchema.delete("whuserUnit", testUnit);
+  });
+}
+
 async function testAuthStatus() {
   const url = (await test.getTestSiteJS()).webRoot ?? throwError("No webroot for JS testsite");
   const prepped = await prepAuthForURL(url, null);
@@ -818,6 +903,7 @@ test.runTests([
   testAuthSettings,
   testLowLevelAuthAPIs,
   setupOpenID,
+  testSecondFactorAttempts,
   testAuthAPI,
   testAuthStatus,
   testApiTokens,

@@ -927,6 +927,7 @@
         <text tid="emailchange-processed">We have sent a confirmation email to your new email address '<param p="1"/>'. Click the link in this email to confirm the change.</text>
         <text tid="emailchange-title">Change email address</text>
         <text tid="emailchanged">Your email address has been changed</text>
+        <text tid="errorpage">Login failed</text>
         <text tid="extloginfailure-accountdisabled">The account<ifparam p="1" value=""><else/> '<param p="1"/>'</ifparam> has been disabled</text>
         <text tid="extloginfailure-retry">Retry</text>
         <text tid="extloginfailure-title">Login failed</text>
@@ -966,9 +967,17 @@
         <text tid="setpassword-intro">Please set a password to enable your account</text>
         <text tid="setpassword-title">Set password</text>
         <text tid="totp">One-time login code</text>
+        <text tid="totp-attemptsleft">You have <param p="1"/> <ifparam p="1" value="1">attempt<else/>attempts</ifparam> left</text>
         <text tid="totp-intro">Please enter your one-time code</text>
         <text tid="totp-invalid">This code is not valid</text>
+        <text tid="totp-invaliddata">Something went wrong, please log in again.</text>
+        <text tid="totp-locked">You have provided a wrong code too many times, please use a backup code or ask your administrator to reset your second factor settings.</text>
+        <text tid="totp-retry-login">Retry login</text>
+        <text tid="totp-reusedbackupcode">This backup code has already been used to login, please use another</text>
+        <text tid="totp-reusedcode">This code has already been used to login, please wait for the next code and try again</text>
+        <text tid="totp-sessionexpired">The login session has expired, please log in again.</text>
         <text tid="totp-title">One-time code</text>
+        <text tid="totp_page">One-time code</text>
         <text tid="totpsetup-backupcodes">Backup codes</text>
         <text tid="totpsetup-processed">Your second factor has been configured.</text>
         <text tid="totpsetup-save-backupcodes">These backup codes can be used if you cannot use your authenticator app. Please save them somewhere secure.</text>
