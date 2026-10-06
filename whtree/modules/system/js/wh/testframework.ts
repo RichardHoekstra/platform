@@ -11,7 +11,7 @@ import type { Annotation, WaitOptions, PositiveWaitRetVal } from '@webhare/test/
 import { invoke } from "@mod-platform/js/testing/whtest";
 import { isFormControl } from '@webhare/dompack';
 import type { TestFramework, TestStep, TestWaitItem } from '@mod-system/web/systemroot/jstests/testsuite';
-import { throwError } from '@webhare/std';
+import { attempt, throwError } from '@webhare/std';
 import { TestMonitor } from '@webhare/test/src/monitor';
 import { __getTestSuiteCallbacks, __setTestSuiteCallbacks, waitForUI } from "@webhare/test-frontend";
 
@@ -61,7 +61,7 @@ export type { TestWaitItem };
 //basic test functions
 let testfw: TestFramework | undefined;
 if (typeof window !== 'undefined') {
-  testfw = window.top?.__testframework;
+  testfw = attempt(() => window.top?.__testframework);
   whtest.setupLogging({
     onLog: (...args) => {
       console.log(...args);
