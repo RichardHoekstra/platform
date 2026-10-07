@@ -180,22 +180,9 @@ deploydocker:
   stage: deploy
   # "If you do not use dependencies, all artifacts from previous stages are passed to each job." - we don't need the deploy stages to download all these artifacts..
   dependencies: []
+  only:
+    - /^release\/5.*$/
   except:
     - schedules
-    - /^docs\/.*$/
   script:
     - addons/docker-build/deploydocker.sh
-
-updatetestscripts:
-  stage: deploy
-  dependencies: []
-  only:
-    refs:
-      - main
-    variables:
-      - $WHBUILD_BUILDBOTPASSWORD
-  except:
-    - schedules
-    - /^docs\/.*$/
-  script:
-    - addons/deploy_testscripts.sh
