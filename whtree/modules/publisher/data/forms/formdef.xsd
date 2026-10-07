@@ -177,7 +177,6 @@
       <xs:element ref="upload" />
       <xs:element ref="richtext" />
       <xs:element ref="address" />
-      <xs:element ref="captcha" />
       <xs:element ref="array" />
     </xs:choice>
   </xs:group>
@@ -1029,7 +1028,7 @@
     </xs:complexType>
   </xs:element>
 
-  <xs:element name="captcha">
+  <xs:element name="__captcha">
     <xs:annotation>
       <xs:documentation>
         @topic forms/standardcomponents

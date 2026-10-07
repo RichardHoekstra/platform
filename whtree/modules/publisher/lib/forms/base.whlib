@@ -1346,7 +1346,7 @@ PUBLIC STATIC OBJECTTYPE FormBase <
   PUBLIC MACRO EnableCaptcha(RECORD options DEFAULTSTO DEFAULT RECORD) {
     options := ValidateOptions(CELL[], options);
     //NOTE is not actually added to any page, just created to receive form responses
-    this->__captchaquestion := this->AppendFormField(DEFAULT OBJECT, "http://www.webhare.net/xmlns/publisher/forms#captcha", "__form_captcha");
+    this->__captchaquestion := this->AppendFormField(DEFAULT OBJECT, "http://www.webhare.net/xmlns/publisher/forms#__captcha", "__form_captcha");
   }
 >;
 
