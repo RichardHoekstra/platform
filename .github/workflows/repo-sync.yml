@@ -15,7 +15,8 @@ permissions:
 
 jobs:
   sync-branches:
-    runs-on: 'ubuntu-26.04'
+    # We expect ["self-hosted","podman"] at https://github.com/organizations/WebHare/settings/variables/actions/WHBUILD_RUNNER
+    runs-on: ${{ vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     name: Sync branches to configured repositories
     steps:
       - name: Fetch repository source history
