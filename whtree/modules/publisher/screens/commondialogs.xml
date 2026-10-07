@@ -5,14 +5,11 @@
     <messagebox name="deleteconfirm" icon="question" buttons="yes no" />
     <messagebox name="deletesitesconfirm" icon="question" buttons="yes no" />
     <messagebox name="recyclesitesconfirm" icon="question" buttons="yes no" />
-    <messagebox name="cannotopenlink" icon="information" buttons="ok" />
-    <messagebox name="cannotopencontentlisting" icon="information" buttons="ok" />
     <messagebox name="cannotfindobjecteditor" icon="warning" buttons="ok" />
     <messagebox name="deletefsobjects" icon="warning" buttons="yes no" />
     <messagebox name="fsobjectalreadyinlist" icon="warning" buttons="yes no" />
     <messagebox name="norightstoeditfile" icon="error" buttons="ok" />
     <messagebox name="replace_file_with_other_type" icon="warning" buttons="yes no" default="no" />
-    <messagebox name="editordoesnotsupportversionedsites" icon="error" buttons="ok" />
   </messageboxes>
 
   <screen name="selectsitedialog" width="50x" height="30x" allowresize="true" gid=".selectsitedialog">

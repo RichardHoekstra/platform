@@ -585,16 +585,6 @@ PUBLIC MACRO RunFSObjectEditApplication(OBJECT parentscreen, INTEGER objectid, R
     extractdialog->RunModal();
     RETURN;
   }
-  IF(fileobj->type IN [18,19,20])
-  {
-    parentscreen->RunMessageBox("publisher:commondialogs.cannotopenlink");
-    RETURN;
-  }
-  IF(fileobj->type = 24)
-  {
-    parentscreen->RunMessageBox("publisher:commondialogs.cannotopencontentlisting");
-    RETURN;
-  }
 
   //Get the siteprofile information about this type
   RECORD typedef := LookupContentType(fileobj->typens);

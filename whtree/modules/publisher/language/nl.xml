@@ -56,8 +56,6 @@
   <textgroup gid="commondialogs">   <!-- commondialogs -->
     <textgroup gid="messageboxes">   <!-- commondialogs.messageboxes -->
       <text tid="cannotfindobjecteditor">De objecteditor '<param p="1"/>' zou gebruikt moeten worden voor dit object, maar deze kon niet gevonden of gestart worden.</text>
-      <text tid="cannotopencontentlisting">Een contentopsomming heeft geen inhoud die gewijzigd of gedownload kan worden.</text>
-      <text tid="cannotopenlink">Een linkbestand heeft geen inhoud die gewijzigd of gedownload kan worden. Gebruik de 'Eigenschappen' knop als u de bestemming van de link wilt wijzigen.</text>
       <text tid="deleteconfirm"><ifparam p="1" value="1"><ifparam p="2" value="">Weet u zeker dat u de map '<param p="3"/>' permanent wilt verwijderen?<else/>Weet u zeker dat u het bestand '<param p="2"/>' permanent wilt verwijderen?</ifparam><else/>Weet u zeker dat u de <param p="1"/>  geselecteerde onderdelen permanent wilt verwijderen?</ifparam></text>
       <text tid="deletefsobjects">Weet u zeker dat u <ifparam p="1" value="1">het geselecteerde item<else/>de <param p="1"/> geselecteerde items</ifparam> wilt verwijderen?</text>
       <text tid="deletesitesconfirm">Uw selectie bevat de volgende sites, die verwijderd zullen worden:<br/><param p="1"/><br/><br/>Weet u zeker dat u de selectie wilt verwijderen?</text>

@@ -56,8 +56,6 @@
   <textgroup gid="commondialogs" limitlanguages="en nl">   <!-- commondialogs -->
     <textgroup gid="messageboxes">   <!-- commondialogs.messageboxes -->
       <text tid="cannotfindobjecteditor">The '<param p="1"/>' object editor should be used for this object, but it could not be found or invoked.</text>
-      <text tid="cannotopencontentlisting">A content listing has no contents that can be modified or downloaded.</text>
-      <text tid="cannotopenlink">A link file has no contents that can be modified or downloaded. Use the Properties button to change the link destination</text>
       <text tid="deleteconfirm"><ifparam p="1" value="1"><ifparam p="2" value="">Are you sure you want to permanently delete the folder '<param p="3"/>'?<else/>Are you sure you want to permanently delete the file '<param p="2"/>'?</ifparam><else/>Are you sure you want to permanently delete these <param p="1"/> items?</ifparam></text>
       <text tid="deletefsobjects">Are you sure you want to delete <ifparam p="1" value="1"> the selected item<else/>the <param p="1"/> items you've selected</ifparam>?</text>
       <text tid="deletesitesconfirm">Your selection contains the following sites, which would be deleted:\n<param p="1"/>\n\nAre you sure you want to delete the selection?</text>
