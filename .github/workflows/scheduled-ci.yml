@@ -2,7 +2,7 @@ name: Schedule WebHare CI
 
 on:
   schedule:
-    - cron: "0 3 * * 0"
+    - cron: "0 3 * * 1,2,3,4,5" # Run at 03:00 on Monday through Friday
 
 permissions:
   actions: write
@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ref: [main, release/5.9, release/6.0]
+        ref: [main] #FIXME add release/6.1 etc as soon as feasible
     steps:
       - uses: actions/github-script@v7
         env:
