@@ -295,44 +295,6 @@ PUBLIC MACRO AddCopyMoveExceptionToWork(OBJECT work, OBJECT e, OBJECT destfolder
   }
 }
 
-PUBLIC INTEGER FUNCTION __RunHistoryPropsDialog(OBJECT parent, RECORD data, STRING dialogname) {
-  RECORD ARRAY faultypropeditors;
-
-  IF(dialogname = "site") {
-    dialogname := "mod::publisher/screens/commondialogs/siteprops.xml";
-  } ELSE IF (dialogname = "objectprops") {
-    dialogname := "mod::publisher/tolliumapps/objectprops/objectprops.xml";
-  }
-
-  WHILE (TRUE)
-  {
-    TRY
-    {
-      RETURN parent->RunScreen(dialogname, CELL[...data, faultypropeditors ]);
-    }
-    CATCH (OBJECT<PropertyEditorException> e)
-    {
-      // Exception is thrown when propertyeditor could not be loaded/initialized, try to create the dialog without this
-      // propertyeditor
-      RECORD fault := [ extension := e->extension
-                      , error := e->what
-                      ];
-      Print("Property editor exception:\n" || AnyToString(fault,'boxed'));
-      DumpValue(e->originalexception->trace,'boxed');
-
-      INSERT fault INTO faultypropeditors AT END;
-    }
-    CATCH(OBJECT err)
-    {
-      // don't crash on any exception, we can just choose to not open the properties dialog
-      // which is better than to crash the whole Publisher
-      RunExceptionReportDialog(parent, err);
-      RETURN 0;
-
-    }
-  }
-}
-
 RECORD ARRAY FUNCTION ApplyModifyTypes(RECORD ARRAY intypes, RECORD ARRAY modifyrules) {
   FOREVERY(RECORD mod FROM modifyrules) {
     UPDATE intypes

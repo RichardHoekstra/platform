@@ -209,15 +209,15 @@ async function testMarkAsTemporaryFailure(engine: "js" | "hs") {
     // Test honouring specifying retryat option
     await beginWork();
     const taskstart = Temporal.Now.instant();
-    const retryat = taskstart.add({ minutes: 2 });
+    const retryat = taskstart.add({ minutes: 2 }).round({ smallestUnit: "milliseconds" });
     const taskid = await scheduleTask(temporaryfailure_taskname, { nextretry: new Date(retryat.epochMilliseconds) });
     await commitWork();
 
     await test.wait(async () => (await describeTask(taskid)).lastErrors); //TODO why can't we use timeoout?
     const descr = await describeTask(taskid);
 
-    // Check if retryat is honoured
     test.eq(retryat, descr.nextAttempt);
+    // Check if retryat is honoured
 
     await beginWork();
     await cancelTask([taskid]); //TODO singular name and just accept both id and ids

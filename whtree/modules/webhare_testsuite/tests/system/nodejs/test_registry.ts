@@ -91,7 +91,7 @@ async function doKeyTests(basename: string, { acceptInvalidKeyNames = false } = 
 async function testRegistry() {
   await readRegistryKey("system:backend.development.manualdebugmgr");
 
-  const now = Temporal.Now.instant();
+  const now = Temporal.Now.instant().round({ smallestUnit: "milliseconds" });
   await runInWork(() => writeRegistryKey("webhare_testsuite:tests.lastaftercompile", now));
   test.eq(now, await readRegistryKey("webhare_testsuite:tests.lastaftercompile"));
 
