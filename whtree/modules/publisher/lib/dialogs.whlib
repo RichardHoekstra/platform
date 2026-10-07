@@ -126,6 +126,45 @@ PUBLIC RECORD FUNCTION RunSelectNewFSObjectTypeDialog(OBJECT parentscreen, INTEG
          ];
 }
 
+INTEGER FUNCTION __RunHistoryPropsDialog(OBJECT parent, RECORD data, STRING dialogname) {
+  RECORD ARRAY faultypropeditors;
+
+  IF(dialogname = "site")
+    dialogname := "mod::publisher/screens/commondialogs/siteprops.xml";
+  ELSE IF (dialogname = "objectprops")
+    dialogname := "mod::publisher/tolliumapps/objectprops/objectprops.xml";
+  ELSE
+    THROW NEW Exception("Unknown dialog name: " || dialogname);
+
+  WHILE (TRUE)
+  {
+    TRY
+    {
+      RETURN parent->RunScreen(dialogname, CELL[...data, faultypropeditors ]);
+    }
+    CATCH (OBJECT<PropertyEditorException> e)
+    {
+      // Exception is thrown when propertyeditor could not be loaded/initialized, try to create the dialog without this
+      // propertyeditor
+      RECORD fault := [ extension := e->extension
+                      , error := e->what
+                      ];
+      Print("Property editor exception:\n" || AnyToString(fault,'boxed'));
+      DumpValue(e->originalexception->trace,'boxed');
+
+      INSERT fault INTO faultypropeditors AT END;
+    }
+    CATCH(OBJECT err)
+    {
+      // don't crash on any exception, we can just choose to not open the properties dialog
+      // which is better than to crash the whole Publisher
+      RunExceptionReportDialog(parent, err);
+      RETURN 0;
+
+    }
+  }
+}
+
 /** Run the 'create new object' flow
     @long This function invokes the standard 'new object' flow (which currently starts with a type selection and then runs the objectproperties dialog)
     @param parentscreen Screen invoking us
@@ -136,8 +175,7 @@ PUBLIC RECORD FUNCTION RunSelectNewFSObjectTypeDialog(OBJECT parentscreen, INTEG
     @cell(integer) options.type Type to create. If not set, this flow may launch a 'select type' dialog
     @return ID of the newly generated fsobject, 0 if creation was cancelled
 */
-PUBLIC INTEGER FUNCTION RunNewFSObjectDialog(OBJECT parentscreen, INTEGER parentfolder, RECORD options DEFAULTSTO DEFAULT RECORD)
-{
+PUBLIC INTEGER FUNCTION RunNewFSObjectDialog(OBJECT parentscreen, INTEGER parentfolder, RECORD options DEFAULTSTO DEFAULT RECORD) {
   //TODO should we fail or ignore if 'isfolder' is inconsistent with 'type' ?
 
   //We will require 'isfolder' for now, but may drop that in the future if we're not going to require either
@@ -371,8 +409,7 @@ PUBLIC MACRO RunFSObjectVersionsDialog(OBJECT parentscreen, INTEGER objectid, RE
     @cell(boolean) options.assumereadaccess Don't check for read access, just assume the user has it
     @cell(boolean) options.siteproperties Open to access site properties
 */
-PUBLIC MACRO RunFSObjectPropertiesDialog(OBJECT parentscreen, INTEGER objectid, RECORD options DEFAULTSTO DEFAULT RECORD)
-{
+PUBLIC MACRO RunFSObjectPropertiesDialog(OBJECT parentscreen, INTEGER objectid, RECORD options DEFAULTSTO DEFAULT RECORD) {
   options := ValidateOptions(CELL[ assumereadaccess := FALSE
                                  , siteproperties := FALSE
                                  , readonly := FALSE
@@ -388,16 +425,7 @@ PUBLIC MACRO RunFSObjectPropertiesDialog(OBJECT parentscreen, INTEGER objectid, 
     }
   }
 
-  TRY
-  {
-    __RunHistoryPropsDialog(parentscreen, CELL[ why := "edit", fsobj := objectid, options.readonly ], options.siteproperties ? "site" : "objectprops");
-  }
-  CATCH(OBJECT err)
-  {
-    // don't crash on any exception, we can just choose to not open the properties dialog
-    // which is better than to crash the whole Publisher
-    RunExceptionReportDialog(parentscreen, err);
-  }
+  __RunHistoryPropsDialog(parentscreen, CELL[ why := "edit", fsobj := objectid, options.readonly ], options.siteproperties ? "site" : "objectprops");
 }
 
 /** @short Launch the filemanager opening the specified file or folder
