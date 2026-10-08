@@ -17,6 +17,15 @@ on:
         description: 'Cache user'
       cache_password:
         description: 'Cache password'
+      TESTSECRET_SECRETSURL:
+        description: 'Test secret service URL'
+        required: false
+      DOCKERHUB_REGISTRY_PASSWORD:
+        description: 'Docker Hub registry password'
+        required: false
+      WHBUILD_BUILDBOTPASSWORD:
+        description: 'Build bot password for deploying test scripts'
+        required: false
     inputs:
       ref: # This will point to the actual PR commit
         type: string
@@ -25,6 +34,8 @@ on:
 env:
   CI_COMMIT_SHA: ${{ inputs.ref || github.sha }}
   GIT_SUBMODULE_STRATEGY: recursive
+  PUBLIC_REGISTRY_IMAGE: ${{ vars.PUBLIC_REGISTRY_IMAGE }}
+  DOCKERHUB_REGISTRY_USER: ${{ vars.DOCKERHUB_REGISTRY_USER }}
 
 permissions:
   contents: read
@@ -109,6 +120,7 @@ jobs:
     continue-on-error: ${{ matrix.allow_failure }}
     env:
       CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
+      TESTSECRET_SECRETSURL: ${{ secrets.TESTSECRET_SECRETSURL }}
     strategy:
       fail-fast: false
       matrix:
@@ -179,6 +191,7 @@ jobs:
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     env:
       CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
+      DOCKERHUB_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_REGISTRY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:
