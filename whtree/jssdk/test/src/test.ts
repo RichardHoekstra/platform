@@ -21,7 +21,8 @@ export {
   typeAssert,
   wait,
   waitToggled,
-  waitForEvent
+  waitForEvent,
+  scopedPrefix
 } from './checks';
 
 export type {

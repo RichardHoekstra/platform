@@ -2,7 +2,7 @@ import { fetchPreviewAsDoc } from "@mod-webhare_testsuite/js/whfs";
 import * as test from "@mod-webhare_testsuite/js/wts-backend.ts";
 import { throwError } from "@webhare/std";
 import { beginWork, commitWork } from "@webhare/whdb";
-import { listInstances, whfsType } from "@webhare/whfs";
+import { listInstances, whfsType, type WHFSTypeName } from "@webhare/whfs";
 import { openWorkflowManager } from "@webhare/whfs/src/workflow";
 import { generateForm } from "../data/whfs-testhelpers";
 
@@ -48,34 +48,41 @@ async function testVersionedForm() {
 }
 
 async function testVersionedStaticPage() {
-  const tmp = await test.getTestSiteJSTemp();
+  for (const tmp of [await test.getTestSiteJSTemp(), await test.getTestSiteHSTemp()]) {
+    using p1 = test.scopedPrefix(tmp.whfsPath); void (p1);
+    for (const type of ["webhare_testsuite:base_test.testsuite_rtd_hs", "webhare_testsuite:base_test.testsuite_rtd_ts"] as WHFSTypeName[]) {
+      using p2 = test.scopedPrefix(type); void (p2);
 
-  await beginWork();
+      await using work = await beginWork();
 
-  //We need a file that will remain HS HTML rendered so use the explicit test type
-  const file = await tmp.createFile("widgetholder", { type: "webhare_testsuite:base_test.testsuite_rtd_hs", publish: true });
-  await whfsType("platform:filetypes.richdocument").set(file.id, { data: [{ p: "This is version #1" }] });
+      const file = await tmp.createFile(type.split('.')[1], { type, publish: true });
+      await whfsType("platform:filetypes.richdocument").set(file.id, { data: [{ p: "This is version #1" }] });
+      await whfsType("webhare_testsuite:base_test.base_test_props").set(file.id, { anyField: "V1" });
 
-  const workflowMgr = await openWorkflowManager(file.id, {
-    useWorkflow: true,
-    workflowTypes: ["platform:filetypes.richdocument"],
-    assumeWriteAccess: true
-  });
+      const workflowMgr = await openWorkflowManager(file.id, {
+        useWorkflow: true,
+        workflowTypes: ["platform:filetypes.richdocument", "webhare_testsuite:base_test.base_test_props"],
+        assumeWriteAccess: true
+      });
 
-  await workflowMgr.set("platform:filetypes.richdocument", { data: [{ p: "This is version #2" }] });
-  await workflowMgr.save();
+      await workflowMgr.set("platform:filetypes.richdocument", { data: [{ p: "This is version #2" }] });
+      await workflowMgr.set("webhare_testsuite:base_test.base_test_props", { anyField: "V2" });
+      await workflowMgr.save();
 
-  await commitWork();
+      await work.commit();
 
-  const livePreview = await fetchPreviewAsDoc(file.id);
-  test.eq(/This is version #1/, livePreview.contentDiv?.textContent);
+      const livePreview = await fetchPreviewAsDoc(file.id);
+      test.eq(/This is version #1/, livePreview.contentDiv?.textContent);
+      test.eq("V1", livePreview.contentDiv?.attributes["data-betatestprops-anyfield"]);
 
-  const history = await file.listHistory();
-  test.eqPartial([{ type: "import", version: "1.0" }, { type: "saved", version: "1.1" }], history);
-  const draftPreview = await fetchPreviewAsDoc(history[1].snapshot ?? throwError("No snapshot for draft save?"));
+      const history = await file.listHistory();
+      test.eqPartial([{ type: "import", version: "1.0" }, { type: "saved", version: "1.1" }], history);
+      const draftPreview = await fetchPreviewAsDoc(history[1].snapshot ?? throwError("No snapshot for draft save?"));
 
-  test.eq(/This is version #2/, draftPreview.contentDiv?.textContent);
-
+      test.eq(/This is version #2/, draftPreview.contentDiv?.textContent);
+      test.eq("V2", draftPreview.contentDiv?.attributes["data-betatestprops-anyfield"]);
+    }
+  }
 }
 
 test.runTests([

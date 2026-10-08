@@ -365,9 +365,14 @@ export class CPageRequest {
     this.pageBuilderData[dataObject] = data;
   }
 
+  /** Get the default source for a given whfsType, considering workflows and contentlinks
+   * @returns target | content - the source to use
+  */
   private getSourceFor<const Type extends keyof WHFSTypes | string & {}>(type: string extends Type ? Type : WHFSTypeName): "target" | "content" {
+    /* If we're publishing a contentlink (which will be the target object) and the whfsType is marked for contentlinks, take that.
+       Otherwise the workflow flag determines whether we take the version (contentobject) or the object in the site (targetobject) */
     const typeinfo = getType(type);
-    return typeinfo?.workflow ? "content" : "target";
+    return typeinfo?.workflow && !(this.targetObject.type === "platform:filetypes.contentlink" && typeinfo?.contentlink) ? "content" : "target";
   }
 
   /** Get data for a whfsType. Considers versioning and contentlinks to ensure the right version is picked

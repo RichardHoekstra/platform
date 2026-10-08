@@ -140,11 +140,13 @@ async function testPageMetadata() {
      - title: Meta title
      - seoTitle: SEO title
      - pageHeading: <should fall back to Meta title>
+     - betatestprops#anyField: Any doc1
 
      doc1-clink1 - points to doc1, no metadata of its own
 
      doc1-clink2 - points to doc1
      - title: Doc1 Clink2
+     - betatestprops#anyField: Any doc1-clink2
 
      doc1-clink3 - points to doc1
      - seoTitle: Doc1 Clink3 Seo
@@ -161,11 +163,19 @@ async function testPageMetadata() {
      */
   await beginWork();
   const testfolder = await (await test.getTestSiteJSTemp()).ensureFolder("testmetadata", { title: "Folder title" });
+  const testfolderHS = await (await test.getTestSiteHSTemp()).ensureFolder("testmetadata", { title: "Folder title" });
 
   const doc1 = await testfolder.ensureFile("doc1", { publish: true, title: "The meta title", type: "platform:filetypes.markdown" });
   await whfsType("platform:web.metadata").set(doc1.id, { seoTitle: "The seo title 1" });
-  const doc1Req = await createContentPageRequest(doc1, { webRequest: new IncomingWebRequest(doc1.link!) });
+  await whfsType("webhare_testsuite:base_test.base_test_props").set(doc1.id, { anyField: "Any doc1" });
+  await whfsType("webhare_testsuite:global.type_clone_ondraft").set(doc1.id, { onDraftString: "onDraft-doc1" });
 
+  const doc1HS = await testfolderHS.ensureFile("doc1", { publish: true, title: "The meta title", type: "platform:filetypes.markdown" });
+  await whfsType("platform:web.metadata").set(doc1HS.id, { seoTitle: "The seo title 1" });
+  await whfsType("webhare_testsuite:base_test.base_test_props").set(doc1HS.id, { anyField: "Any doc1 HS" });
+  await whfsType("webhare_testsuite:global.type_clone_ondraft").set(doc1HS.id, { onDraftString: "onDraft-doc1 HS" });
+
+  const doc1Req = await createContentPageRequest(doc1, { webRequest: new IncomingWebRequest(doc1.link!) });
   test.eq("The seo title 1", doc1Req.pageMetadata.title);
   test.eq("The meta title", doc1Req.pageMetadata.pageHeading, "should fallback to Meta title, not seoTitle");
 
@@ -183,6 +193,11 @@ async function testPageMetadata() {
   test.eq("Folder title", doc1clinkreq1asIndex.pageMetadata.pageHeading);
 
   const doc1clink2 = await testfolder.ensureFile("doc1clink2", { publish: true, title: "Doc1 Clink2", type: "platform:filetypes.contentlink", target: new IntExtLink(doc1.id) });
+  await whfsType("webhare_testsuite:base_test.base_test_props").set(doc1clink2.id, { anyField: "Any doc1-clink2" });
+
+  const doc1clink2HS = await testfolderHS.ensureFile("doc1clink2", { publish: true, title: "", type: "platform:filetypes.contentlink", target: new IntExtLink(doc1HS.id) });
+  await whfsType("webhare_testsuite:base_test.base_test_props").set(doc1clink2HS.id, { anyField: "Any doc1-clink2 HS" });
+
   const doc1clinkreq2 = await createContentPageRequest(doc1clink2, { webRequest: new IncomingWebRequest(doc1clink2.link!) });
 
   test.eq("Doc1 Clink2", doc1clinkreq2.pageMetadata.title);
@@ -225,6 +240,22 @@ async function testPageMetadata() {
   //TODO test with versions too, they differ from contentlinks
 
   await commitWork();
+
+  const doc1Preview = await fetchPreviewAsDoc(doc1.id);
+  test.eq("Any doc1", doc1Preview.contentDiv?.attributes["data-betatestprops-anyfield"]);
+  test.eq("onDraft-doc1", doc1Preview.byId.get("on_draft_string")?.textContent);
+
+  const doc1HSPreview = await fetchPreviewAsDoc(doc1HS.id);
+  test.eq("Any doc1 HS", doc1HSPreview.contentDiv?.attributes["data-betatestprops-anyfield"]);
+  test.eq("onDraft-doc1 HS", doc1HSPreview.byId.get("on_draft_string")?.textContent);
+
+  const doc1clink2Preview = await fetchPreviewAsDoc(doc1clink2.id);
+  test.eq("Any doc1-clink2", doc1clink2Preview.contentDiv?.attributes["data-betatestprops-anyfield"]);
+  test.eq("onDraft-doc1", doc1clink2Preview.byId.get("on_draft_string")?.textContent);
+
+  const doc1clink2HSPreview = await fetchPreviewAsDoc(doc1clink2HS.id);
+  test.eq("Any doc1-clink2 HS", doc1clink2HSPreview.contentDiv?.attributes["data-betatestprops-anyfield"]);
+  test.eq("onDraft-doc1 HS", doc1clink2HSPreview.byId.get("on_draft_string")?.textContent);
 }
 
 async function testOpenGraph() {

@@ -176,7 +176,9 @@ export async function runHareScriptPage(contReq: ContentPageRequest, how:
 
 export async function wrapHSWebdesign(request: PageBuildRequest): Promise<WebResponse> {
   const siteprofileslib = loadlib("mod::publisher/lib/siteprofiles.whlib");
-  const webDesign = await siteprofileslib.GetWebDesign(request.targetObject.id) as HSVMObject;
+  const webDesign = await siteprofileslib.GetWebDesign(request.targetObject.id, {
+    contentobjectid: (request as CPageRequest)["_contentObject"] && (request as CPageRequest)["_contentObject"].id !== request.targetObject.id ? (request as CPageRequest)["_contentObject"].id : 0
+  }) as HSVMObject;
 
   const fileswhlib = loadlib("wh::files.whlib");
   const placeholder = generateRandomId();

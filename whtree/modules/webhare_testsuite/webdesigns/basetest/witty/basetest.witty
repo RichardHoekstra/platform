@@ -15,6 +15,7 @@
                     data-contentobjectpath="[contentobjectpath]"
                     data-navigationobjectpath="[navigationobjectpath]"
                     data-betatestinstance="[betatestinstance:jsonvalue]"
+                    data-betatestprops-anyfield="[betatestprops.any_field]"
                     [if sitelanguage.nl]data-sitelanguage-nl[/if]
                     [if sitelanguage.en]data-sitelanguage-en[/if]
                     [if sitelanguage.ps]data-sitelanguage-ps[/if]

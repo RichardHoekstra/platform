@@ -5,7 +5,7 @@ import * as whfs from "@webhare/whfs";
 import type { Document } from "@xmldom/xmldom";
 import { createContentPageRequest, type CPageRequest } from "@webhare/router/src/siterequest";
 import { IncomingWebRequest } from "@webhare/router/src/request";
-import { elements, parseDocAsXML, xmlToJS } from "@mod-system/js/internal/generation/xmlhelpers";
+import { elements, parseDocAsXML, xmlToJS, type XMLToJSElement } from "@mod-system/js/internal/generation/xmlhelpers";
 import type { WHConfigSerializedData } from "@webhare/frontend/src/init";
 import { attempt, throwError } from "@webhare/std";
 import { decodeHSONorJSONRecord } from "@webhare/hscompat";
@@ -19,8 +19,18 @@ export function getWHConfig(parseddoc: Document): WHConfigSerializedData {
   return JSON.parse(config.textContent || "");
 }
 
+function buildIDMap(map: Map<string, XMLToJSElement>, node: XMLToJSElement) {
+  if (node.attributes.id && !map.get(node.attributes.id))
+    map.set(node.attributes.id, node);
+  for (const child of node.children) {
+    if (typeof child === "object")
+      buildIDMap(map, child);
+  }
+}
+
 export function parseResponse(responsetext: string) {
   const doc = parseDocAsXML(responsetext, 'text/html', { rewriteHTML: true });
+  const docJs = xmlToJS(doc);
   const config = attempt(() => getWHConfig(doc), null);
   const htmlClasses = doc.documentElement?.getAttribute("class")?.split(" ") ?? [];
   const body = doc.getElementsByTagName("body")[0];
@@ -39,7 +49,10 @@ export function parseResponse(responsetext: string) {
   //TODO HS & TS should both switch to <meta name="consilio.xxx" /> fields and avoid HSON in JS paths
   const consilioFields = consilioFieldElement ? decodeHSONorJSONRecord(consilioFieldElement.textContent || "") as PageMetadata["consilioFields"] : {};
 
-  return { responsetext, contentDiv, doc, body, contentElements, bodyElements, htmlClasses, config, metaTags, openGraph, schemaOrg, linkTags, linkMap, consilioFields };
+  const byId = new Map<string, XMLToJSElement>;
+  buildIDMap(byId, docJs);
+
+  return { responsetext, contentDiv, doc, body, contentElements, bodyElements, htmlClasses, config, metaTags, openGraph, schemaOrg, linkTags, linkMap, consilioFields, byId };
 }
 
 /** Get the file inline (running its builders in the current script, often easier to debug) */
