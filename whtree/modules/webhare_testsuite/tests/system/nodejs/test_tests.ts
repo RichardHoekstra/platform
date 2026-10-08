@@ -32,6 +32,18 @@ async function testChecks() {
   //@ts-expect-error -- TS also rejects null/undefined
   test.throws(/is null/, () => test.cmp(null, "<", 1));
 
+  //test annotation prefixing
+  test.eqPartial({ annotation: "myAnnotation" }, test.throws(/^Expected 1 == 0/, () => test.cmp(1, "==", 0, { annotation: "myAnnotation" })) as any);
+  {
+    using prefix = test.scopedPrefix("myPrefix");
+    void (prefix);
+    {
+      using prefix2 = test.scopedPrefix("myPrefix2");
+      void (prefix2);
+      test.eqPartial({ annotation: "myPrefix: myPrefix2: myAnnotation" }, test.throws(/^Expected 1 == 0/, () => test.cmp(1, "==", 0, { annotation: "myAnnotation" })) as any);
+    }
+  }
+
   //test JS native Date type
   test.eq(new Date("2023-01-01"), new Date("2023-01-01"));
   test.eq({ deep: new Date("2023-01-01") }, { deep: new Date("2023-01-01") });

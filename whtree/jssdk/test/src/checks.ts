@@ -10,6 +10,9 @@ export type { JSONSchemaObject } from "./ajv-wrapper";
 /** An Annotation must either be a simple string or a callback returning one */
 export type Annotation = string | (() => string) | undefined;
 
+/** Annotation prefixes. Kept inside an object so we can easily dispose of them */
+const annotationPrefixStack: Array<{ prefix: string }> = [];
+
 type LoggingCallback = (...args: unknown[]) => void;
 
 type PrimitiveType = Money | Date | RegExp;
@@ -70,7 +73,7 @@ class TestError extends Error {
 
     //Log test failure info during construction so it's not lost if there's not a testrunner to catch and display this
     console.error("TestError:", message);
-    this.annotation = (typeof options?.annotation === "function" ? options?.annotation() : options?.annotation) || "";
+    this.annotation = annotationPrefixStack.map(_ => _.prefix + ": ").join("") + ((typeof options?.annotation === "function" ? options?.annotation() : options?.annotation) || "");
     if (this.annotation)
       console.error("Annotation:", this.annotation);
   }
@@ -468,6 +471,21 @@ function verifyThrowsException(expect: RegExp | ((error: Error) => boolean), exc
   }
 
   return exception; //we got what we wanted - a throw! return the Error
+}
+
+/** Prefix test annotations. This is intended to be used together with JavaScript scopes and 'using' to clear the prefix
+*/
+export function scopedPrefix(prefix: string): Disposable {
+  const setPrefix = { prefix };
+  annotationPrefixStack.push(setPrefix);
+  return {
+    [Symbol.dispose]: () => {
+      const index = annotationPrefixStack.indexOf(setPrefix);
+      if (index !== -1) {
+        annotationPrefixStack.splice(index, 1);
+      }
+    }
+  };
 }
 
 /** Expect a call or promise to throw
