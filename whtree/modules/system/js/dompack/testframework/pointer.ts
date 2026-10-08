@@ -868,6 +868,14 @@ function processGestureQueue() {
     if (!elhere) {
       elhere = currentdoc.documentElement;
       console.error("Unable to find element at location " + position.x + "," + position.y);
+    } else {
+      if (part.el && part.el !== elhere) {
+        const rel = part.el.compareDocumentPosition(elhere);
+        if (!(rel & 24)) {
+          // elhere is not same as or an ancestor or descendant of the original element (part.el)
+          console.error("Element at point is not directly related to the requested element", part.el, " resolved to ", elhere);
+        }
+      }
     }
 
     const targetdoc = elhere.ownerDocument;
