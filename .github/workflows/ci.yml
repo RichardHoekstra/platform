@@ -33,6 +33,10 @@ on:
 
 env:
   CI_COMMIT_SHA: ${{ inputs.ref || github.sha }}
+  # Branch name. Used also to detect if we're on the main branch and need to autotag a release/x.y container too
+  # Forks setting this to 'main' shouldn't be a risk as deployment will not run unless github.event_name == 'push' (TODO but still cleaner to not set it at all?)
+  CI_COMMIT_REF_NAME: "${{ github.ref_name }}" # Extract ref name (e.g. main or feature/my-branch).
+  CI_PIPELINE_ID: "${{ github.run_id }}"
   GIT_SUBMODULE_STRATEGY: recursive
   DOCKERHUB_REGISTRY_USER: ${{ vars.DOCKERHUB_REGISTRY_USER }}
 
@@ -61,14 +65,12 @@ jobs:
         env:
           PUBLIC_REGISTRY_IMAGE_CONFIG: ${{ vars.PUBLIC_REGISTRY_IMAGE }}
         run: |
-          # Extract ref name (e.g. main or feature/my-branch)
-          REF="${{ github.ref_name }}"
           # Lowercase, replace non-alphanumeric chars with '-', trim trailing dashes, cut to 63 chars
-          SLUG=$(echo "$REF" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g' | cut -c1-63)
+          SLUG=$(echo "$CI_COMMIT_REF_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g' | cut -c1-63)
           echo "CI_COMMIT_REF_SLUG=$SLUG" >> "$GITHUB_OUTPUT"
 
-          # Setting PUBLIC_REGISTRY_IMAGE triggers pushes to docker.io, which we don't want to do for non release branches
-          if [[ "$REF" == "main" || "$REF" == release/* ]]; then
+          # Setting PUBLIC_REGISTRY_IMAGE triggers pushes to docker.io, which we don't want to do for non release branches (ie feature/ or custom/) - they stay on ghcr.io
+          if [[ "$CI_COMMIT_REF_NAME" == "main" || "$CI_COMMIT_REF_NAME" == release/* ]]; then
             echo "PUBLIC_REGISTRY_IMAGE=$PUBLIC_REGISTRY_IMAGE_CONFIG" >> "$GITHUB_OUTPUT"
           else
             echo "PUBLIC_REGISTRY_IMAGE=" >> "$GITHUB_OUTPUT"
@@ -98,6 +100,7 @@ jobs:
       - name: Build and push WebHare container
         env:
           PUSH_BUILD_IMAGES: "1"
+          WHBUILD_RUNNER: "${{ runner.name }}"
         run: whtree/bin/wh buildcontainer --podman
       - name: Upload artifacts
         if: always()
