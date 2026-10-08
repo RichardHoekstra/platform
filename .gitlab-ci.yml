@@ -48,6 +48,8 @@ buildcontainer:
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
   stage: build
+  only:
+    - /^release\/5.*$/
   except:
     - schedules
   script:
