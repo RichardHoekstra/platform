@@ -95,6 +95,11 @@ export async function baseTestJSPageBuilder(req: PageBuildRequest): Promise<WebR
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sharedblocks: any[] = []; // TODO sharedblocks := (SELECT AS MACRO PTR ARRAY PTR this->RenderSharedBlock(usewidgets) FROM usewidgets)
   const betatestprops = await req.getInstance("webhare_testsuite:base_test.base_test_props");
+
+  const typeCloneNever = await req.getInstance("webhare_testsuite:global.type_clone_never");
+  const typeCloneOnDraft = await req.getInstance("webhare_testsuite:global.type_clone_ondraft");
+  const typeCloneOnCopy = await req.getInstance("webhare_testsuite:global.type_clone_oncopy");
+
   return req.render({
     body: litty`
       <div id="basetitle">${getTid("webhare_testsuite:basetest.title")}</div>
@@ -118,6 +123,9 @@ export async function baseTestJSPageBuilder(req: PageBuildRequest): Promise<WebR
   ${comments ? litty`<div id="comments">${comments}</div>` : ''}
   ${sharedblocks ? litty`<div id="sharedblocks">${sharedblocks.map((block: string) => litty`<div class="basetest__sharedblock">${block}</div>`)}</div>` : ''}
   ${req.webRequest ? litty`<div id="isdynamicrequest">Dynamic request from ${req.webRequest.clientIp}</div>` : ''}
+  ${typeCloneNever?.neverString && litty`<div id="never_string">${typeCloneNever?.neverString}}</div>`}
+  ${typeCloneOnDraft?.onDraftString && litty`<div id="on_draft_string">${typeCloneOnDraft?.onDraftString}</div>`}
+  ${typeCloneOnCopy?.onCopyString && litty`<div id="on_copy_string">${typeCloneOnCopy?.onCopyString}</div>`}
   <img id="smallbob" src="${imgroot}smallbob.jpg">`
   });
 }

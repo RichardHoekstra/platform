@@ -168,18 +168,14 @@ PUBLIC STATIC OBJECTTYPE WebContext <
   }
 
   STRING FUNCTION GetSourceFor(STRING ns) {
-    RECORD typeinfo := SELECT * FROM this->pvt_contentinstances WHERE namespace = VAR ns OR scopedtype = VAR ns;
-    IF(NOT RecordExists(typeinfo) OR NOT typeinfo.workflow)
+    /* If we're publishing a contentlink (which will be the target object) and the whfsType is marked for contentlinks, take that.
+       Otherwise the workflow flag determines whether we take the version (contentobject) or the object in the site (targetobject) */
+    RECORD typeinfo := LookupContentTypeByName(ns);
+    // return typeinfo?.workflow && !(this.targetObject.type === "platform:filetypes.contentlink" && typeinfo?.contentlink) ? "content" : "target";
+    IF(RecordExists(typeinfo) AND typeinfo.workflow AND NOT (ObjectExists(this->targetobject) AND this->targetobject->type = whconstant_whfstype_contentlink AND typeinfo.contentlink))
+      RETURN "content";
+    ELSE
       RETURN "target";
-
-    //If it's a workflow type, doublecheck we shouldn't still get it from the target if this is a content link
-    IF(ObjectExists(this->targetobject) AND this->targetobject->type = whconstant_whfstype_contentlink) {
-      RECORD typedscr := LookupContentTypeById(typeinfo.fstype);
-      IF(RecordExists(typedscr) AND typedscr.contentlink)
-        RETURN "target";
-    }
-
-    RETURN "content";
   }
 
   /** Get instance data from the relevant content/target object. Added since WH5.8.2 and should generally be used over this->contentobject/targetobject->GetInstanceData() */
