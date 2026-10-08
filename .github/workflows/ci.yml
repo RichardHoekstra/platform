@@ -34,7 +34,6 @@ on:
 env:
   CI_COMMIT_SHA: ${{ inputs.ref || github.sha }}
   GIT_SUBMODULE_STRATEGY: recursive
-  PUBLIC_REGISTRY_IMAGE: ${{ vars.PUBLIC_REGISTRY_IMAGE }}
   DOCKERHUB_REGISTRY_USER: ${{ vars.DOCKERHUB_REGISTRY_USER }}
 
 permissions:
@@ -55,15 +54,25 @@ jobs:
     name: Calculate release tag
     outputs:
       CI_COMMIT_REF_SLUG: ${{ steps.slug.outputs.CI_COMMIT_REF_SLUG }}
+      PUBLIC_REGISTRY_IMAGE: ${{ steps.slug.outputs.PUBLIC_REGISTRY_IMAGE }}
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     steps:
       - id: slug
+        env:
+          PUBLIC_REGISTRY_IMAGE_CONFIG: ${{ vars.PUBLIC_REGISTRY_IMAGE }}
         run: |
           # Extract ref name (e.g. main or feature/my-branch)
           REF="${{ github.ref_name }}"
           # Lowercase, replace non-alphanumeric chars with '-', trim trailing dashes, cut to 63 chars
           SLUG=$(echo "$REF" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g' | cut -c1-63)
           echo "CI_COMMIT_REF_SLUG=$SLUG" >> "$GITHUB_OUTPUT"
+
+          # Setting PUBLIC_REGISTRY_IMAGE triggers pushes to docker.io, which we don't want to do for non release branches
+          if [[ "$REF" == "main" || "$REF" == release/* ]]; then
+            echo "PUBLIC_REGISTRY_IMAGE=$PUBLIC_REGISTRY_IMAGE_CONFIG" >> "$GITHUB_OUTPUT"
+          else
+            echo "PUBLIC_REGISTRY_IMAGE=" >> "$GITHUB_OUTPUT"
+          fi
 
   buildcontainer:
     needs: [prepare]
@@ -72,6 +81,7 @@ jobs:
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     env:
       CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
+      PUBLIC_REGISTRY_IMAGE: ${{ needs.prepare.outputs.PUBLIC_REGISTRY_IMAGE }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -192,6 +202,7 @@ jobs:
     env:
       CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
       DOCKERHUB_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_REGISTRY_PASSWORD }}
+      PUBLIC_REGISTRY_IMAGE: ${{ needs.prepare.outputs.PUBLIC_REGISTRY_IMAGE }}
     steps:
       - uses: actions/checkout@v4
         with:
