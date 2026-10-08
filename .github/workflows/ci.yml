@@ -24,7 +24,6 @@ on:
 
 env:
   CI_COMMIT_SHA: ${{ inputs.ref || github.sha }}
-  CI_COMMIT_REF_SLUG: ci-${{ github.run_id }}
   GIT_SUBMODULE_STRATEGY: recursive
 
 permissions:
@@ -41,10 +40,27 @@ concurrency: # cancel older workflows when a new push is done on a branch
   cancel-in-progress: true
 
 jobs:
+  prepare:
+    name: Calculate release tag
+    outputs:
+      CI_COMMIT_REF_SLUG: ${{ steps.slug.outputs.CI_COMMIT_REF_SLUG }}
+    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    steps:
+      - id: slug
+        run: |
+          # Extract ref name (e.g. main or feature/my-branch)
+          REF="${{ github.ref_name }}"
+          # Lowercase, replace non-alphanumeric chars with '-', trim trailing dashes, cut to 63 chars
+          SLUG=$(echo "$REF" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g' | cut -c1-63)
+          echo "CI_COMMIT_REF_SLUG=$SLUG" >> "$GITHUB_OUTPUT"
+
   buildcontainer:
+    needs: [prepare]
     name: Build container
     # See https://github.com/actions/runner-images. Fork PRs (via pull-request.yml) never get our own runners
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    env:
+      CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,10 +103,12 @@ jobs:
 
   testcontainers:
     name: ${{ matrix.name }}
-    needs: buildcontainer
+    needs: [prepare,buildcontainer]
     if: needs.buildcontainer.result == 'success'
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     continue-on-error: ${{ matrix.allow_failure }}
+    env:
+      CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
     strategy:
       fail-fast: false
       matrix:
@@ -156,9 +174,11 @@ jobs:
 
   deploy:
     name: Deploy container
-    needs: [all-tests-passed]
+    needs: [prepare, all-tests-passed]
     if: github.event_name == 'push' && !inputs.scheduled
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    env:
+      CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
     steps:
       - uses: actions/checkout@v4
         with:

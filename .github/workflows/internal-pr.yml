@@ -2,6 +2,7 @@ name: Internal
 
 on:
   push:
+  workflow_dispatch: # To allow manual starting
 
 permissions:
   actions: write

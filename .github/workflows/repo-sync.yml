@@ -9,12 +9,14 @@ on:
     branches:
       - main
       - 'release/*'
+  workflow_dispatch: # To allow manual starting
 
 permissions:
   contents: read
 
 jobs:
   sync-branches:
+    if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/') }}
     # We expect ["self-hosted","podman"] at https://github.com/organizations/WebHare/settings/variables/actions/WHBUILD_RUNNER
     runs-on: ${{ vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     name: Sync branches to configured repositories
