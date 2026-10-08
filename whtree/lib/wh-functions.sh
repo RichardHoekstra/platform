@@ -349,10 +349,6 @@ get_finaltag()
       echo "Public images set but no DOCKERHUB_REGISTRY_USER environment received - deploy will fail"
       exit 1
     fi
-    if [ -z "$DOCKERHUB_REGISTRY_PASSWORD" ]; then
-      echo "Public images set but no DOCKERHUB_REGISTRY_PASSWORD environment received - deploy will fail"
-      exit 1
-    fi
   fi
 }
 
