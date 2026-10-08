@@ -370,7 +370,7 @@ export class CPageRequest {
   */
   private getSourceFor<const Type extends keyof WHFSTypes | string & {}>(type: string extends Type ? Type : WHFSTypeName): "target" | "content" {
     /* If we're publishing a contentlink (which will be the target object) and the whfsType is marked for contentlinks, take that.
-       Otherwise the workflow flag determines whether we take the version (contentobject) or the obejct in the site (targetobject) */
+       Otherwise the workflow flag determines whether we take the version (contentobject) or the object in the site (targetobject) */
     const typeinfo = getType(type);
     return typeinfo?.workflow && !(this.targetObject.type === "platform:filetypes.contentlink" && typeinfo?.contentlink) ? "content" : "target";
   }
