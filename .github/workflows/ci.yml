@@ -1,14 +1,15 @@
 name: WebHare CI
 
 on:
-  push:
   workflow_dispatch: # Used by scheduled-ci.yml
     inputs:
       scheduled:
         description: Skip deployment steps for scheduled CI runs
         type: boolean
         default: false
-  workflow_call: # Used by pull-request.yml to ensure we stay in the same PR context. Using dispatch doesn't add 'checks' to the PR
+  # This workflow is used by external-pr.yml to ensure we stay in the same PR context. Using workflow_dispatch didn't add 'checks' to the PR
+  # It's also invoked by internal-pr.yml on push events so that the success test is always named 'WebHare CI / all-tests-passed'
+  workflow_call:
     secrets:
       cache_registry:
         description: 'Cache Registry URL'

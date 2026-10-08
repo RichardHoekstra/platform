@@ -1,4 +1,4 @@
-name: External Pull Request CI
+name: External
 
 on:
   pull_request_target:
