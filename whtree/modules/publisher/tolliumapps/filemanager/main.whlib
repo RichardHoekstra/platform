@@ -2127,7 +2127,7 @@ PUBLIC STATIC OBJECTTYPE App EXTEND TolliumScreenBase <
 
   MACRO DoBoostWordsOverviewTree()
   {
-    this->RunScreen("#boostwordsoverview", [ id := ^foldertree->value ]);
+    this->RunScreen("#boostwordsoverview", [ folderid := ^foldertree->value ]);
   }
 
   MACRO DoBoostWordsOverviewList()
@@ -2219,12 +2219,22 @@ PUBLIC STATIC OBJECTTYPE BoostWordsOverview EXTEND TolliumScreenBase
 
   MACRO Init(RECORD data)
   {
-    // Find all folders (data.ids is a foldertree folder id or a list of filelist file and folder ids)
+    // NOTE: We either get:
+    // - data.folderid which is a single folder id (the folder selected in the foldertree)
+    // - data.ids which is a list file and folder ids (those that were selected in the filelist)
+    INTEGER ARRAY findids;
     INTEGER ARRAY allfolderids;
-    IF (CellExists(data, "id"))
-      INSERT data.id INTO allfolderids AT END;
+
+    // Get the list of folders which want to scan
+    IF (CellExists(data, "folderid"))
+      INSERT data.folderid INTO allfolderids AT END;
     ELSE
-      allfolderids := SELECT AS INTEGER ARRAY id FROM system.fs_objects WHERE id IN VAR data.ids AND isfolder;
+    {
+      findids := data.ids;
+      allfolderids := SELECT AS INTEGER ARRAY id FROM system.fs_objects WHERE id IN VAR findids AND isfolder;
+    }
+
+    // Add all descendant folders
     FOREVERY (INTEGER folderid FROM allfolderids)
     {
       OBJECT folder := OpenWHFSObject(folderid);
@@ -2238,14 +2248,17 @@ PUBLIC STATIC OBJECTTYPE BoostWordsOverview EXTEND TolliumScreenBase
               , parentsite
               , fullpath
            FROM system.fs_objects
-          WHERE parent IN allfolderids AND NOT isfolder)
+          WHERE NOT isfolder
+                AND parent IN VAR allfolderids) // all files in the selected folders
         CONCAT
         (SELECT id
               , whfspath
               , parentsite
               , fullpath
            FROM system.fs_objects
-          WHERE id IN VAR data.ids AND NOT isfolder);
+          WHERE NOT isfolder
+                AND id IN VAR findids); // also pick up explicitly requested files
+
     // Enrich with boost words
     files := OpenWHFSType("http://www.webhare.net/xmlns/consilio/boostwords")->Enrich(files, "id", [ "words" ]);
     DELETE FROM files WHERE Length(words) = 0 OR parentsite = 0;
