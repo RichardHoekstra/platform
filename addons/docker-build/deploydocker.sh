@@ -17,6 +17,8 @@ fi
 
 get_finaltag
 list_finaltag
+FIRST_PUBLIC_IMAGE=${PUBLIC_IMAGES/%\ */}
+FIRST_PUBLIC_REGISTRY=${FIRST_PUBLIC_IMAGE%%/*}
 
 if [ "$PUSH_BUILD_IMAGES" != "1" ]; then
   echo "Nothing to deploy"
@@ -50,10 +52,8 @@ function logout()
 
 trap logout exit INT TERM
 
-if [ -n "$PUBLIC_IMAGES" ]; then
-  echo "-----------------------------------------------------------------------"
-  echo "Tagging and pushing external images"
-  if ! echo "$DOCKERHUB_REGISTRY_PASSWORD" | "$CONTAINERENGINE" login -u "$DOCKERHUB_REGISTRY_USER" --password-stdin ; then
+if [ -n "$PUBLIC_IMAGES" ] && [ -n "$DOCKERHUB_REGISTRY_PASSWORD" ]; then
+  if ! echo "$DOCKERHUB_REGISTRY_PASSWORD" | "$CONTAINERENGINE" login -u "$DOCKERHUB_REGISTRY_USER" --password-stdin "$FIRST_PUBLIC_REGISTRY" ; then
     echo "Failed to log in to the registry"
     exit 1
   fi
@@ -84,7 +84,6 @@ echo ""
 echo "Done. For fast/emergency installations:"
 echo ""
 FIRST_BRANCH_IMAGE=${BRANCH_IMAGES/%\ */}
-FIRST_PUBLIC_IMAGE=${PUBLIC_IMAGES/%\ */}
 USEIMAGE=${FIRST_PUBLIC_IMAGE:-$FIRST_BRANCH_IMAGE}
 echo "  servermgmt:    SV install -s ${USEIMAGE} <server>"
 echo "  module test:   wh testcontainer -w ${USEIMAGE} -m <module>"

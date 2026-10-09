@@ -17,6 +17,15 @@ on:
         description: 'Cache user'
       cache_password:
         description: 'Cache password'
+      TESTSECRET_SECRETSURL:
+        description: 'Test secret service URL'
+        required: false
+      DOCKERHUB_REGISTRY_PASSWORD:
+        description: 'Docker Hub registry password'
+        required: false
+      WHBUILD_BUILDBOTPASSWORD:
+        description: 'Build bot password for deploying test scripts'
+        required: false
     inputs:
       ref: # This will point to the actual PR commit
         type: string
@@ -24,8 +33,12 @@ on:
 
 env:
   CI_COMMIT_SHA: ${{ inputs.ref || github.sha }}
-  CI_COMMIT_REF_SLUG: ci-${{ github.run_id }}
+  # Branch name. Used also to detect if we're on the main branch and need to autotag a release/x.y container too
+  # Forks setting this to 'main' shouldn't be a risk as deployment will not run unless github.event_name == 'push' (TODO but still cleaner to not set it at all?)
+  CI_COMMIT_REF_NAME: "${{ github.ref_name }}" # Extract ref name (e.g. main or feature/my-branch).
+  CI_PIPELINE_ID: "${{ github.run_id }}"
   GIT_SUBMODULE_STRATEGY: recursive
+  DOCKERHUB_REGISTRY_USER: ${{ vars.DOCKERHUB_REGISTRY_USER }}
 
 permissions:
   contents: read
@@ -41,10 +54,36 @@ concurrency: # cancel older workflows when a new push is done on a branch
   cancel-in-progress: true
 
 jobs:
+  prepare:
+    name: Calculate release tag
+    outputs:
+      CI_COMMIT_REF_SLUG: ${{ steps.slug.outputs.CI_COMMIT_REF_SLUG }}
+      PUBLIC_REGISTRY_IMAGE: ${{ steps.slug.outputs.PUBLIC_REGISTRY_IMAGE }}
+    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    steps:
+      - id: slug
+        env:
+          PUBLIC_REGISTRY_IMAGE_CONFIG: ${{ vars.PUBLIC_REGISTRY_IMAGE }}
+        run: |
+          # Lowercase, replace non-alphanumeric chars with '-', trim trailing dashes, cut to 63 chars
+          SLUG=$(echo "$CI_COMMIT_REF_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g' | cut -c1-63)
+          echo "CI_COMMIT_REF_SLUG=$SLUG" >> "$GITHUB_OUTPUT"
+
+          # Setting PUBLIC_REGISTRY_IMAGE triggers pushes to docker.io, which we don't want to do for non release branches (ie feature/ or custom/) - they stay on ghcr.io
+          if [[ "$CI_COMMIT_REF_NAME" == "main" || "$CI_COMMIT_REF_NAME" == release/* ]]; then
+            echo "PUBLIC_REGISTRY_IMAGE=$PUBLIC_REGISTRY_IMAGE_CONFIG" >> "$GITHUB_OUTPUT"
+          else
+            echo "PUBLIC_REGISTRY_IMAGE=" >> "$GITHUB_OUTPUT"
+          fi
+
   buildcontainer:
+    needs: [prepare]
     name: Build container
     # See https://github.com/actions/runner-images. Fork PRs (via pull-request.yml) never get our own runners
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    env:
+      CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
+      PUBLIC_REGISTRY_IMAGE: ${{ needs.prepare.outputs.PUBLIC_REGISTRY_IMAGE }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,6 +100,7 @@ jobs:
       - name: Build and push WebHare container
         env:
           PUSH_BUILD_IMAGES: "1"
+          WHBUILD_RUNNER: "${{ runner.name }}"
         run: whtree/bin/wh buildcontainer --podman
       - name: Upload artifacts
         if: always()
@@ -87,10 +127,13 @@ jobs:
 
   testcontainers:
     name: ${{ matrix.name }}
-    needs: buildcontainer
+    needs: [prepare,buildcontainer]
     if: needs.buildcontainer.result == 'success'
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     continue-on-error: ${{ matrix.allow_failure }}
+    env:
+      CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
+      TESTSECRET_SECRETSURL: ${{ secrets.TESTSECRET_SECRETSURL }}
     strategy:
       fail-fast: false
       matrix:
@@ -156,9 +199,13 @@ jobs:
 
   deploy:
     name: Deploy container
-    needs: [all-tests-passed]
+    needs: [prepare, all-tests-passed]
     if: github.event_name == 'push' && !inputs.scheduled
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    env:
+      CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
+      DOCKERHUB_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_REGISTRY_PASSWORD }}
+      PUBLIC_REGISTRY_IMAGE: ${{ needs.prepare.outputs.PUBLIC_REGISTRY_IMAGE }}
     steps:
       - uses: actions/checkout@v4
         with:
