@@ -690,7 +690,7 @@ PUBLIC STATIC OBJECTTYPE WebDesignBase EXTEND WebContext <
    //formtargetid is where the answers are routed to and extensions come form. may differ from formobject when previewing/contentobjecting (targetobject will point to final location, but contentobject/formobject to draft)
   OBJECT FUNCTION DoOpenWebtoolForm(OBJECT formobject, BOOLEAN isprimaryform, INTEGER formtargetid)
   {
-    OBJECT form := __DoOpenWebtoolForm(formobject, "webtoolform", this, this->targetapplytester, formtargetid, "", TRUE); //TRUE: PrepareForFrontend
+    OBJECT form := __DoOpenWebtoolForm(formobject, "webtoolform", this, this->targetapplytester, formtargetid, "", TRUE, TRUE); //TRUE: PrepareForFrontend & isinitialrender
     IF(NOT ObjectExists(form))
       RETURN form;
 

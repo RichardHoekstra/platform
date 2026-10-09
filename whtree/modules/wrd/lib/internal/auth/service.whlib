@@ -19,7 +19,10 @@ LOADLIB "mod::wrd/lib/auth.whlib";
     @param persistent Whether persistent login is requested
     @cell(string) options.logincontrol Contents of 'wrdauth_logincontrol' variable, handles redirects after login
     @cell(string) options.browsertriplet Browser triplet
-    @return @includecelldef %WRDAuthPlugin::LoginSecondFactor.return
+    @return Login result
+    @cell return.success Whether the user was logged in successfully
+    @cell return.code Login error code
+    @cell return.submitinstruction Form action to execute to complete SAML / external login flow
     @cell return.userinfo @includecelldef %WRDAuthPlugin::GetUserInfo.return
 */
 PUBLIC RECORD FUNCTION RPC_Login(STRING url, STRING login, STRING password, BOOLEAN persistent, RECORD options DEFAULTSTO DEFAULT RECORD)

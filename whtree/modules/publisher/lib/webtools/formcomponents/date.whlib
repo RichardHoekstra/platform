@@ -211,7 +211,8 @@ PUBLIC OBJECTTYPE DateField EXTEND FormFieldBase
   MACRO SetValue(DATETIME newvalue)
   {
     this->pvt_abstractvalue := MakeSettableRealDate(newvalue, TRUE);
-    this->form->__SendFormMessage(this->field.name, 'value', this->abstractvalue);
+    IF (NOT this->form->formisinitialrender)
+      this->form->__SendFormMessage(this->field.name, 'value', this->abstractvalue);
   }
   MACRO SetMax(DATETIME newvalue)
   {

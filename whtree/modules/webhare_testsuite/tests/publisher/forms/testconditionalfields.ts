@@ -93,5 +93,22 @@ test.runTests(
         test.assert(disabled_options.includes("2"));
         test.assert(disabled_options.includes("3"));
       }
+    },
+
+    "test dynamic formvar update",
+    async function () {
+      test.eq(false, test.qR(("#coretest-condition_formvar_x_set")).disabled);
+
+      // Submits hidden formvar state to rpc, toggles formvar based on that state and submits new formvar state to the frontend
+      test.click(test.qS('.toggleformvarbutton'));
+      await test.waitForUI();
+
+      // that should have disabled the checkbox
+      test.eq(true, test.qR(("#coretest-condition_formvar_x_set")).disabled);
+
+      // and toggle again
+      test.click(test.qS('.toggleformvarbutton'));
+      await test.waitForUI();
+      test.eq(false, test.qR(("#coretest-condition_formvar_x_set")).disabled);
     }
   ]);

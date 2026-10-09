@@ -1,0 +1,33 @@
+/// activate the tollium modality layer
+@mixin tolliummodalitylayer-activate {
+  .tolliummodalitylayer {
+    display: block;
+  }
+}
+
+/// show the tollium modality layer busy state
+@mixin tolliummodalitylayer-showbusy {
+  .tolliummodalitylayer,&.tolliummodalitylayer {
+    display: block;
+    background-color: rgba(0, 0, 0, 0.1);
+    transition: background-color 200ms;
+    @starting-style {
+      background-color: rgba(0, 0, 0, 0.0);
+    }
+    > .tolliummodalitylayer__loader {
+      opacity: 1;
+    }
+  }
+}
+
+// show the loader 200ms after showing the busy state
+@mixin tolliummodalitylayer-delayshow {
+  .tolliummodalitylayer,&.tolliummodalitylayer {
+    > .tolliummodalitylayer__loader {
+      transition: opacity 0s 200ms;
+      @starting-style {
+        opacity: 0;
+      }
+    }
+  }
+}

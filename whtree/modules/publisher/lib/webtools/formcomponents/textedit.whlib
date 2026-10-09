@@ -99,7 +99,8 @@ PUBLIC STATIC OBJECTTYPE TextEditFieldBase EXTEND FormFieldBase
   MACRO SetValue(VARIANT newval)
   {
     this->textvalue := UnmapValueType(this->valuetype, newval, this->emptyvalue, TRUE);
-    this->form->__SendFormMessage(this->field.name, 'value', this->textvalue);
+    IF (NOT this->form->formisinitialrender)
+      this->form->__SendFormMessage(this->field.name, 'value', this->textvalue);
   }
 
   UPDATE PUBLIC MACRO UpdateFromJS(VARIANT jsdata)
@@ -108,7 +109,8 @@ PUBLIC STATIC OBJECTTYPE TextEditFieldBase EXTEND FormFieldBase
       jsdata := TrimWhitespace(jsdata);
 
     this->textvalue := jsdata;
-    this->form->__SendFormMessage(this->field.name, 'value', this->textvalue);
+    IF (NOT this->form->formisinitialrender)
+      this->form->__SendFormMessage(this->field.name, 'value', this->textvalue);
   }
 
   PUBLIC RECORD FUNCTION GetEmailRestrictions()

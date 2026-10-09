@@ -742,4 +742,14 @@ test.runTests(
       await test.waitForUI();
       test.eq("value-javascript", JSON.parse(test.qR("#coreformsubmitresponse").textContent!).form.hidden);
     },
+
+    "Test richvalue update",
+    async function () {
+      await test.load(`${test.getTestSiteRoot()}testpages/formtest/`);
+      quickFillDefaultRequiredFields();
+      test.click(".updaterichtextbutton");
+      await test.waitForUI();
+      // Add assertions here to verify the richtext update
+      test.eq("Updated richtext", test.qR("[name=richtexttid]").textContent);
+    }
   ]);

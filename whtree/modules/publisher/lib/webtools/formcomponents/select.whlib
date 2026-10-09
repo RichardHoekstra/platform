@@ -13,6 +13,7 @@ LOADLIB "wh::xml/xsd.whlib";
 
 LOADLIB "mod::publisher/lib/forms/components.whlib";
 LOADLIB "mod::publisher/lib/forms/editor.whlib";
+LOADLIB "mod::publisher/lib/internal/forms/conditions.whlib";
 LOADLIB "mod::publisher/lib/internal/forms/support.whlib";
 
 LOADLIB "mod::tollium/lib/gettid.whlib";
@@ -1002,6 +1003,9 @@ PUBLIC OBJECTTYPE SelectField EXTEND FormFieldBase
              , isoptgroup := isoptgroup
              , DELETE children //to avoid confusion
              ];
+
+      IF (IsValueSet(opt.visiblecondition))
+        opt.visiblecondition := ValidateFormCondition(opt.visiblecondition);
 
       FOREVERY(OBJECT subfield FROM opt.subfields)
         IF(subfield->parent != this)

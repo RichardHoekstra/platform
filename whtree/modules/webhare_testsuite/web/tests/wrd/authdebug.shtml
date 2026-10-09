@@ -99,15 +99,6 @@ RECORD FUNCTION ProcessReq()
       trans->RollbackWork();
       RETURN res;
     }
-    CASE "loginsecondfactor"
-    {
-      RECORD res := plugin->LoginSecondFactor(
-          GetWebVariable("firstfactorproof"),
-          GetWebVariable("type"),
-          DecodeJSON(GetWebVariable("data")));
-      RETURN res;
-    }
-
   }
   THROW NEW Exception("Unrecognized function '" || GetwebVariable('action') || "'");
 }

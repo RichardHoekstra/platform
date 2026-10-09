@@ -1248,6 +1248,45 @@ export default class FormBase<DataShape extends object = Record<string, unknown>
     this.node.classList.toggle("wh-form--allowsubmit", curpagerole === 'thankyou'
       ? pagestate.pages[pagestate.curpage].dataset.whFormExitButton !== undefined
       : (!morepages || nextpagerole === 'thankyou'));
+
+    // Also handle the thank you page preparation (changing submit labels, redirecting if necessary)
+    this._prepareThankYouPage(pagestate.curpage);
+  }
+
+  _prepareThankYouPage(nextpage: number) {
+    const state = this._getPageState();
+    if (nextpage !== -1 && state.pages[nextpage] && state.pages[nextpage].dataset.whFormPagerole === 'thankyou') {
+      const rawNavigateTo = state.pages[nextpage].dataset.whFormNavigateTo;
+      const exitButton = state.pages[nextpage].dataset.whFormExitButton;
+      const parsedNavTo = rawNavigateTo ? JSON.parse(rawNavigateTo) : null;
+      if (parsedNavTo)
+        this.exitButtonNavigateTo = parsedNavTo;
+
+      const redirectdelay = parseInt(state.pages[nextpage].dataset.whFormPageredirectDelay ?? "");
+
+      if (exitButton) {
+        const submitButton = this.node.querySelector<HTMLElement>(".wh-form__button--submit");
+        const submitButtonLabel = submitButton?.querySelector<HTMLElement>(".wh-form__buttonlabel");
+        if (submitButton && submitButtonLabel) {
+          submitButton.dataset.whFormAction = "exit";
+          submitButtonLabel.textContent = exitButton;
+        } else {
+          console.error(`Unable to find the submit button '.wh-form__button--submit .wh-form__buttonlabel' - I need to replace its label with '${exitButton}'!`);
+        }
+      }
+
+      if (parsedNavTo && !(redirectdelay >= 0) && !exitButton) {
+        navigateTo(parsedNavTo);
+        return;
+      }
+
+      if (parsedNavTo && redirectdelay >= 0) {
+        // If redirectdelay==0 (redirect immediately, while showing the thank you page), redirect after a small delay to
+        // give the browser time to hide the busy layer
+        // Might be caused by this: https://stackoverflow.com/a/60439478
+        setTimeout(() => navigateTo(parsedNavTo), redirectdelay * 1000 || 100);
+      }
+    }
   }
 
   _navigateToThankYou(richvalues?: RichValues) {
@@ -1256,38 +1295,8 @@ export default class FormBase<DataShape extends object = Record<string, unknown>
     if (state.curpage >= 0) {
       const nextpage = this._getDestinationPage(state, +1);
       if (nextpage !== -1 && state.pages[nextpage] && state.pages[nextpage].dataset.whFormPagerole === 'thankyou') {
-        const rawNavigateTo = state.pages[nextpage].dataset.whFormNavigateTo;
-        const exitButton = state.pages[nextpage].dataset.whFormExitButton;
-        const parsedNavTo = rawNavigateTo ? JSON.parse(rawNavigateTo) : null;
-        if (parsedNavTo)
-          this.exitButtonNavigateTo = parsedNavTo;
-
-        const redirectdelay = parseInt(state.pages[nextpage].dataset.whFormPageredirectDelay ?? "");
-
-        if (exitButton) {
-          const submitButton = this.node.querySelector<HTMLElement>(".wh-form__button--submit");
-          const submitButtonLabel = submitButton?.querySelector<HTMLElement>(".wh-form__buttonlabel");
-          if (submitButton && submitButtonLabel) {
-            submitButton.dataset.whFormAction = "exit";
-            submitButtonLabel.textContent = exitButton;
-          } else {
-            console.error(`Unable to find the submit button '.wh-form__button--submit .wh-form__buttonlabel' - I need to replace its label with '${exitButton}'!`);
-          }
-        }
-
-        if (parsedNavTo && !(redirectdelay >= 0) && !exitButton) {
-          navigateTo(parsedNavTo);
-          return;
-        }
-
         this.updateRichValues(state.pages[nextpage], richvalues);
         this.gotoPage(nextpage, { __isSubmit: true });
-        if (parsedNavTo && redirectdelay >= 0) {
-          // If redirectdelay==0 (redirect immediately, while showing the thank you page), redirect after a small delay to
-          // give the browser time to hide the busy layer
-          // Might be caused by this: https://stackoverflow.com/a/60439478
-          setTimeout(() => navigateTo(parsedNavTo), redirectdelay * 1000 || 100);
-        }
       }
     }
   }

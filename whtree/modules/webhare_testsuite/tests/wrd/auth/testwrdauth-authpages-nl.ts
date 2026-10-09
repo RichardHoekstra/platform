@@ -71,6 +71,7 @@ test.runTests(
         { type: "platform:login", entityLogin: "pietje-authpages-js@beta.webhare.net" },
         { type: "platform:logout", entityLogin: "pietje-authpages-js@beta.webhare.net" },
         { type: "platform:secondfactor.challenge", entityLogin: "pietje-authpages-js@beta.webhare.net" },
+        { type: "platform:secondfactor.ok", entityLogin: "pietje-authpages-js@beta.webhare.net" },
         { type: "platform:login", entityLogin: "pietje-authpages-js@beta.webhare.net" },
         { type: "platform:logout", entityLogin: "pietje-authpages-js@beta.webhare.net" },
       ], auditevents);

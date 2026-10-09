@@ -25,7 +25,7 @@ async function checkPostgres(): Promise<CheckResult[]> {
     issues.push({
       type: "platform:checker.pg.collation",
       isCritical: true,
-      messageText: `PostgreSQL reports it's in the '${collation}' collation, forcing a 'wh db upgrade' to the same vesrion may fix this`,
+      messageText: `PostgreSQL reports it's in the '${collation}' collation, forcing a 'wh db upgrade' to the same version may fix this`,
     });
   }
 

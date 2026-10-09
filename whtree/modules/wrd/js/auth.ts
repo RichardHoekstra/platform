@@ -149,33 +149,6 @@ export class WRDAuthenticationProvider {
     });
   }
 
-  loginSecondFactor(loginproof, type, data, options) {
-    return new Promise((resolve, reject) => {
-      const url = new URL(location.href);
-
-      const opts =
-      {
-        logincontrol: url.searchParams.get("wrdauth_logincontrol") || ""
-      };
-
-      return this.loginservice.request('LoginSecondFactor'
-        , [
-          location.href,
-          loginproof,
-          type,
-          { ...data },
-          opts
-        ]
-        , function (response) { //success handler
-          resolve(response);
-        }
-        , function (error) {
-          reject(error);//FIXME translate to exception
-        }
-      );
-    });
-  }
-
   /** Get the afterlogin submitinstruction from the wrdauth_logincontrol webvariable
       @cell(string) opts.logincontrol Override wrdauth_logincontrol variable from the url
       @return Submit instruction. The defult instruction is { "type": "reload" }.

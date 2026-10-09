@@ -117,7 +117,8 @@ PUBLIC OBJECTTYPE TimeField EXTEND FormFieldBase
   MACRO SetValue(INTEGER newvalue)
   {
     this->pvt_abstractvalue := MakeSettableRealTime(newvalue, this->precision);
-    this->form->__SendFormMessage(this->field.name, 'value', this->abstractvalue);
+    IF (NOT this->form->formisinitialrender)
+      this->form->__SendFormMessage(this->field.name, 'value', this->abstractvalue);
   }
 
   MACRO SetPrecision(STRING precision)

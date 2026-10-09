@@ -6,6 +6,7 @@ import './css/webinterface.scss';
 import './pages/forms';
 import './pages/manual';
 import "./js/remotecontrol";
+import "../../web/ui/js/modalitylayer/modalitylayer";
 
 import 'font-awesome/css/font-awesome.css';
 import startTolliumShell from '@mod-tollium/shell';

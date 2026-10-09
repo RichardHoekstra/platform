@@ -4,6 +4,7 @@ LOADLIB "wh::util/langspecific.whlib";
 
 LOADLIB "mod::publisher/lib/internal/forms/support.whlib";
 
+
 MACRO PrintRowkeyType(STRING type)
 {
   STRING valuetype;
@@ -775,7 +776,7 @@ PUBLIC STATIC OBJECTTYPE FormRenderingBase EXTEND FormRendererRenderingTranslato
       }
       CASE "richtext"
       {
-        Print(`<div${fielddescription.hasmergefields ? idstr : ""} class="wh-form__richtext"${datasetstr}>`);
+        Print(`<div${fielddescription.hasmergefields ? idstr : ""} class="wh-form__richtext"${datasetstr}${datasetstr}${fielddescription.name != "" ? ` name="${EncodeValue(fielddescription.name)}"` : ""}>`);
         IF (fielddescription.hasmergefields AND fielddescription.renderedmergefields != "")
         {
           // 'renderedmergefields' is set by WebtoolFormBase::Submit, which captures the output from RenderRTD in

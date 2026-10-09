@@ -34,6 +34,8 @@ export interface AuthEventData {
     code: "unknown-account";
   };
   "platform:secondfactor.challenge": { challenge: string };
+  "platform:secondfactor.ok": { code: string };
+  "platform:secondfactor.failed": { failurecode: string };
   //FIXME old style, remove
   "wrd:loginbyid:ok": void;
 }

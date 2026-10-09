@@ -21,6 +21,8 @@ class CoreForm extends RPCFormBase {
   constructor(node: HTMLFormElement) {
     super(node);
     qR('#coreform .prefillbutton').addEventListener('click', () => void this.doPrefill());
+    qR('#coreform .toggleformvarbutton').addEventListener('click', () => void this.doToggleFormVarX());
+    qR('#coreform .updaterichtextbutton').addEventListener('click', () => void this.doUpdateRichText());
     qR('#coreform .validatebutton').addEventListener('click', () => void this.validate());
 
     if (new URL(location.href).searchParams.get("sethiddenfield") === "javascript")
@@ -29,6 +31,14 @@ class CoreForm extends RPCFormBase {
 
   async doPrefill() {
     qR('#coreformsubmitresponse').textContent = JSON.stringify(await this.invokeRPC('prefill'));
+  }
+
+  async doToggleFormVarX() {
+    await this.invokeRPC('toggleformvarx');
+  }
+
+  async doUpdateRichText() {
+    await this.invokeRPC('updaterichtexttid');
   }
 
   async getFormExtraSubmitData() {

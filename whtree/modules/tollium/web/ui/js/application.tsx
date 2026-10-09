@@ -14,6 +14,7 @@ import { runSimpleScreen } from '@mod-tollium/web/ui/js/dialogs/simplescreen';
 import LinkEndPoint from './comm/linkendpoint';
 import DocPanel from "./application/docpanel";
 import "./application/appcanvas.scss";
+import "./modalitylayer/modalitylayer";
 import * as toddImages from "@mod-tollium/js/icons";
 import type DirtyListener from '@mod-tollium/webdesigns/webinterface/components/frame/dirtylistener';
 import type { IndyShell } from './shell';
@@ -100,9 +101,6 @@ export class ApplicationBase {
   //Is the app currently showing a lock (or in the pre-spinner phase, but intending to show a spinner)
   private appShowsLocked = false;
 
-  private appbusytimeout: NodeJS.Timeout | null = null;
-  private appunbusytimeout: NodeJS.Timeout | null = null;
-
   private visible = false;
 
   ///Unique identifier for this browser load
@@ -161,13 +159,14 @@ export class ApplicationBase {
     this.apptarget = apptarget;
     this.appnodes = {};
 
-    this.appnodes.loader = <div class="appcanvas__loader" />;
-    this.appnodes.appmodalitylayer = <div class="appcanvas__appmodalitylayer">{this.appnodes.loader}</div>;
+    this.appnodes.loader = <div class="tolliummodalitylayer__loader" />;
+    this.appnodes.appmodalitylayer = <div class="tolliummodalitylayer">{this.appnodes.loader}</div>;
     this.appnodes.docpanel = <div class="appcanvas__docpanel" />;
     this.appnodes.screens = <div class="appcanvas__screens">{this.appnodes.appmodalitylayer}</div>;
     this.appnodes.root = <div class="appcanvas" lang={this.lang}>{this.appnodes.screens}{this.appnodes.docpanel}</div>;
 
     this.container.appendChild(this.appnodes.root);
+    dompack.registerMissed(this.appnodes.root);
 
     if (parentapp) {
       this.parentapp = parentapp;
@@ -206,17 +205,6 @@ export class ApplicationBase {
   showBusyFlags() {
     console.log('Current busy locks:');
     window.$dompack$busylockmanager.logLocks();
-  }
-
-  displayBusy() {
-    this.appnodes.root.classList.add("appcanvas--isbusyindicator");
-    this.appbusytimeout = null;
-  }
-
-  undisplayBusy() {
-    this.appnodes.root.classList.remove("appcanvas--isbusyindicator");
-    this.appnodes.root.classList.remove("appcanvas--isbusydone");
-    this.appunbusytimeout = null;
   }
 
   // ---------------------------------------------------------------------------
@@ -413,41 +401,8 @@ export class ApplicationBase {
     if (this.appShowsLocked === shouldBeLocked)
       return;  //no change
 
-    if (shouldBeLocked) { // Apply the modality layer
-      this.appnodes.root.classList.add('appcanvas--isbusy'); //initially this just applies a modality layer
-      globaltop?.updateFocusable();
-
-      // FIXME: calculate from real animation periods
-      const animation_period_lcm = 6000;
-
-      // Emulate that the animation is running continuously
-      this.appnodes.loader.style.animationDelay = -(Date.now() % animation_period_lcm) + "ms";
-
-      // Still showing busy indicators? Hide them immediately.
-      if (this.appunbusytimeout) {
-        clearTimeout(this.appunbusytimeout);
-        this.undisplayBusy();
-      }
-
-      this.appbusytimeout = setTimeout(() => this.displayBusy(), busyinitialwait);
-    } else { //remove the modality later
-      // Are we still waiting for the busy indicator to show (short wait period)
-      if (this.appbusytimeout) {
-        // Indicator hasn't been shown yet, nothing to do
-        clearTimeout(this.appbusytimeout);
-        this.appbusytimeout = null;
-      } else {
-        // Indicator is being shown at the moment. Show done indicator
-        this.appnodes.root.classList.add('appcanvas--isbusydone');
-
-        // Remove everything after a small delay
-        this.appunbusytimeout = setTimeout(() => this.undisplayBusy(), busydonedelay);
-      }
-
-      // Remove the modality layer immediately
-      this.appnodes.root.classList.remove('appcanvas--isbusy');
-      globaltop?.updateFocusable();
-    }
+    this.appnodes.root.classList.toggle('appcanvas--isbusy', shouldBeLocked);
+    globaltop?.updateFocusable();
 
     this.appShowsLocked = shouldBeLocked;
     this.shell.appmgr.notifyApplicationLockChange();

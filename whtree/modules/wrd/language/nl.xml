@@ -927,6 +927,7 @@
         <text tid="emailchange-processed">We hebben een bevestiging naar het nieuwe e-mailadres '<param p="1"/>' verzonden. Klik op de link in deze email om uw wijziging te bevestigen.</text>
         <text tid="emailchange-title">Wijzig e-mailadres</text>
         <text tid="emailchanged">Het e-mailadres is gewijzigd</text>
+        <text tid="errorpage">Inloggen niet gelukt</text>
         <text tid="extloginfailure-accountdisabled">Het account<ifparam p="1" value=""><else/> '<param p="1"/>'</ifparam> is uitgeschakeld</text>
         <text tid="extloginfailure-retry">Opnieuw proberen</text>
         <text tid="extloginfailure-title">Inloggen niet gelukt</text>
@@ -966,9 +967,17 @@
         <text tid="setpassword-intro">Voer een wachtwoord in om het account in te schakelen</text>
         <text tid="setpassword-title">Wachtwoord instellen</text>
         <text tid="totp">Eenmalige toegangscode</text>
+        <text tid="totp-attemptsleft">U heeft nog <param p="1"/> <ifparam p="1" value="1">poging<else/>pogingen</ifparam></text>
         <text tid="totp-intro">Voer uw inlogcode in</text>
         <text tid="totp-invalid">Deze code is niet valide</text>
+        <text tid="totp-invaliddata">Er ging iets mis, log opnieuw in.</text>
+        <text tid="totp-locked">U heeft te vaak een ongeldige code ingevoerd, gebruik een backupcode of vraag een administrator om uw tweede factor installingen te resetten.</text>
+        <text tid="totp-retry-login">Opnieuw inloggen</text>
+        <text tid="totp-reusedbackupcode">Deze backupcode is al gebruikt om in te loggen, gebruik een andere</text>
+        <text tid="totp-reusedcode">Deze code is al gebruikt om in te loggen, wacht op een nieuwe code en probeer opnieuw</text>
+        <text tid="totp-sessionexpired">De loginsessie is verlopen, log opnieuw in.</text>
         <text tid="totp-title">Inlogcode</text>
+        <text tid="totp_page">Inlogcode</text>
         <text tid="totpsetup-backupcodes">Backup codes</text>
         <text tid="totpsetup-processed">Je tweede factor is ingesteld.</text>
         <text tid="totpsetup-save-backupcodes">Deze backupcodes kunnen worden gebruikt om in te loggen als je je authenticator-app niet kunt gebruiken. Bewaar ze backupcodes op een veilige plaats.</text>

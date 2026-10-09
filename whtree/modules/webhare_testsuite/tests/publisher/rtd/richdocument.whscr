@@ -76,6 +76,9 @@ MACRO RichDocumentTest()
   TestEQ( RecurseDeleteSettingIds(orgrec,DEFAULT STRING ARRAY),  RecurseDeleteSettingIds(rec2.richtest, ["HASH","LINK"]));
 
   testfw->CommitWork();
+
+  TestEq(StringToBlob("<html><body><p>yeey</p></body></html>"), GetRichDocumentAsHtmlFragment([ htmltext := StringToBlob("<html><body><p>yeey</p></body></html>"), embedded := RECORD[], links := RECORD[], instances := RECORD[] ]));
+  TestEq(StringToBlob("<p>yeey</p>"), GetRichDocumentAsHtmlFragment([ htmltext := StringToBlob("<html><body><p>yeey</p></body></html>"), embedded := RECORD[], links := RECORD[], instances := RECORD[] ], [ stripbodytags := TRUE ]));
 }
 
 MACRO RichdocumentStrongEmphasis()

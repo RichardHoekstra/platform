@@ -28,7 +28,7 @@ OBJECT FUNCTION GetFormObject(RECORD submitinfo)
   OBJECT form;
   STRING url := GetWebOriginURL(submitinfo.url);
   originalformrequesturl := url; //Allows GetFormVariable to work in RPCs
-  form := OpenFormByTarget(submitinfo.target, [ __applycontext := TRUE ]);
+  form := OpenFormByTarget(submitinfo.target, [ __applycontext := TRUE, isinitialrender := FALSE ]);
   RETURN form;
 }
 

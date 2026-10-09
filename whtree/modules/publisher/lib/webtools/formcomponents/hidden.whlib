@@ -7,13 +7,22 @@ LOADLIB "mod::publisher/lib/internal/forms/rendering.whlib";
 
 PUBLIC STATIC OBJECTTYPE HiddenField EXTEND FormFieldBase
 <
-  PUBLIC STRING value;
+  STRING __value;
+
+  PUBLIC PROPERTY value(__value, SetValue);
 
   MACRO NEW(OBJECT form, OBJECT parent, RECORD field)
   : FormFieldBase(form, parent, field)
   {
     IF (CellExists(field, "value"))
-      this->value := field.value;
+      this->__value := field.value;
+  }
+
+  MACRO SetValue(VARIANT newval)
+  {
+    this->__value := newval;
+    IF (NOT this->form->formisinitialrender)
+      this->form->__SendFormMessage(this->field.name, 'value', this->__value);
   }
 
   UPDATE PUBLIC MACRO RenderField()
@@ -21,12 +30,12 @@ PUBLIC STATIC OBJECTTYPE HiddenField EXTEND FormFieldBase
     RECORD fielddescription := this->GetBaseRenderData();
     STRING idstr := fielddescription.firstid != "" ? ` id="${EncodeValue(fielddescription.firstid)}"` : "";
     STRING datasetstr := GetDatasetAsString(fielddescription.dataset);
-    Print(`<input${idstr} type="hidden" name="${EncodeValue(fielddescription.name)}" value="${EncodeValue(this->value)}"${datasetstr}>`);
+    Print(`<input${idstr} type="hidden" name="${EncodeValue(fielddescription.name)}" value="${EncodeValue(this->__value)}"${datasetstr}>`);
   }
 
   UPDATE PUBLIC MACRO UpdateFromJS(VARIANT jsdata)
   {
-    this->value := jsdata;
+    this->__value := jsdata;
   }
 >;
 

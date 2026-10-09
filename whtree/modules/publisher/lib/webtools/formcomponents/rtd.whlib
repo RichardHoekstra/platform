@@ -131,7 +131,8 @@ PUBLIC OBJECTTYPE RTDField EXTEND FormFieldBase
   MACRO SetValue(RECORD value)
   {
     this->rtdeditor->ImportFromRecord(value);
-    this->form->__SendFormMessage(this->field.name, 'value', this->rtdeditor->GetHTMLForClientRTE([ innerbody := TRUE ]));
+    IF (NOT this->form->formisinitialrender)
+      this->form->__SendFormMessage(this->field.name, 'value', this->rtdeditor->GetHTMLForClientRTE([ innerbody := TRUE ]));
   }
 
   UPDATE PUBLIC RECORD ARRAY FUNCTION GetResultColumns(RECORD exportoptions)

@@ -12,6 +12,8 @@ class CoreForm extends FormBase {
     super(node);
     qR('#coreform .prefillbutton').addEventListener('click', () => void this.doPrefill());
     qR('#coreform .validatebutton').addEventListener('click', () => void this.validate());
+    qR('#coreform .toggleformvarbutton').addEventListener('click', () => void this.doToggleFormVarX());
+    qR('#coreform .updaterichtextbutton').addEventListener('click', () => void this.doUpdateRichText());
 
     if (new URL(location.href).searchParams.get("sethiddenfield") === "javascript")
       this.setFieldValue(this.getElementByName("hidden")! as HTMLElement, "value-javascript");
@@ -19,6 +21,14 @@ class CoreForm extends FormBase {
 
   async doPrefill() {
     qR('#coreformsubmitresponse').textContent = JSON.stringify(await this.invokeRPC('prefill'));
+  }
+
+  async doToggleFormVarX() {
+    await this.invokeRPC('toggleformvarx');
+  }
+
+  async doUpdateRichText() {
+    await this.invokeRPC('updaterichtexttid');
   }
 
   async getFormExtraSubmitData() {

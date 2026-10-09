@@ -663,16 +663,22 @@ PUBLIC RECORD ARRAY FUNCTION GetPublishedDBFiles(INTEGER ARRAY objectids, STRING
   RETURN retval;
 }
 
+CONSTANT STRING htmlstart := "<html><body>";
+CONSTANT STRING htmlend := "</body></html>";
+
 /** @short Format a whfs instance rich document
     @long Get a richdocument from contenttype data and format it with embedded links. This function does not supported
           embedded objects
     @param indata Richdocument to format
+    @param options Formatting options
+    @cell(boolean) options.stripbodytags Whether to strip `<html>` and `<body>` tags from the output (default: FALSE)
     @return HTML code for the document */
-PUBLIC BLOB FUNCTION GetRichDocumentAsHtmlFragment(RECORD indata)
+PUBLIC BLOB FUNCTION GetRichDocumentAsHtmlFragment(RECORD indata, RECORD options DEFAULTSTO DEFAULT RECORD)
 {
+  options := ValidateOptions([ stripbodytags := FALSE ], options);
   IF(NOT RecordExists(indata))
     RETURN DEFAULT BLOB;
-  IF(Length(indata.embedded)=0 AND Length(indata.links)=0)
+  IF(Length(indata.embedded)=0 AND Length(indata.links)=0 AND NOT options.stripbodytags)
     RETURN indata.htmltext;
 
   //ADDME More robust approach? (global search replace might be dangerous, then again, who would ever manualle generate something that looks like a CID)
@@ -695,6 +701,14 @@ PUBLIC BLOB FUNCTION GetRichDocumentAsHtmlFragment(RECORD indata)
       STRING useurl := SELECT AS STRING url FROM mappedlinks WHERE id = link.linkref;
       input := Substitute(input, "x-richdoclink:" || link.tag, useurl);
     }
+  }
+
+  // Strip HTML/body tags when requested
+  IF (options.stripbodytags) {
+    IF (input LIKE htmlstart || "*")
+      input := Substring(input, Length(htmlstart));
+    IF (input LIKE "*" || htmlend)
+      input := Left(input, Length(input) - Length(htmlend));
   }
 
   RETURN StringToBlob(input);

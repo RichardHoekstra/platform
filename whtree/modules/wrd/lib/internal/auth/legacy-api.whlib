@@ -11,6 +11,7 @@ LOADLIB "wh::util/otp.whlib";
 LOADLIB "mod::system/lib/database.whlib";
 LOADLIB "mod::system/lib/logging.whlib";
 LOADLIB "mod::system/lib/webserver.whlib";
+LOADLIB "mod::system/lib/internal/typecoder.whlib";
 LOADLIB "mod::system/lib/internal/whcore_interface.whlib";
 
 LOADLIB "mod::wrd/lib/database.whlib";
@@ -52,38 +53,53 @@ PUBLIC RECORD FUNCTION ParseIDCookie(STRING idcookie) {
 */
 PUBLIC RECORD FUNCTION GetSecondFactorState(OBJECT wrdschema, INTEGER entityid)
 {
+  IF (NOT wrdschema->accountpasswordisauthsettings)
+    RETURN DEFAULT RECORD;
+
+  RECORD settings := wrdschema->accounttype->GetEntityField(entityid, wrdschema->accountpasswordtag);
+  IF (NOT RecordExists(settings))
+    RETURN DEFAULT RECORD;
+  IF (NOT RecordExists(settings.totp))
+    RETURN DEFAULT RECORD;
+
   /* Only look a the login events from a day back. Allow a fixed number of tries per day
       Only need audit events with logged data
 
       Needed events:
-      - wrd:login:secondfactor:*
-      - wrd:authsettings.setuptotp
+      - platform:secondfactor.*
+      - wrd:authsettings.setuptotp and wrd:authsettings.disabletotp, which restart the failure count
   */
   RECORD ARRAY auditevents :=
       SELECT creationdate
-            , COLUMN type
-            , data := DecodeJSON(COLUMN data)
+           , COLUMN type
+           , data := DecodeHSONorJSONRecord(COLUMN data)
         FROM wrd.auditevents
-        WHERE COLUMN entity = VAR entityid
-          AND creationdate >= AddDaysToDate(-1, GetCurrentDateTime())
-          AND type LIKE "platform:secondfactor.*"
+       WHERE COLUMN entity = VAR entityid
+         AND creationdate >= AddDaysToDate(-1, GetCurrentDateTime())
+         AND (type LIKE "platform:secondfactor.*" OR type IN [ "wrd:authsettings.setuptotp", "wrd:authsettings.disabletotp" ])
      ORDER BY creationdate DESC;
 
   // current open second factor login
   RECORD curinit;
 
-  // secondfactorlogin init for this validation
+  // Find the current active challenge
   STRING ARRAY used_challenges;
   FOREVERY (RECORD rec FROM auditevents) {
-    IF(rec.type = "platform:secondfactor.failed")
+    // Every try invalidates the current challenge
+    IF (rec.type IN [ "platform:secondfactor.ok", "platform:secondfactor.failed" ] AND CellExists(rec.data, "challenge")) {
       INSERT rec.data.challenge INTO used_challenges AT END;
-    ELSE IF(rec.type = "platform:secondfactor.challenge") {
-      IF(rec.data.challenge NOT IN used_challenges)
+    }
+    // If TOTP settings are changed, all previous challenges are invalidated
+    IF (rec.type IN [ "wrd:authsettings.setuptotp", "wrd:authsettings.disabletotp" ]) {
+      BREAK;
+    }
+    // Get the last emitted challenge, but only if it hasn't been used yet
+    IF (rec.type = "platform:secondfactor.challenge") {
+      IF (rec.data.challenge NOT IN used_challenges)
         curinit := rec;
       BREAK;
     }
   }
-
 
   STRING ARRAY totpblockedcodes;
 
@@ -105,22 +121,23 @@ PUBLIC RECORD FUNCTION GetSecondFactorState(OBJECT wrdschema, INTEGER entityid)
   INTEGER totpfailures;
   FOREVERY (RECORD rec FROM auditevents)
   {
-    // A totpreusedcode isn't counted toward the totpfailures
+    // A totpreused(backup) code isn't counted toward the totpfailures
     IF (rec.type = "platform:secondfactor.failed")
     {
       IF (rec.data.failurecode = "TOTPINVALIDCODE" OR rec.data.failurecode = "TOTPLOCKED")
         totpfailures := totpfailures + 1;
     }
-    IF (rec.type = "platform:secondfactor.ok" OR rec.type = "platform:secondfactor.setuptotp")
+    IF (rec.type IN [ "platform:secondfactor.ok", "wrd:authsettings.setuptotp", "wrd:authsettings.disabletotp" ])
       BREAK;
   }
 
   INTEGER totpattemptsleft := max_totp_attempts - totpfailures;
-  IF (totpattemptsleft < 0)
+  IF (totpattemptsleft < 0 OR IsValueSet(settings.totp.locked))
     totpattemptsleft := 0;
 
   RETURN CELL
       [ curinit
+      , totplocked := IsValueSet(settings.totp.locked)
       , totpfailures
       , totpattemptsleft
       , totpblockedcodes
@@ -141,119 +158,123 @@ PUBLIC RECORD FUNCTION GetSecondFactorState(OBJECT wrdschema, INTEGER entityid)
     @cell(string) return.code
               - OK: verification success
               - INVALIDDATA: verification failed, please login with password again
+              - SESSIONEXPIRED: the session has expired, get a new challenge
               - TOTPLOCKED: too many failed attempts, please use backup codes (totp only)
               - TOTPINVALIDCODE: invalid attempt (totp only)
               - TOTPREUSEDCODE: reused a code already accepted in a previous login attempt (totp only)
-    @cell(string) return.nonce Updated nonce for next attempt (only for codes TOTPINVALIDCODE and TOTPREUSEDCODE)
+              - TOTPREUSEDBACKUPCODE: reused a backup code already accepted in a previous login attempt (totp only)
     @cell(object %WRDEntity2017) return.entity User entity (only for code OK)
 */
-PUBLIC RECORD FUNCTION ValidateSecondFactor(OBJECT wrdschema, INTEGER entityid, STRING type, RECORD data, RECORD logindata)
-{
-  OBJECT lock := OpenLocalLockManager()->LockLocalMutex(`wrd:auth.2fa.${entityid}`);
+PUBLIC RECORD FUNCTION ValidateSecondFactor(OBJECT wrdschema, INTEGER entityid, STRING type, RECORD data, RECORD logindata) {
+  STRING returncode := "";
+  RECORD response;
+  DATETIME now := GetCurrentDatetime();
 
-  TRY
+  IF (NOT wrdschema->accountpasswordisauthsettings)
+    RETURN [ success := FALSE, code := "TOTPINVALIDDATA" ];
+
+  RECORD settings := wrdschema->accounttype->GetEntityField(entityid, wrdschema->accountpasswordtag);
+  IF (NOT RecordExists(settings))
+    RETURN [ success := FALSE, code := "TOTPINVALIDDATA" ];
+  IF (NOT RecordExists(settings.totp))
+    RETURN [ success := FALSE, code := "TOTPINVALIDDATA" ];
+
+  RECORD state := GetSecondFactorState(wrdschema, entityid);
+
+  IF (NOT RecordExists(state.curinit))
+    RETURN [ success := FALSE, code := "SESSIONEXPIRED" ];
+
+  BOOLEAN updatesettings; // should settings be written back?
+  RECORD logmessagedata;
+  INTEGER totpattemptsleft := state.totpattemptsleft;
+  BOOLEAN totplocked;
+
+  SWITCH (type)
   {
-    STRING returncode := "";
-    RECORD response;
-    DATETIME now := GetCurrentDatetime();
-
-    IF (NOT wrdschema->accountpasswordisauthsettings)
-      RETURN [ success := FALSE, code := "INVALIDDATA" ];
-
-    RECORD settings := wrdschema->accounttype->GetEntityField(entityid, wrdschema->accountpasswordtag);
-    IF (NOT RecordExists(settings))
-      RETURN [ success := FALSE, code := "INVALIDDATA" ];
-    IF (NOT RecordExists(settings.totp))
-      RETURN [ success := FALSE, code := "INVALIDDATA" ];
-
-    RECORD state := GetSecondFactorState(wrdschema, entityid);
-
-    IF (NOT RecordExists(state.curinit))
-      RETURN [ success := FALSE, code := "SESSIONEXPIRED" ];
-
-    BOOLEAN updatesettings; // should settings be written back?
-    RECORD logmessagedata;
-    INTEGER totpattemptsleft := state.totpattemptsleft;
-
-    SWITCH (type)
+    CASE "totp"
     {
-      CASE "totp"
+      RECORD parsed := UnpackOTPUrl(settings.totp.url);
+
+      logmessagedata := CELL[ data.code, logindata.challenge ];
+      totplocked := IsValueSet(settings.totp.locked);
+
+      IF (LENGTH(data.code) = parsed.options.digits)
       {
-        RECORD parsed := UnpackOTPUrl(settings.totp.url);
-
-        logmessagedata := CELL[ data.code ];
-
-        IF (LENGTH(data.code) = parsed.options.digits)
+        IF (IsValueSet(settings.totp.locked))
+          returncode := "TOTPLOCKED";
+        ELSE
         {
-          IF (IsValueSet(settings.totp.locked))
-            returncode := "TOTPLOCKED";
-          ELSE
+          BOOLEAN ismatch := TestTOTPCode(parsed.secret, data.code, parsed.options).success;
+
+          IF (ismatch)
           {
-            BOOLEAN ismatch := TestTOTPCode(parsed.secret, data.code, parsed.options).success;
-
-            IF (ismatch)
-            {
-              // https://tools.ietf.org/html/rfc6238#section-5: The verifier MUST NOT accept
-              // the second attempt of the OTP after the successful validation has
-              // been issued for the first OTP, which ensures one-time only use of an
-              // OTP.
-              IF (data.code IN state.totpblockedcodes)
-                returncode := "TOTPREUSEDCODE";
-            }
-
-            // count failures since last login
-            totpattemptsleft := state.totpattemptsleft - (ismatch ? 0 : 1);
-            IF (totpattemptsleft <= 0)
-            {
-              totpattemptsleft := 0;
-              settings.totp.locked := GetCurrentDatetime();
-              updatesettings := TRUE;
-              returncode := "TOTPLOCKED";
-            }
-            ELSE IF (NOT ismatch)
-              returncode := "TOTPINVALIDCODE";
-            ELSE IF (returncode = "")
-              returncode := "OK";
+            // https://tools.ietf.org/html/rfc6238#section-5: The verifier MUST NOT accept
+            // the second attempt of the OTP after the successful validation has
+            // been issued for the first OTP, which ensures one-time only use of an
+            // OTP.
+            IF (data.code IN state.totpblockedcodes)
+              returncode := "TOTPREUSEDCODE";
           }
-        }
-        ELSE // might be backup code
-        {
-          RECORD backupcode := SELECT * FROM settings.totp.backupcodes WHERE code = data.code;
-          IF (NOT RecordExists(backupcode))
-            returncode := "TOTPINVALIDCODE";
-          ELSE IF (backupcode.used != DEFAULT DATETIME)
-            returncode := "TOTPREUSEDCODE";
-          ELSE
+
+          // count failures since last login
+          totpattemptsleft := state.totpattemptsleft - (ismatch ? 0 : 1);
+          IF (totpattemptsleft <= 0)
           {
-            UPDATE settings.totp.backupcodes
-                SET used := now
-              WHERE code = data.code;
+            totpattemptsleft := 0;
+            settings.totp.locked := GetCurrentDatetime();
+            totplocked := TRUE;
             updatesettings := TRUE;
-            returncode := "OK";
+            returncode := "TOTPLOCKED";
           }
-        }
-
-        IF (updatesettings)
-        {
-          GetPrimary()->BeginWork();
-          wrdschema->accounttype->UpdateEntity(entityid, CellInsert(CELL[], wrdschema->accountpasswordtag, settings));
-          GetPrimary()->CommitWork();
+          ELSE IF (NOT ismatch)
+            returncode := "TOTPINVALIDCODE";
+          ELSE IF (returncode = "")
+            returncode := "OK";
         }
       }
-      DEFAULT
+      ELSE // might be backup code
       {
-        THROW NEW Exception(`Second factor login type ${EncodeJSON(type)} not supported`);
+        RECORD backupcode := SELECT * FROM settings.totp.backupcodes WHERE code = data.code;
+        IF (NOT RecordExists(backupcode))
+          returncode := "TOTPINVALIDCODE";
+        ELSE IF (backupcode.used != DEFAULT DATETIME)
+          returncode := "TOTPREUSEDBACKUPCODE";
+        ELSE
+        {
+          // Mark the backup code as used and unlock the TOTP if it was previously locked
+          UPDATE settings.totp.backupcodes
+              SET used := now
+            WHERE code = data.code;
+          settings.totp.locked := DEFAULT DATETIME;
+          totplocked := FALSE;
+          totpattemptsleft := max_totp_attempts;
+          updatesettings := TRUE;
+          returncode := "OK";
+        }
+      }
+
+      IF (updatesettings)
+      {
+        GetPrimary()->BeginWork();
+        wrdschema->accounttype->UpdateEntity(entityid, CellInsert(CELL[], wrdschema->accountpasswordtag, settings));
+        GetPrimary()->CommitWork();
       }
     }
+    DEFAULT
+    {
+      THROW NEW Exception(`Second factor login type ${EncodeJSON(type)} not supported`);
+    }
+  }
 
-    RETURN returncode = "OK"
-        ? CELL[ success := TRUE, code := "OK", entity := entityid, totpattemptsleft ]
-        : CELL[ success := FALSE, code := returncode, totpattemptsleft ];
-  }
-  FINALLY
-  {
-    lock->Close();
-  }
+  // GetSecondFactorState counts these events for the attempt limit and the code reuse check
+  WriteWRDAuditEvent(wrdschema->accounttype, returncode = "OK" ? "platform:secondfactor.ok" : "platform:secondfactor.failed",
+      [ account := entityid
+      , message := returncode = "OK" ? logmessagedata : CELL[ failurecode := returncode ]
+      ]);
+
+  RETURN returncode = "OK"
+      ? CELL[ success := TRUE, code := "OK", entity := entityid ]
+      : CELL[ success := FALSE, code := returncode, totpattemptsleft, totplocked, totpfailures := max_totp_attempts - totpattemptsleft ];
 }
 
 PUBLIC STATIC OBJECTTYPE WRDAuth <
@@ -526,108 +547,6 @@ PUBLIC STATIC OBJECTTYPE WRDAuth <
     RETURN EncodeBase64(GenerateRandomBinaryValue(16));
   }
 
-  /** @param loginproof Login proof generated by #Login
-      @param type Type of 2fa verification (allowed: 'totp')
-      @param data Verification data
-      @cell(string) data.code TOTP code
-      @param ip Remote ip address
-      @param options @includecelldef #FinalizeLogin.options
-      @return @includecelldef #FinalizeLogin.return
-      @cell return.code Result code if verification failed:
-                - INVALIDDATA: Login proof expired/decryption failed, please login with password again
-                - TOTPLOCKED: too many failed attempts, please use backup codes (totp only)
-                - TOTPINVALIDCODE: invalid attempt (totp only)
-                - TOTPREUSEDCODE: reused a code already accepted in a previous login attempt (totp only)
-      @cell return.totpattemptsleft Updated login proof for next attempt (only for codes TOTPINVALIDCODE and TOTPREUSEDCODE)
-      @cell return.entityid User entityid
-      @cell return.login User login
-  */
-  RECORD FUNCTION serviceLoginSecondFactor(STRING loginproof, STRING type, RECORD data, STRING ip, RECORD options DEFAULTSTO DEFAULT RECORD)
-  {
-    DATETIME now := GetCurrentDatetime();
-
-    RECORD logindata := this->DecryptData(loginproof, "wrd:2faloginproof");
-    IF (NOT RecordExists(logindata))
-      RETURN [ success := FALSE, code := "INVALIDDATA", entityid := 0, login := "" ];
-    IF (logindata.validuntil < now)
-      RETURN [ success := FALSE, code := "INVALIDDATA", entityid := 0, login := "" ];
-
-    OBJECT the_entity := this->wrdschema->accounttype->GetEntity(logindata.entityid);
-    IF (NOT ObjectExists(the_entity))
-      RETURN [ success := FALSE, code := "INVALIDDATA", entityid := 0, login := "" ];
-
-    UpdateAuditContext([ user_entityid := logindata.entityid, user_login := logindata.login ]);
-
-    RECORD response := ValidateSecondFactor(this->wrdschema, logindata.entityid, type, data, logindata);
-
-    RECORD logdata;
-    RECORD secondfactordata;
-
-    SWITCH (response.code)
-    {
-      CASE "OK"
-      {
-        TRY
-        {
-          GetPrimary()->BeginWork();
-          response := this->FinalizeLogin(this->wrdschema->accounttype->GetEntity(response.entity), logindata.isimpersonation, logindata.cookietype, logindata.login, ip, TRUE, PickCells(options, [ "firstloginfield", "lastloginfield" ]));
-
-          RETURN CELL
-              [ ...response
-              , secondfactordata :=         DEFAULT RECORD
-              , logdata := CELL
-                    [ data.code
-                    , usedchallenge :=      logindata.challenge
-                    , decodedlogindata :=   logindata
-                    ]
-              ];
-        }
-        FINALLY (OBJECT e)
-        {
-          IF (ObjectExists(e))
-            GetPrimary()->RollbackWork();
-          ELSE
-            GetPrimary()->CommitWork();
-        }
-      }
-      CASE "TOTPINVALIDCODE", "TOTPREUSEDCODE", "TOTPLOCKED"
-      {
-        // generate a new challenge
-        STRING challenge := this->GenerateSecondFactorLoginChallenge();
-        loginproof := this->EncryptData(CELL
-              [ ...logindata
-              , challenge
-              ], "wrd:2faloginproof");
-
-        secondfactordata := CELL
-            [ challenge
-            , response.totpattemptsleft
-            , totp :=       TRUE
-            , firstfactorproof :=   loginproof
-            ];
-      }
-      CASE "SESSIONEXPIRED"
-      {
-        // no updating of login proof or second factor data, just login again
-      }
-      DEFAULT
-      {
-        THROW NEW Exception(`Unknown result code ${EncodeJSON(response.code)}`);
-      }
-    }
-
-    RETURN CELL
-        [ success :=            response.code = "OK"
-        , response.code
-        , logdata :=            CELL[ decodedlogindata := logindata
-                                    , usedchallenge :=    logindata.challenge
-                                    ]
-        , secondfactordata
-        , logindata.entityid
-        , logindata.login
-        ];
-  }
-
   /** @param the_entity WRD entity of the user to log in
       @param isimpersonation Whether this is an impersonation
       @param cookietype The type of cookie: cookietype_session, cookietype_thirdparty, cookietype_persistent or cookietype_external
@@ -803,37 +722,6 @@ PUBLIC STATIC OBJECTTYPE WRDAuth <
     //      , remoteip := remoteip
     //      , isimpersonation := trylogin.isimpersonation
     //      ]);
-    RETURN res;
-  }
-
-  PUBLIC RECORD FUNCTION LoginSecondFactor(STRING loginproof, STRING type, RECORD data, RECORD options DEFAULTSTO DEFAULT RECORD)
-  {
-    options := ValidateOptions(
-        [ firstloginfield :=    ""
-        , lastloginfield :=     ""
-        , remoteip :=           ""
-        ], options,
-        [ optional := [ "firstloginfield", "lastloginfield" ]
-        ]);
-
-    STRING loginname;
-
-    STRING remoteip := options.remoteip ?? (IsRequest() ? GetClientRemoteIp() : "");
-
-    this->loggedinentity := -1;
-    RECORD trylogin := this->serviceLoginSecondFactor(loginproof, type, data, remoteip, CELL
-          [ ...options
-          ]);
-
-    IF(NOT trylogin.success)
-      RETURN trylogin;
-
-    RECORD res := this->CompleteLogin(trylogin, TRUE, "", options);
-
-    res := CELL
-        [ ...res
-        , ...PickCells(trylogin, [ "logdata", "secondfactordata", "entityid", "login" ])
-        ];
     RETURN res;
   }
 
