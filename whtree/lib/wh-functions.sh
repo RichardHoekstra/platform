@@ -359,7 +359,7 @@ list_finaltag()
   echo "Pushing images to CI registry:"
   echo "PUSH_BUILD_IMAGES=    $PUSH_BUILD_IMAGES"
   echo ""
-  echo "Branch shortcuts to be pushed to CI registry for testing use (includes feature and custom branchs)"
+  echo "Branch shortcuts to be pushed to CI registry for testing use (includes feature and custom branches)"
   echo "BRANCH_IMAGES=        $BRANCH_IMAGES"
   echo ""
   echo "Public release images to be deployed after tests succeed (no feature etc branches)"
