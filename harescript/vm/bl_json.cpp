@@ -1267,6 +1267,12 @@ bool JSONParser::ParseHSONTypedValue(HSVM_VariableId target, std::string const &
                             return false;
                     }
 
+                    if (token.empty())
+                    {
+                           HSVM_SetDefault(vm, target, HSVM_VAR_Blob);
+                           return true;
+                    }
+
                     // base64 decode the token
                     int stream = HSVM_CreateStream(vm);
 
