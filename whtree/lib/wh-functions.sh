@@ -328,16 +328,12 @@ get_finaltag()
 
     BRANCH_IMAGES="$(trim $BRANCH_IMAGES $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG)"
 
-    local TAG
-    for TAG in $CI_COMMIT_REF_SLUG $ADDTAGS; do
-      if [ -n "$PUBLIC_REGISTRY_IMAGE" ]; then # PUBLIC_REGISTRY_IMAGE is only set for protected branches/tags
-        PUBLIC_IMAGES="$(trim $PUBLIC_IMAGES $PUBLIC_REGISTRY_IMAGE:$TAG)"
-      fi
-
-      if [ -n "$FALLBACK_REGISTRY_IMAGE" ]; then # FALLBACK_REGISTRY_IMAGE is only set for protected branches/tags
-        PUBLIC_IMAGES="$(trim $PUBLIC_IMAGES $FALLBACK_REGISTRY_IMAGE:$TAG)"
-      fi
-    done
+    if [ -n "$PUBLIC_REGISTRY_IMAGE" ]; then # PUBLIC_REGISTRY_IMAGE is only set for main/release branches, so this is our hint it's not a feature/custom branch
+      PUBLIC_IMAGES="$PUBLIC_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
+      for TAG in $ADDTAGS; do
+        PUBLIC_IMAGES="$(trim $PUBLIC_IMAGES $PUBLIC_REGISTRY_IMAGE:$TAG $CI_REGISTRY_IMAGE:$TAG)"
+      done
+    fi
 
   else
     # local build. No pushes or deploys
@@ -363,10 +359,10 @@ list_finaltag()
   echo "Pushing images to CI registry:"
   echo "PUSH_BUILD_IMAGES=    $PUSH_BUILD_IMAGES"
   echo ""
-  echo "Branch shortcuts, to be pushed to CI registry:"
+  echo "Branch shortcuts to be pushed to CI registry for testing use (includes feature and custom branches)"
   echo "BRANCH_IMAGES=        $BRANCH_IMAGES"
   echo ""
-  echo "Images to be deployed after tests succeed"
+  echo "Public release images to be deployed after tests succeed (no feature etc branches)"
   echo "PUBLIC_IMAGES=        $PUBLIC_IMAGES"
   echo ""
 }
