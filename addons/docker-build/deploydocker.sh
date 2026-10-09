@@ -18,7 +18,6 @@ fi
 get_finaltag
 list_finaltag
 FIRST_PUBLIC_IMAGE=${PUBLIC_IMAGES/%\ */}
-FIRST_PUBLIC_REGISTRY=${FIRST_PUBLIC_IMAGE%%/*}
 
 if [ "$PUSH_BUILD_IMAGES" != "1" ]; then
   echo "Nothing to deploy"
@@ -44,25 +43,12 @@ for P in $BRANCH_IMAGES; do
   fi
 done
 
-function logout()
-{
-  [ -n "$DOCKERHUB_REGISTRY_USER" ] && "$CONTAINERENGINE" logout
-  [ -n "$FALLBACK_REGISTRY_IMAGE" ] && "$CONTAINERENGINE" logout "$FALLBACK_REGISTRY_IMAGE"
-}
-
-trap logout exit INT TERM
-
+# As we're using ephemeral builders logging out isn't needed anymore
 if [ -n "$PUBLIC_IMAGES" ] && [ -n "$DOCKERHUB_REGISTRY_PASSWORD" ]; then
-  if ! echo "$DOCKERHUB_REGISTRY_PASSWORD" | "$CONTAINERENGINE" login -u "$DOCKERHUB_REGISTRY_USER" --password-stdin "$FIRST_PUBLIC_REGISTRY" ; then
+  # dockerhub requires a separate login. ghcr.io is taken care of by the github runner
+  if ! echo "$DOCKERHUB_REGISTRY_PASSWORD" | "$CONTAINERENGINE" login -u "$DOCKERHUB_REGISTRY_USER" --password-stdin docker.io ; then
     echo "Failed to log in to the registry"
     exit 1
-  fi
-
-  if [ -n "$FALLBACK_REGISTRY_IMAGE" ] && [ -n "$FALLBACK_REGISTRY_PASSWORD" ]; then
-    if ! echo "$FALLBACK_REGISTRY_PASSWORD" | "$CONTAINERENGINE" login -u "$FALLBACK_REGISTRY_USER" --password-stdin "$FALLBACK_REGISTRY_IMAGE" ; then
-      echo "Failed to log in to the fallback registry"
-      exit 1
-    fi
   fi
 
   for P in $PUBLIC_IMAGES ; do

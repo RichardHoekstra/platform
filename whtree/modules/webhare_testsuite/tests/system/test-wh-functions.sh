@@ -37,11 +37,10 @@ testIsWasmEngine()
 
 testContainerTagCalculation()
 {
-  CI_REGISTRY_IMAGE=gitlab-registry.webhare.com/webhare-opensource/platform
+  CI_REGISTRY_IMAGE=ghcr.io/webhare/platform
   DOCKERHUB_REGISTRY_USER=exampleuser
   DOCKERHUB_REGISTRY_PASSWORD=topsecret
   PUBLIC_REGISTRY_IMAGE=docker.io/webhare/platform
-  FALLBACK_REGISTRY_IMAGE=registry.gitlab.com/webhare/platform
   CI_COMMIT_SHA=test
   CI_COMMIT_TAG=
 
@@ -57,8 +56,8 @@ testContainerTagCalculation()
   echo ---- CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME CI_COMMIT_REF_SLUG=$CI_COMMIT_REF_SLUG
   get_finaltag
   list_finaltag
-  testEq "$CI_REGISTRY_IMAGE:main" "$BRANCH_IMAGES"
-  testEq "docker.io/webhare/platform:main registry.gitlab.com/webhare/platform:main docker.io/webhare/platform:release-5-6 registry.gitlab.com/webhare/platform:release-5-6 docker.io/webhare/platform:5.6.7 registry.gitlab.com/webhare/platform:5.6.7" "$PUBLIC_IMAGES"
+  testEq "ghcr.io/webhare/platform:main" "$BRANCH_IMAGES"
+  testEq "docker.io/webhare/platform:main docker.io/webhare/platform:release-5-6 ghcr.io/webhare/platform:release-5-6 docker.io/webhare/platform:5.6.7 ghcr.io/webhare/platform:5.6.7" "$PUBLIC_IMAGES"
   testEq "5.6.7" "$WEBHARE_VERSION"
 
   getwebhareversion() # mock version getter
@@ -72,8 +71,8 @@ testContainerTagCalculation()
   echo ---- CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME CI_COMMIT_REF_SLUG=$CI_COMMIT_REF_SLUG
   get_finaltag
   list_finaltag
-  testEq "$CI_REGISTRY_IMAGE:release-4-35" "$BRANCH_IMAGES"
-  testEq "docker.io/webhare/platform:release-4-35 registry.gitlab.com/webhare/platform:release-4-35 docker.io/webhare/platform:4.35.0 registry.gitlab.com/webhare/platform:4.35.0" "$PUBLIC_IMAGES"
+  testEq "ghcr.io/webhare/platform:release-4-35" "$BRANCH_IMAGES"
+  testEq "docker.io/webhare/platform:release-4-35 docker.io/webhare/platform:4.35.0 ghcr.io/webhare/platform:4.35.0" "$PUBLIC_IMAGES"
   testEq "4.35.0" "$WEBHARE_VERSION"
 
   CI_COMMIT_REF_NAME=custom/customer
@@ -82,8 +81,8 @@ testContainerTagCalculation()
   echo ---- CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME CI_COMMIT_REF_SLUG=$CI_COMMIT_REF_SLUG
   get_finaltag
   list_finaltag
-  testEq "$CI_REGISTRY_IMAGE:custom-customer" "$BRANCH_IMAGES"
-  testEq "docker.io/webhare/platform:custom-customer registry.gitlab.com/webhare/platform:custom-customer" "$PUBLIC_IMAGES"
+  testEq "ghcr.io/webhare/platform:custom-customer" "$BRANCH_IMAGES"
+  testEq "docker.io/webhare/platform:custom-customer" "$PUBLIC_IMAGES"
   testEq "4.35.0" "$WEBHARE_VERSION"
 }
 
