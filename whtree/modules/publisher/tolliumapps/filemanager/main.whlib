@@ -2243,14 +2243,21 @@ PUBLIC STATIC OBJECTTYPE BoostWordsOverview EXTEND TolliumScreenBase
 
     // Find all files in these folders and all explicitly requested files
     RECORD ARRAY files :=
-         SELECT id
+        (SELECT id
               , whfspath
               , parentsite
               , fullpath
            FROM system.fs_objects
           WHERE NOT isfolder
-                AND (parent IN VAR allfolderids // all files in the selected folders
-                      OR id IN VAR findids); // also pick up explicitly requested files
+                AND parent IN VAR allfolderids) // all files in the selected folders
+        CONCAT
+        (SELECT id
+              , whfspath
+              , parentsite
+              , fullpath
+           FROM system.fs_objects
+          WHERE NOT isfolder
+                AND id IN VAR findids); // also pick up explicitly requested files
 
     // Enrich with boost words
     files := OpenWHFSType("http://www.webhare.net/xmlns/consilio/boostwords")->Enrich(files, "id", [ "words" ]);
