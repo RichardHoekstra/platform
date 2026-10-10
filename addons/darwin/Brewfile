@@ -20,3 +20,9 @@ brew "pkg-config"
 brew "postgresql@17", link: false # Prepared for WH5.8/5.9 masters, might be in use
 brew "postgresql@#{ENV["HOMEBREW_POSTGRES_MAJOR"]}", link: false # See etc/platform.conf (eg 17)
 brew "rapidjson"
+
+# NGINX and its build tools:
+brew "nginx"
+brew "git"
+brew "PCRE"
+brew "pcre2"
