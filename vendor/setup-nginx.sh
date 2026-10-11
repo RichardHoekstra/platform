@@ -48,7 +48,20 @@ curl --fail --location --silent --show-error \
 tar -xzf "$ARCHIVE" -C "$BUILD_DIR"
 
 cd "$SOURCE_DIR"
-./configure --with-compat --add-dynamic-module="$NJS_DIR/nginx"
+CONFIGURE_ARGS=(--with-compat --add-dynamic-module="$NJS_DIR/nginx")
+QUICKJS_PREFIX="${QUICKJS_PREFIX:-}"
+if [[ -z "$QUICKJS_PREFIX" ]] && command -v brew >/dev/null 2>&1; then
+  QUICKJS_PREFIX=$(brew --prefix quickjs)
+fi
+if [[ -n "$QUICKJS_PREFIX" ]]; then
+  CONFIGURE_ARGS+=(--with-cc-opt="-I$QUICKJS_PREFIX/include/quickjs" --with-ld-opt="-L$QUICKJS_PREFIX/lib/quickjs")
+fi
+
+NJS_QUICKJS=YES ./configure "${CONFIGURE_ARGS[@]}"
+if ! grep -Eq '^#define NJS_HAVE_QUICKJS[[:space:]]+1' objs/ngx_auto_config.h; then
+  echo "NGINX JavaScript module was configured without QuickJS support"
+  exit 1
+fi
 make modules
 
 cp objs/ngx_http_js_module.so "$TARGETDIR/ngx_http_js_module.so"

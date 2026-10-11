@@ -601,11 +601,12 @@ setup-nginx: $(NGINX_MODULE)
 $(SRCDIR)/vendor/njs/nginx/config:
 	git -C "$(SRCDIR)" submodule update --init --recursive vendor/njs
 
-$(NGINX_MODULE): $(SRCDIR)/vendor/setup-nginx.sh $(SRCDIR)/vendor/njs/nginx/config
+$(NGINX_MODULE): $(SRCDIR)/vendor/setup-nginx.sh $(SRCDIR)/vendor/njs/nginx/config $(SRCDIR)/vendor/setup-nginx.sh
 	bash $(SRCDIR)/vendor/setup-nginx.sh "$(dir $@)"
 
 ifeq ($(WEBHARE_WEBSERVER),nginxjs)
 install-binaries: $(PREFIX)/lib/ngx_http_js_module.so
+all: $(NGINX_MODULE)
 
 $(PREFIX)/lib/ngx_http_js_module.so: $(NGINX_MODULE)
 	$(HIDE)echo "- Installing $< -> $@" && mkdir -p $(dir $@) && cp -af $< $(dir $@)
