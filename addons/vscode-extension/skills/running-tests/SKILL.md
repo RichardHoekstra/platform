@@ -9,6 +9,8 @@ To validate a file (which should be done before running it) use the `webhare_val
 
 Use the `get_errors` tool to validate TypeScript files before running.
 
-To validate a module completely use the `webhare_checkmodule` tool. This tool is too slow for individual files and is not a replacement for actually running tests
+To validate a module completely use the `webhare_checkmodule` tool, corresponding to `wh checkmodule <modulename>`. It checks the whole module, not just the files open in the editor. This takes longer than individual-file diagnostics, so use focused checks during iteration and module-wide validation when changes warrant broader coverage. It is not a replacement for actually running tests.
 
 To run a test use the `webhare_runtest` tool. Specify the full path to the test file as the argument
+
+Run WebHare tests serially: they share a global testframework lock. A lock conflict blocks verification; do not kill another developer's test. Report any blocked or failing validation.
