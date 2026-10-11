@@ -95,6 +95,53 @@ function getDataRootPath(r: NginxHTTPRequest) {
   return resolveDomain(r).dataroot;
 }
 
+function getFileRoute(r: NginxHTTPRequest) {
+  if (!r.uri.endsWith('.shtml') && !r.uri.endsWith('/index.html'))
+    return '000';
+
+  const filename = r.variables.request_filename;
+  if (!filename)
+    return '000';
+
+  let contents: string;
+  try {
+    contents = fs.readFileSync(filename, 'utf8');
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'EISDIR')
+      return '000';
+    ngx.log(ngx.ERR, `[NJS] Failed to read ${filename}: ${(error as Error).message}`);
+    return '403';
+  }
+
+  const marker = 'WBHRWS::v0dmzc5chW4AxhbiSdDpJQ\r\n';
+  if (!contents.startsWith(marker))
+    return '000';
+
+  try {
+    const metadata: unknown = JSON.parse(contents.slice(marker.length));
+    if (metadata && typeof metadata === 'object') {
+      if ('redirect' in metadata && typeof metadata.redirect === 'string') {
+        r.variables.file_redirect = metadata.redirect;
+        return '303';
+      }
+      if ('abtest' in metadata) {
+        // FIXME: Implement A/B test routing.
+        return '500';
+      }
+      if ('js' in metadata) {
+        if (metadata.js === false)
+          return '418';
+        if (metadata.js === true)
+          return '403';
+      }
+    }
+  } catch (error) {
+    ngx.log(ngx.ERR, `[NJS] Invalid execution metadata in ${filename}: ${(error as Error).message}`);
+  }
+  return '403';
+}
+
 function getLogTimestamp(r: NginxHTTPRequest) {
   return new Date(Math.round(Number(r.variables.msec) * 1000)).toISOString();
 }
@@ -102,4 +149,4 @@ function getLogTimestamp(r: NginxHTTPRequest) {
 if (!process.env.WEBHARE_DATAROOT)
   throw new Error('WEBHARE_DATAROOT environment variable is not set');
 
-export default { getCertPem, getKeyPem, getDataRootPath, getLogTimestamp };
+export default { getCertPem, getKeyPem, getDataRootPath, getFileRoute, getLogTimestamp };

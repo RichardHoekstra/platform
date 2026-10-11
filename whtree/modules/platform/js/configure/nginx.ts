@@ -46,6 +46,20 @@ root $dynamic_dataroot;
 index index.shtml index.html;
 
 location / {
+  error_page 418 = @hswebserver;
+  set $file_route $dynamic_file_route;
+  if ($file_route = 418) {
+    return 418;
+  }
+  if ($file_route = 403) {
+    return 403;
+  }
+  if ($file_route = 303) {
+    return 303 $file_redirect;
+  }
+  if ($file_route = 500) {
+    return 500;
+  }
   try_files $uri $uri/ @hswebserver;
 }
 
@@ -96,6 +110,8 @@ http {
   js_set $dynamic_cert_pem router.getCertPem;
   js_set $dynamic_key_pem  router.getKeyPem;
   js_set $dynamic_dataroot router.getDataRootPath;
+  js_set $dynamic_file_route router.getFileRoute nocache;
+  js_var $file_redirect;
   js_set $log_timestamp router.getLogTimestamp;
 
   # Shared RAM dictionary (allocate 10-20MB for PEM strings)
