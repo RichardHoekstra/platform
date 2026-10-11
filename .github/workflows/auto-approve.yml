@@ -3,23 +3,53 @@
 name: Auto Approve Internal PRs
 
 on:
+  # trigger auto-approval after ci.yml completes
   workflow_run:
     workflows: [Internal]
     types: [completed]
+  # and auto-approve in cases PR is created after ci.yml completed
+  pull_request_target:
+    types: [opened, reopened]
 
 jobs:
   auto-approve:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository
+    if: >-
+      (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ${{ vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     permissions:
+      actions: read
       contents: write # Our PR Approval was interpreted as 'Approved these changes with read-only permissions' - will this fix it?
       pull-requests: write
     env:
       WEBHARE_BOT_APPID: ${{ secrets.WEBHARE_BOT_APPID }}
 
     steps:
+      - name: Check Internal CI for PR Head
+        if: env.WEBHARE_BOT_APPID != '' && github.event_name == 'pull_request_target'
+        id: check-ci
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              ...context.repo,
+              workflow_id: 'internal-pr.yml',
+              head_sha: pr.head.sha,
+              branch: pr.head.ref,
+            });
+            const run = runs.find(candidate =>
+              candidate.head_sha === pr.head.sha &&
+              candidate.head_repository?.full_name === context.payload.repository.full_name
+            );
+            const passed = run?.status === 'completed' && run.conclusion === 'success';
+            core.setOutput('passed', passed ? 'true' : 'false');
+            if (!passed) {
+              console.log(`PR #${pr.number} has no completed successful Internal run for its current head. Skipping auto-approval.`);
+            }
+
       - name: Generate Bot Token
-        if: env.WEBHARE_BOT_APPID != ''
+        if: env.WEBHARE_BOT_APPID != '' && (github.event_name == 'workflow_run' || steps.check-ci.outputs.passed == 'true')
         id: generate-token
         uses: actions/create-github-app-token@v1
         with:
@@ -27,7 +57,7 @@ jobs:
           private-key: ${{ secrets.WEBHARE_BOT_PRIVATEKEY }}
 
       - name: Auto-Approve if PR is Internal
-        if: env.WEBHARE_BOT_APPID != ''
+        if: env.WEBHARE_BOT_APPID != '' && (github.event_name == 'workflow_run' || steps.check-ci.outputs.passed == 'true')
         uses: actions/github-script@v7
         env:
           BOT_LOGIN: ${{ steps.generate-token.outputs.app-slug }}[bot]
@@ -37,18 +67,23 @@ jobs:
             const org = context.repo.owner;
             const repo = context.repo.repo;
             const run = context.payload.workflow_run;
-            const pullRequests = await github.paginate(github.rest.pulls.list, {
+            const testedSha = run?.head_sha || context.payload.pull_request.head.sha;
+            const pullRequests = run ? await github.paginate(github.rest.pulls.list, {
               owner: org,
               repo,
               state: 'open',
               head: `${org}:${run.head_branch}`,
-            });
+            }) : [(await github.rest.pulls.get({
+              owner: org,
+              repo,
+              pull_number: context.payload.pull_request.number,
+            })).data];
 
             // List of associations that count as Internal
             const internalRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
 
             for (const pr of pullRequests) {
-              if (pr.head.repo?.full_name !== context.payload.repository.full_name || pr.head.sha !== run.head_sha) {
+              if (pr.state !== 'open' || pr.head.repo?.full_name !== context.payload.repository.full_name || pr.head.sha !== testedSha) {
                 console.log(`PR #${pr.number} does not match the tested commit. Skipping auto-approval.`);
                 continue;
               }
@@ -89,7 +124,7 @@ jobs:
                 owner: org,
                 repo: repo,
                 pull_number: prNumber,
-                commit_id: run.head_sha,
+                commit_id: testedSha,
                 event: 'APPROVE',
                 body: `🤖 **Auto-Approved:** PR author (@${prCreator}) is an internal organization/repository member.`,
               });
