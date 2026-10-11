@@ -2,10 +2,9 @@ import { debugFlags } from "@webhare/env";
 import type { RPCAPI, RPCContext, RPCFilter } from "@webhare/router";
 import { beginWork } from "@webhare/whdb";
 
-import { testschemaSchema, type OidcschemaSchemaType } from "wh:wrd/webhare_testsuite";
 import { sleep, throwError } from "@webhare/std";
 import { getTestSiteJS } from "./wts-backend";
-import { WRDSchema } from "@webhare/wrd";
+import { wrd, type WRDSchemaLike } from "@webhare/wrd";
 import { prepareFrontendLogin } from "@webhare/auth";
 
 export async function filterAPI(context: RPCContext, args: unknown[]) {
@@ -53,9 +52,10 @@ export const testAPI = {
     return null;
   },
   async validateLoggedinUser(context: RPCContext): Promise<{ user: string }> {
-    const userId = await context.getRequestUser(testschemaSchema);
+    const testSchema = wrd("webhare_testsuite:testschema");
+    const userId = await context.getRequestUser(testSchema);
     if (userId) {
-      const user = await testschemaSchema.getFields("wrdPerson", userId, ["wrdFullName"]);
+      const user = await testSchema.getFields("wrdPerson", userId, ["wrdFullName"]);
       if (user)
         return { user: user.wrdFullName };
     }
@@ -63,7 +63,7 @@ export const testAPI = {
     return { user: "" };
   },
   async getCustomClaimAction() {
-    const oidcAuthSchema = new WRDSchema<OidcschemaSchemaType>("webhare_testsuite:testschema");
+    const oidcAuthSchema = wrd<WRDSchemaLike["webhare_testsuite:oidcschema"]>("webhare_testsuite:testschema");
     const targetlink = (await getTestSiteJS()).webRoot + "testpages/wrdauthtest/";
     const pietje = await oidcAuthSchema.find("wrdPerson", { wrdContactEmail: "pietje-js@beta.webhare.net" }) ?? throwError("Pietje not found");
 

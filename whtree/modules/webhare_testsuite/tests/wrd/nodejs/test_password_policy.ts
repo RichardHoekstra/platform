@@ -7,8 +7,6 @@ import { beginWork, commitWork, db, rollbackWork, runInWork } from "@webhare/whd
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import { getUserValidationSettings } from "@webhare/auth/src/support";
 
-const wrdTestschemaSchema = wrd("wrd:testschema");
-
 async function testPasswordBreachCount() {
   test.assert(await getPasswordBreachCount("a") > 700000);
   test.assert(await getPasswordBreachCount("secret") > 1000000);
@@ -116,35 +114,37 @@ async function testCheckPassword() {
 }
 
 async function testSettingOverrides() {
+  const testSchema = wrd("wrd:testschema");
   await beginWork();
-  await updateSchemaSettings(wrdTestschemaSchema, { passwordValidationChecks: "hibp" });
-  const baseUnit = await wrdTestschemaSchema.insert("whuserUnit", { wrdLeftEntity: null, overridePasswordchecks: true, passwordchecks: "uppercase:1" });
-  const subUnit = await wrdTestschemaSchema.insert("whuserUnit", { wrdLeftEntity: baseUnit, overridePasswordchecks: false, passwordchecks: "lowercase:1" });
-  const subSubUnit = await wrdTestschemaSchema.insert("whuserUnit", { wrdLeftEntity: subUnit, overridePasswordchecks: true, passwordchecks: "symbols:1" });
+  await updateSchemaSettings(testSchema, { passwordValidationChecks: "hibp" });
+  const baseUnit = await testSchema.insert("whuserUnit", { wrdLeftEntity: null, overridePasswordchecks: true, passwordchecks: "uppercase:1" });
+  const subUnit = await testSchema.insert("whuserUnit", { wrdLeftEntity: baseUnit, overridePasswordchecks: false, passwordchecks: "lowercase:1" });
+  const subSubUnit = await testSchema.insert("whuserUnit", { wrdLeftEntity: subUnit, overridePasswordchecks: true, passwordchecks: "symbols:1" });
 
-  test.eq("hibp", await getUserValidationSettings(wrdTestschemaSchema, null));
-  test.eq("uppercase:1", await getUserValidationSettings(wrdTestschemaSchema, baseUnit));
-  test.eq("uppercase:1", await getUserValidationSettings(wrdTestschemaSchema, subUnit));
-  test.eq("symbols:1", await getUserValidationSettings(wrdTestschemaSchema, subSubUnit));
+  test.eq("hibp", await getUserValidationSettings(testSchema, null));
+  test.eq("uppercase:1", await getUserValidationSettings(testSchema, baseUnit));
+  test.eq("uppercase:1", await getUserValidationSettings(testSchema, subUnit));
+  test.eq("symbols:1", await getUserValidationSettings(testSchema, subSubUnit));
   await rollbackWork();
 }
 
 async function testCompleteAccountExpiry() {
+  const testSchema = wrd("wrd:testschema");
   await beginWork();
-  const unit = await wrdTestschemaSchema.insert("whuserUnit", { wrdLeftEntity: null, overridePasswordchecks: true, passwordchecks: "minlength:20" });
-  const user = await wrdTestschemaSchema.insert("wrdPerson", { wrdContactEmail: `complete-${generateRandomId().toLowerCase()}@beta.webhare.net`, whuserUnit: unit, wrdauthAccountStatus: { status: "active" } });
+  const unit = await testSchema.insert("whuserUnit", { wrdLeftEntity: null, overridePasswordchecks: true, passwordchecks: "minlength:20" });
+  const user = await testSchema.insert("wrdPerson", { wrdContactEmail: `complete-${generateRandomId().toLowerCase()}@beta.webhare.net`, whuserUnit: unit, wrdauthAccountStatus: { status: "active" } });
   await commitWork();
 
   //A password that fails the unit's checks sends the user to complete the account, which should be possible for one hour
   const start = Date.now();
   const authsettings = AuthenticationSettings.fromHSON(encodeHSON({ version: 1, passwords: [{ validfrom: new Date, passwordhash: "PLAIN:short" }] }));
-  const sessionId = await verifyPasswordCompliance(wrdTestschemaSchema, user, unit, "short", authsettings, "", { clientIp: "1.2.3.4", browserTriplet: "ios-safari-1" }) ?? throwError("Expected an incomplete-account session");
+  const sessionId = await verifyPasswordCompliance(testSchema, user, unit, "short", authsettings, "", { clientIp: "1.2.3.4", browserTriplet: "ios-safari-1" }) ?? throwError("Expected an incomplete-account session");
   const session = await db<PlatformDB>().selectFrom("system.sessions").select(["expires"]).where("sessionid", "=", sessionId).executeTakeFirstOrThrow();
   test.assert(Math.abs(session.expires.getTime() - (start + 3600_000)) < 60_000, `Expected the session to expire in one hour, got ${session.expires.toISOString()}`);
 
   await runInWork(async () => {
-    await wrdTestschemaSchema.delete("wrdPerson", user);
-    await wrdTestschemaSchema.delete("whuserUnit", unit);
+    await testSchema.delete("wrdPerson", user);
+    await testSchema.delete("whuserUnit", unit);
   });
 }
 

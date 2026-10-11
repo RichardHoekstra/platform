@@ -1,9 +1,8 @@
-import type { WRD_IdpSchemaType } from "@mod-platform/generated/wrd/webhare";
 import { buildCookieHeader, type ServersideCookieOptions } from "@webhare/dompack/src/cookiebuilder";
 import { expandCookies, HTTPErrorCode, RPCError, type RPCContext } from "@webhare/router";
 import { importJSObject } from "@webhare/services";
 import { stringify, throwError } from "@webhare/std";
-import { WRDSchema } from "@webhare/wrd";
+import { wrd, type WRDSchemaLike } from "@webhare/wrd";
 import { writeAuthAuditEvent, type AuthAuditContext, type AuthCustomizer, type LoginErrorCodes } from "@webhare/auth";
 import { hashSHA256, IdentityProvider, type LoginOptions, type SetAuthCookies } from "@webhare/auth/src/identity";
 import type { PublicAuthData } from "@webhare/frontend/src/auth";
@@ -41,7 +40,7 @@ export async function closeAccessToken(wrdSchema: string, accessToken: string, a
     const tokeninfo = await db<PlatformDB>().deleteFrom("wrd.tokens").where("hash", "=", hash).returning(["entity", "id"]).executeTakeFirst();
 
     if (tokeninfo) {
-      await writeAuthAuditEvent(new WRDSchema(wrdSchema), {
+      await writeAuthAuditEvent(wrd<"*">(wrdSchema), {
         type: "platform:logout",
         ...auditContext,
         entity: tokeninfo.entity,
@@ -105,7 +104,7 @@ export const authService = {
 
     const { settings } = prepped;
     const customizer = settings.customizer ? await importJSObject(settings.customizer) as AuthCustomizer : undefined;
-    const wrdschema = new WRDSchema<WRD_IdpSchemaType>(settings.wrdSchema);
+    const wrdschema = wrd<WRDSchemaLike["wrd:idp"]>(settings.wrdSchema);
     const provider = new IdentityProvider(wrdschema);
     const response = await provider.handleFrontendLogin({
       settings: { ...prepped.settings, secureRequest: originUrl.startsWith("https:"), reportedCookieName: cookieName }, loginHost: originUrl, login: username, password, customizer,

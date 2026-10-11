@@ -18,10 +18,7 @@ import { buildInstance } from "@webhare/services/src/richdocument";
 import type { HSVMObject } from "@webhare/harescript";
 import { whconstant_whfsid_webharebackend } from "@mod-system/js/internal/webhareconstants";
 
-const wrdTestschemaSchema = wrd("wrd:testschema");
 type TestschemaSchemaType = WRDSchemaLike["webhare_testsuite:testschema"];
-type WRD_TestschemaSchemaType = WRDSchemaLike["wrd:testschema"];
-type Platform_BasewrdschemaSchemaType = WRDSchemaLike["platform:basewrdschema"];
 
 function cmp(a: unknown, condition: string, b: unknown) {
   if (condition === "in") {
@@ -266,7 +263,7 @@ async function testNewAPI() {
   //this should be fine:
   wrd<"*">("webhare_testsuite:unknownschema");
 
-  const schema = wrd<Combine<[WRD_TestschemaSchemaType, CustomExtensionsModern, Extensions]>>(testSchemaTag);
+  const schema = wrd<Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensionsModern, Extensions]>>(testSchemaTag);
   // FIXME: make this work:
   // wrd<Combine<["wrd:testschema", CustomExtensionsModern, Extensions]>>(testSchemaTag) satisfies typeof schema;
 
@@ -298,16 +295,16 @@ async function testNewAPI() {
   await schema.getType("wrdPerson").createAttribute("testJsonRequired", { attributeType: "json", title: "JSON attribute", isRequired: true });
 
   //Verify WRD type helpers
-  ({ wrdTitle: "Root unit", wrdTag: "TAG" }) satisfies WRDInsertable<WRD_TestschemaSchemaType["whuserUnit"]>;
-  ({ wrdTitle: "Root unit", wrdId: 15 }) satisfies WRDInsertable<WRD_TestschemaSchemaType["whuserUnit"]>;
-  ({ wrdTitle: "Root unit", wrdTag: "TAG" }) satisfies WRDUpdatable<WRD_TestschemaSchemaType["whuserUnit"]>;
+  ({ wrdTitle: "Root unit", wrdTag: "TAG" }) satisfies WRDInsertable<WRDSchemaLike["wrd:testschema"]["whuserUnit"]>;
+  ({ wrdTitle: "Root unit", wrdId: 15 }) satisfies WRDInsertable<WRDSchemaLike["wrd:testschema"]["whuserUnit"]>;
+  ({ wrdTitle: "Root unit", wrdTag: "TAG" }) satisfies WRDUpdatable<WRDSchemaLike["wrd:testschema"]["whuserUnit"]>;
 
   //Verify there's a route from a schema object back to its type
-  ({ wrdContactEmail: "pietje@beta.webhare.net" }) satisfies WRDUpdatable<WRD_TestschemaSchemaType["wrdPerson"]>;
+  ({ wrdContactEmail: "pietje@beta.webhare.net" }) satisfies WRDUpdatable<WRDSchemaLike["wrd:testschema"]["wrdPerson"]>;
   ({ wrdContactEmail: "pietje@beta.webhare.net" }) satisfies WRDUpdatable<WRDSchemaTypeOf<typeof schema>["wrdPerson"]>;
 
   //@ts-expect-error Cannot update a wrdId
-  ({ wrdTitle: "Root unit", wrdId: 15 }) satisfies WRDUpdatable<WRD_TestschemaSchemaType["whuserUnit"]>;
+  ({ wrdTitle: "Root unit", wrdId: 15 }) satisfies WRDUpdatable<WRDSchemaLike["wrd:testschema"]["whuserUnit"]>;
 
   //Use WRD type helpers to verify enum generation
   ({ wrdTag: "TAG", enum1: "a" }) satisfies WRDInsertable<TestschemaSchemaType["testType"]>;
@@ -1038,7 +1035,7 @@ async function testNewAPI() {
 
   // STORY: test url
   {
-    const combinedSchema = wrd<Combine<[WRD_TestschemaSchemaType, CustomExtensionsModern, Extensions]>>(testSchemaTag);
+    const combinedSchema = wrd<Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensionsModern, Extensions]>>(testSchemaTag);
     await test.throws(/Invalid URL/, () => combinedSchema.update("wrdPerson", newperson, { testUrl: ":https://beta.webhare.net" }));
     await combinedSchema.update("wrdPerson", newperson, { testUrl: "https://beta.webhare.net/met spatie" });
     test.eq("https://beta.webhare.net/met%20spatie", await combinedSchema.getFields("wrdPerson", newperson, "testUrl"));
@@ -1075,7 +1072,7 @@ async function testNewAPI() {
 }
 
 async function testBaseTypes() {
-  const schema = wrd<Platform_BasewrdschemaSchemaType>(testSchemaTag);//extendWith<SchemaUserAPIExtension>().extendWith<CustomExtensions>();
+  const schema = wrd<WRDSchemaLike["platform:basewrdschema"]>(testSchemaTag);//extendWith<SchemaUserAPIExtension>().extendWith<CustomExtensions>();
   const wrdSettingsEntity = await schema.search("wrdSettings", "wrdTag", "WRD_SETTINGS");
   test.assert(wrdSettingsEntity);
   test.eq({ "wrdGuid": "07004000-0000-4000-a000-00bea61ef00d" }, await schema.getFields("wrdSettings", wrdSettingsEntity, ["wrdGuid"]));
@@ -1103,7 +1100,7 @@ async function testMetaData() {
 }
 
 async function testDates() {
-  const schema = wrd<Combine<[WRD_TestschemaSchemaType, CustomExtensionsModern, Extensions]>>(testSchemaTag);
+  const schema = wrd<Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensionsModern, Extensions]>>(testSchemaTag);
 
   //Verify Date/DateTime support
   await whdb.beginWork();
@@ -1140,7 +1137,7 @@ async function testDates() {
 }
 
 async function testBadValues() {
-  const schema = wrd<Combine<[WRD_TestschemaSchemaType, CustomExtensions, Extensions]>>(testSchemaTag);
+  const schema = wrd<Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensions, Extensions]>>(testSchemaTag);
 
   await whdb.beginWork();
 
@@ -1170,6 +1167,7 @@ async function testBadValues() {
 
 async function testTSTypes() {
   const schema = await getExtendedWRDSchema();
+  const testSchema = wrd("wrd:testschema");
   const unit_id = 0;
   const testrecorddata = null as any;
 
@@ -1188,20 +1186,20 @@ async function testTSTypes() {
     await schema.insert("wrdPerson", { wrdFirstName: "second", wrdLastName: "lastname2", whuserUnit: unit_id, testRecord: testrecorddata as TestRecordDataInterface, testJsonRequired: null });
 
     // Test if wrdSettings.signingKeys[].privateKey has type `JSONWebKey`
-    const settingid = await wrdTestschemaSchema.search("wrdSettings", "wrdTag", "WRD_SETTINGS");
+    const settingid = await testSchema.search("wrdSettings", "wrdTag", "WRD_SETTINGS");
     if (settingid) {
-      await wrdTestschemaSchema.update("wrdSettings", settingid, {
+      await testSchema.update("wrdSettings", settingid, {
         signingKeys: [{ availableSince: new Date, keyId: "key", privateKey: {} as JsonWebKey }]
       });
-      await wrdTestschemaSchema.insert("wrdSettings", {
+      await testSchema.insert("wrdSettings", {
         // @ts-expect-error -- Wrong type
         signingKeys: [{ availableSince: new Date, keyId: "key", privateKey: { wrong: true, x: 0 } }]
       });
-      await wrdTestschemaSchema.update("wrdSettings", settingid, {
+      await testSchema.update("wrdSettings", settingid, {
         // @ts-expect-error -- Wrong type
         signingKeys: [{ availableSince: new Date, keyId: "key", privateKey: { wrong: true, x: 0 } }]
       });
-      const signingKeys = await wrdTestschemaSchema.getFields("wrdSettings", settingid, "signingKeys");
+      const signingKeys = await testSchema.getFields("wrdSettings", settingid, "signingKeys");
       void signingKeys;
       test.typeAssert<test.Equals<JsonWebKey, (typeof signingKeys & object)[0]["privateKey"]>>();
     }
@@ -1209,61 +1207,63 @@ async function testTSTypes() {
 }
 
 async function testOrgs() {
+  const testSchema = wrd("wrd:testschema");
   await whdb.beginWork();
-  const org1 = await wrdTestschemaSchema.insert("wrdOrganization", { wrdOrgName: "org1" });
-  test.eq(org1, await wrdTestschemaSchema.search("wrdOrganization", "wrdOrgName", "org1"));
-  test.eq(null, await wrdTestschemaSchema.search("wrdOrganization", "wrdOrgName", "ORG1"));
+  const org1 = await testSchema.insert("wrdOrganization", { wrdOrgName: "org1" });
+  test.eq(org1, await testSchema.search("wrdOrganization", "wrdOrgName", "org1"));
+  test.eq(null, await testSchema.search("wrdOrganization", "wrdOrgName", "ORG1"));
   //@ts-expect-error -- wrdTitle is not an attribute of wrdOrganization
-  test.eq(org1, await wrdTestschemaSchema.search("wrdOrganization", "wrdTitle", "org1"));
+  test.eq(org1, await testSchema.search("wrdOrganization", "wrdTitle", "org1"));
   await whdb.commitWork();
 }
 
 async function testUpsert() {
+  const testSchema = wrd("wrd:testschema");
   await whdb.beginWork();
-  test.eq(2, (await wrdTestschemaSchema.query("whuserUnit").select("wrdId").execute()).length);
+  test.eq(2, (await testSchema.query("whuserUnit").select("wrdId").execute()).length);
   ///@ts-expect-error -- TS should also detect wrdTagXX being invalid
-  await test.throws(/Cannot find attribute/, wrdTestschemaSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTagXX: "TAG" }, {}));
+  await test.throws(/Cannot find attribute/, testSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTagXX: "TAG" }, {}));
 
-  const [firstUnitId, firstUnitIsNew] = await wrdTestschemaSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT" }, {}, { ifNew: { wrdTitle: "Unit #1" } });
+  const [firstUnitId, firstUnitIsNew] = await testSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT" }, {}, { ifNew: { wrdTitle: "Unit #1" } });
   test.assert(firstUnitIsNew);
-  const [secondUnitId] = await wrdTestschemaSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "SECONDUNIT" }, {}, { ifNew: { wrdTitle: "Unit #2" } });
-  test.eq(4, (await wrdTestschemaSchema.query("whuserUnit").select("wrdId").execute()).length);
+  const [secondUnitId] = await testSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "SECONDUNIT" }, {}, { ifNew: { wrdTitle: "Unit #2" } });
+  test.eq(4, (await testSchema.query("whuserUnit").select("wrdId").execute()).length);
   test.assert(firstUnitId);
   test.assert(secondUnitId);
-  test.eq("Unit #1", (await wrdTestschemaSchema.getFields("whuserUnit", firstUnitId, ["wrdTitle"])).wrdTitle);
+  test.eq("Unit #1", (await testSchema.getFields("whuserUnit", firstUnitId, ["wrdTitle"])).wrdTitle);
 
-  let [firstUnitId2, firstUnitIsNew2] = await wrdTestschemaSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT" }, {}, { ifNew: { wrdTitle: "Unit #1b" } });
+  let [firstUnitId2, firstUnitIsNew2] = await testSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT" }, {}, { ifNew: { wrdTitle: "Unit #1b" } });
   test.eq(firstUnitId, firstUnitId2);
   test.assert(!firstUnitIsNew2);
-  test.eq("Unit #1", (await wrdTestschemaSchema.getFields("whuserUnit", firstUnitId, ["wrdTitle"])).wrdTitle);
+  test.eq("Unit #1", (await testSchema.getFields("whuserUnit", firstUnitId, ["wrdTitle"])).wrdTitle);
 
   // @ts-expect-error -- this is the old way of calling upsert, ensure compatibility for now
-  [firstUnitId2, firstUnitIsNew2] = await wrdTestschemaSchema.upsert("whuserUnit", ["wrdLeftEntity", "wrdTag"], { wrdLeftEntity: null, wrdTag: "FIRSTUNIT", wrdTitle: "Unit #1bx" }, { ifNew: { wrdTitle: "Unit #1b" } });
-  test.eq("Unit #1bx", (await wrdTestschemaSchema.getFields("whuserUnit", firstUnitId, ["wrdTitle"])).wrdTitle);
+  [firstUnitId2, firstUnitIsNew2] = await testSchema.upsert("whuserUnit", ["wrdLeftEntity", "wrdTag"], { wrdLeftEntity: null, wrdTag: "FIRSTUNIT", wrdTitle: "Unit #1bx" }, { ifNew: { wrdTitle: "Unit #1b" } });
+  test.eq("Unit #1bx", (await testSchema.getFields("whuserUnit", firstUnitId, ["wrdTitle"])).wrdTitle);
 
-  await wrdTestschemaSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT" }, { wrdTitle: "Unit #1b" });
-  test.eq(4, (await wrdTestschemaSchema.query("whuserUnit").select("wrdId").execute()).length);
-  test.eq("Unit #1b", (await wrdTestschemaSchema.getFields("whuserUnit", firstUnitId, ["wrdTitle"])).wrdTitle);
+  await testSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT" }, { wrdTitle: "Unit #1b" });
+  test.eq(4, (await testSchema.query("whuserUnit").select("wrdId").execute()).length);
+  test.eq("Unit #1b", (await testSchema.getFields("whuserUnit", firstUnitId, ["wrdTitle"])).wrdTitle);
 
-  await test.throws(/at most one is allowed/, wrdTestschemaSchema.upsert("whuserUnit", {}, { wrdTitle: "Unit without key" }));
+  await test.throws(/at most one is allowed/, testSchema.upsert("whuserUnit", {}, { wrdTitle: "Unit without key" }));
 
-  await wrdTestschemaSchema.update("whuserUnit", firstUnitId, { wrdClosed: new Date() });
+  await testSchema.update("whuserUnit", firstUnitId, { wrdClosed: new Date() });
 
-  await test.throws(/requires.*historyMode/i, wrdTestschemaSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT" }, { wrdClosed: null }, { ifNew: { wrdTitle: "Unit #1b" } }));
+  await test.throws(/requires.*historyMode/i, testSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT" }, { wrdClosed: null }, { ifNew: { wrdTitle: "Unit #1b" } }));
 
-  let [recreateId, recreateIsNew] = await wrdTestschemaSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT", }, { wrdClosed: null }, { ifNew: { wrdTitle: "Unit #1b" }, historyMode: "all" });
+  let [recreateId, recreateIsNew] = await testSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT", }, { wrdClosed: null }, { ifNew: { wrdTitle: "Unit #1b" }, historyMode: "all" });
   test.eq(firstUnitId, recreateId);
   test.assert(!recreateIsNew);
 
-  await wrdTestschemaSchema.delete("whuserUnit", recreateId);
-  ([recreateId, recreateIsNew] = await wrdTestschemaSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT", }, { wrdClosed: null }, { ifNew: () => ({ wrdTitle: "Unit #1b" }), historyMode: "all" }));
+  await testSchema.delete("whuserUnit", recreateId);
+  ([recreateId, recreateIsNew] = await testSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT", }, { wrdClosed: null }, { ifNew: () => ({ wrdTitle: "Unit #1b" }), historyMode: "all" }));
   test.assert(recreateIsNew);
-  test.eq("Unit #1b", await wrdTestschemaSchema.getFields("whuserUnit", recreateId, "wrdTitle"));
+  test.eq("Unit #1b", await testSchema.getFields("whuserUnit", recreateId, "wrdTitle"));
 
-  await wrdTestschemaSchema.delete("whuserUnit", recreateId);
-  ([recreateId, recreateIsNew] = await wrdTestschemaSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT", }, { wrdClosed: null }, { ifNew: async () => ({ wrdTitle: "Unit #1b" }), historyMode: "all" }));
+  await testSchema.delete("whuserUnit", recreateId);
+  ([recreateId, recreateIsNew] = await testSchema.upsert("whuserUnit", { wrdLeftEntity: null, wrdTag: "FIRSTUNIT", }, { wrdClosed: null }, { ifNew: async () => ({ wrdTitle: "Unit #1b" }), historyMode: "all" }));
   test.assert(recreateIsNew);
-  test.eq("Unit #1b", await wrdTestschemaSchema.getFields("whuserUnit", recreateId, "wrdTitle"));
+  test.eq("Unit #1b", await testSchema.getFields("whuserUnit", recreateId, "wrdTitle"));
 
   await whdb.commitWork();
 }

@@ -1,5 +1,4 @@
 import * as test from "@mod-webhare_testsuite/js/wts-backend";
-import { systemUsermgmtSchema } from "@mod-platform/generated/wrd/webhare";
 import { createFirstPartyToken, listTokens, deleteToken, type FirstPartyToken, updateToken, getToken } from "@webhare/auth";
 import { getDirectOpenAPIFetch } from "@webhare/openapi-service";
 
@@ -9,12 +8,11 @@ import { runInWork } from "@webhare/whdb";
 import { backendConfig } from "@webhare/services";
 import { throwError } from "@webhare/std";
 import { runAuthMaintenance } from "@mod-platform/js/auth/support";
-import type { JsschemaSchemaType } from "wh:wrd/webhare_testsuite";
-import { WRDSchema } from "@webhare/wrd";
+import { wrd, type WRDSchemaLike } from "@webhare/wrd";
 
 let apiSysopToken: FirstPartyToken, infiniteToken: FirstPartyToken;
 
-const jsAuthSchema = new WRDSchema<JsschemaSchemaType>("webhare_testsuite:testschema");
+const jsAuthSchema = wrd<WRDSchemaLike["webhare_testsuite:jsschema"]>("webhare_testsuite:testschema");
 
 async function setupWHAPITest() {
   await test.reset({
@@ -87,15 +85,16 @@ async function setupWHAPITest() {
     { type: "api", scopes: ["system:sysop", "wrd:schemas:0"], metadata: { myFavouriteKey: true, myDate: Temporal.PlainDate.from("2025-03-25") }, title: "Infinity Token" }
   ], tokens);
 
-  await test.throws(/does not belong to schema system:usermgmt/, () => deleteToken(systemUsermgmtSchema, tokens[0].id));
+  const usermgmtSchema = wrd("system:usermgmt");
+  await test.throws(/does not belong to schema system:usermgmt/, () => deleteToken(usermgmtSchema, tokens[0].id));
   await runInWork(() => deleteToken(jsAuthSchema, tokens[0].id));
   test.eq(3, (await listTokens(jsAuthSchema, test.getUser("sysop").wrdId)).length);
 
-  await test.throws(/is not in.*system:usermgmt/, () => createFirstPartyToken(systemUsermgmtSchema, "id", test.getUser("sysop").wrdId));
+  await test.throws(/is not in.*system:usermgmt/, () => createFirstPartyToken(usermgmtSchema, "id", test.getUser("sysop").wrdId));
   infiniteToken = await createFirstPartyToken(jsAuthSchema, "api", test.getUser("sysop").wrdId, { expires: Infinity, scopes: ["system:sysop"] });
   test.eq(null, infiniteToken.expires);
 
-  await test.throws(/does not belong to schema system:usermgmt/, () => listTokens(systemUsermgmtSchema, test.getUser("sysop").wrdId));
+  await test.throws(/does not belong to schema system:usermgmt/, () => listTokens(usermgmtSchema, test.getUser("sysop").wrdId));
   const infiniteTokenInfo = (await listTokens(jsAuthSchema, test.getUser("sysop").wrdId)).find(_ => _.id === infiniteToken.id);
   test.eq(null, infiniteTokenInfo?.expires);
 

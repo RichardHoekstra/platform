@@ -2,8 +2,7 @@ import * as crypto from "node:crypto";
 import { type WebHareRouter, type WebRequest, type WebResponse, createJSONResponse, createRedirectResponse } from "@webhare/router";
 import { getApplyTesterForObject } from "@webhare/whfs/src/applytester";
 //TOOD make this a public export somewhere? but should it include wrdOrg and wrdPerson though
-import type { WRD_IdpSchemaType } from "@mod-platform/generated/wrd/webhare";
-import { WRDSchema, type WRDSchemaType } from "@webhare/wrd";
+import { wrd, type WRDSchema, type WRDSchemaLike, type WRDSchemaType } from "@webhare/wrd";
 import { listSites, openFolder, openSite } from "@webhare/whfs";
 import { decompressUUID, hashClientSecret, IdentityProvider, type AuthTokenOptions } from "@webhare/auth/src/identity";
 import { closeServerSession, createServerSession, encryptForThisServer, getServerSession, importJSObject, updateServerSession } from "@webhare/services";
@@ -113,7 +112,7 @@ async function findLoginPageForSchema(schema: string) {
   return { loginPage, metadataUrl: candidates[0].webRoot + ".well-known/openid-configuration", wrdauth: candidates[0].wrdauth };
 }
 
-function getOpenIdBase(wrdschema: WRDSchemaType<WRD_IdpSchemaType>) {
+function getOpenIdBase(wrdschema: WRDSchemaType<WRDSchemaLike["wrd:idp"]>) {
   const schemaparts = wrdschema.tag.split(":");
   return "/.wh/openid/" + encodeURIComponent(schemaparts[0]) + "/" + encodeURIComponent(schemaparts[1]) + "/";
 }
@@ -357,7 +356,7 @@ export async function openIdRouter(req: WebRequest): Promise<WebResponse> {
     return createJSONResponse(400, { error: "Invalid endpoint" });
 
   const wrdschemaTag = decodeURIComponent(endpoint[1] + ":" + endpoint[2]);
-  const wrdschema = new WRDSchema<WRD_IdpSchemaType>(wrdschemaTag);
+  const wrdschema = wrd<WRDSchemaLike["wrd:idp"]>(wrdschemaTag);
   if (!await wrdschema.exists() || !await wrdschema.hasType("wrdauthApplication"))
     return createJSONResponse(404, { error: "Provider not configured" });
 

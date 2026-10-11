@@ -1,8 +1,7 @@
 import type { SchemaTypeDefinition } from "@webhare/wrd/src/types";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import { verifyJWT, type JWKS } from "./identity";
-import type { AnyWRDSchema, WRDSchema, WRDSchemaType } from "@webhare/wrd";
-import type { System_UsermgmtSchemaType } from "@mod-platform/generated/wrd/webhare";
+import type { AnyWRDSchema, WRDSchema, WRDSchemaLike, WRDSchemaType } from "@webhare/wrd";
 import { encodeString, pick, throwError, toCamelCase, toSnakeCase, type ToSnakeCase } from "@webhare/std";
 import type { NavigateInstruction } from "@webhare/env";
 import { backendConfig, createServerSession, getServerSession, logNotice, subscribe, updateServerSession, type SessionScopes } from "@webhare/services";
@@ -239,7 +238,7 @@ export class OAuth2Client {
 }
 
 export async function createOAuth2Client<S extends SchemaTypeDefinition>(wrdSchemaIn: WRDSchemaType<S>, provider: number | string) {
-  const wrdSchema = wrdSchemaIn as unknown as WRDSchema<System_UsermgmtSchemaType>; //TODO better schema type but at least this one has the OIDC Client
+  const wrdSchema = wrdSchemaIn as unknown as WRDSchema<WRDSchemaLike["system:usermgmt"]>; //TODO better schema type but at least this one has the OIDC Client
   const providerId = typeof provider === "number" ? provider : await wrdSchema.find("wrdauthServer", { wrdTag: provider }) ?? throwError(`No wrdauthServer with tag ${provider} found`);
   const spData = await wrdSchema.getFields("wrdauthServer", providerId, ["metadataurl", "clientid", "clientsecret", "additionalscopes", "redirectUri", "clientSigning", "extraParams"]) ?? throwError(`wrdauthServer #${providerId} not found`);
 

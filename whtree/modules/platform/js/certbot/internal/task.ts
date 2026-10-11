@@ -1,5 +1,5 @@
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
-import { systemConfigSchema } from "@mod-platform/generated/wrd/webhare";
+import { wrd } from "@webhare/wrd";
 import { ACMEChallengeHandlerBase, type ACMEChallengeHandlerFactory } from "@mod-platform/js/certbot/acmechallengehandler";
 import { acme, testCertificate } from "@mod-platform/js/certbot/certbot";
 import { doRequestACMECertificate, getCertifiableHostNames, getProviderForDomains } from "@mod-platform/js/certbot/internal/certbot";
@@ -70,7 +70,7 @@ async function isCertificateForHostname(keyPair: StoredKeyPair, hostname: string
 }
 
 export type CertificateRequestResult = {
-  provider?: { id: number; domain: string};
+  provider?: { id: number; domain: string };
 } & ({
   /** The request was successful */
   success: true;
@@ -389,7 +389,7 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
     // Store the account private key if new or updated
     const resource = await ResourceDescriptor.from(accountKeyPair.privateKey);
     if (!provider.accountPrivatekey || provider.accountPrivatekey.hash !== resource.hash)
-      await systemConfigSchema.update("certificateProvider", provider.wrdId, { accountPrivatekey: resource });
+      await wrd("system:config").update("certificateProvider", provider.wrdId, { accountPrivatekey: resource });
 
     onFinishWork({
       onCommit: async () => applyConfiguration({ subsystems: ["webserver"], source: "platform:requestcertificate" })
