@@ -9,6 +9,7 @@ import { updateTypeScriptInfrastructure } from '@mod-system/js/internal/generati
 import { reconfigureProxies, refreshGlobalWebserverConfig } from '../webserver/control';
 import type { ValidationMessageWithType } from '../devsupport/validation';
 import { appendToArray } from '@webhare/std';
+import { reconfigureNginx } from './nginx';
 
 type SubsystemConfig = {
   generate?: readonly GeneratorType[];
@@ -46,6 +47,11 @@ const subsystems = {
     title: "Registry",
     description: "Initialize registry keys defined in module definitions",
     generate: ["ts"]
+  },
+  nginx: {
+    title: "Nginx",
+    description: "Reconfigure nginx webserver with njs support",
+    generate: ["nginx"]
   },
   wrd: {
     title: "WRD",
@@ -190,6 +196,10 @@ export async function executeApply(options: ApplyConfigurationOptions & { offlin
 
     if (todoList.includes('consilio')) {
       await updateConsilioCatalogs(generateContext, options);
+    }
+
+    if (todoList.includes('nginx')) {
+      await reconfigureNginx();
     }
 
     broadcast("platform:appliedconfig");

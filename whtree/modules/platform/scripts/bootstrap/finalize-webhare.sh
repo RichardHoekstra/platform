@@ -71,6 +71,11 @@ node_modules/.bin/yaml --json --single --strict < tsconfig.yml | jq > tsconfig.j
 logWithTime "Verifying sharp works"
 node -e 'require("sharp")' || die "Sharp failed"
 
+## test nginx-router
+logWithTime "Verifying nginx-router"
+( cd nginx-router && ../node_modules/.bin/tsc -project . ) || die "nginx-router TypeScript compilation failed"
+
+
 ## download puppeteer
 logWithTime "Downloading puppeteer"
 export PUPPETEER_CHROME_HEADLESS_SHELL_SKIP_DOWNLOAD=1 # we don't use chrome-headless-shell

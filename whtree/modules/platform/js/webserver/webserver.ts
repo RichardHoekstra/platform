@@ -11,6 +11,7 @@ import type { WebHareService } from '@webhare/services';
 import { loadlib } from '@webhare/harescript';
 import type { WebServerLogger } from './logger';
 import { stringify } from '@webhare/std';
+import { whwebserverconfig_hstrustedportid } from "@mod-system/js/internal/webhareconstants.ts";
 
 function getLocalAddress(req: http.IncomingMessage): string {
   if (req.socket.localFamily === 'IPv6') {
@@ -274,7 +275,7 @@ export class WebServer {
     const config = await loadlib("mod::system/lib/internal/webserver/config.whlib").DownloadWebserverConfig() as Configuration;
 
     //Remove the HS trusted port from our bindlist - that one needs to be held by the HS webserver
-    const trustedportidx = config.ports.findIndex(_ => _.id === -6 /*whwebserverconfig_hstrustedportid*/);
+    const trustedportidx = config.ports.findIndex(_ => _.id === whwebserverconfig_hstrustedportid);
     if (trustedportidx >= 0)
       config.ports.splice(trustedportidx, 1);
 
