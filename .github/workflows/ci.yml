@@ -7,6 +7,10 @@ on:
         description: Skip deployment steps for scheduled CI runs
         type: boolean
         default: false
+      WEBHARE_WEBSERVER:
+        description: 'Webserver override (for example nginxjs)'
+        type: string
+        default: ''
   # This workflow is used by external-pr.yml to ensure we stay in the same PR context. Using workflow_dispatch didn't add 'checks' to the PR
   # It's also invoked by internal-pr.yml on push events so that the success test is always named 'WebHare CI / all-tests-passed'
   workflow_call:
@@ -30,8 +34,13 @@ on:
       ref: # This will point to the actual PR commit
         type: string
         description: 'Git ref to build'
+      WEBHARE_WEBSERVER:
+        type: string
+        description: 'Webserver override (for example nginxjs)'
+        default: ''
 
 env:
+  TESTFW_WEBHARE_WEBSERVER: ${{ inputs.WEBHARE_WEBSERVER || '' }}
   CI_COMMIT_SHA: ${{ inputs.ref || github.sha }}
   # Branch name. Used also to detect if we're on the main branch and need to autotag a release/x.y container too
   # Forks setting this to 'main' shouldn't be a risk as deployment will not run unless github.event_name == 'push' (TODO but still cleaner to not set it at all?)
@@ -49,8 +58,8 @@ defaults:
   run:
     shell: bash
 
-concurrency: # cancel older workflows when a new push is done on a branch
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+concurrency: # cancel older workflows when a new push is done on a branch. but workflow_dispatch run shouldn't conflict with normal jobs
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
   cancel-in-progress: true
 
 jobs:
