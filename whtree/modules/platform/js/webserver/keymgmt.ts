@@ -371,3 +371,39 @@ export async function listStoredKeyPairs(): Promise<Array<{
     hasCertificate: certificates.some(c => c.parent === kf.id)
   }));
 }
+
+export type StoredKeyPairWithCertificates = Awaited<ReturnType<typeof listStoredKeyPairs>>[number] & {
+  dns_altnames: string[];
+  certificatechain: string;
+  privatekey: string;
+};
+
+export async function listStoredKeyPairsWithCertificates(): Promise<StoredKeyPairWithCertificates[]> {
+  const enriched: StoredKeyPairWithCertificates[] = [];
+
+  for (const keypair of await listStoredKeyPairs()) {
+    const folder = await openFolder(keypair.id);
+    const certificateFile = await folder.openFile("certificatechain.pem", { allowMissing: true });
+    const privateKeyFile = await folder.openFile("privatekey.pem", { allowMissing: true });
+    const certificatechain = await certificateFile?.data?.file.text() ?? "";
+    const privatekey = await privateKeyFile?.data?.file.text() ?? "";
+    const certificate = splitPEMCertificateBundle(certificatechain)[0];
+    const parsed = certificate ? new X509Certificate(certificate) : null;
+    const dnsNames = (parsed?.subjectAltName?.match(/(?:[^",]|"(?:[^"\\]|\\.)*")+/g) ?? [])
+      .map(entry => entry.trim())
+      .filter(entry => entry.startsWith("DNS:"))
+      .map(entry => {
+        const name = entry.slice(4);
+        return name.startsWith('"') ? JSON.parse(name) as string : name;
+      });
+
+    enriched.push({
+      ...keypair,
+      dns_altnames: dnsNames,
+      certificatechain,
+      privatekey
+    });
+  }
+
+  return enriched;
+}

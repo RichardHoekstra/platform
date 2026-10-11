@@ -2,11 +2,13 @@
 
 import { requestACMECertificate } from "@mod-platform/js/certbot/internal/task";
 import { readArgFile } from "@mod-platform/js/cli/cli-tools";
+import { listStoredKeyPairsWithCertificates, splitPEMCertificateBundle } from "@mod-platform/js/webserver/keymgmt";
 import { CLIRuntimeError, runCli } from "@webhare/cli";
 import { loadlib, type HSVMObject } from "@webhare/harescript";
 import type { HSVMBlob } from "@webhare/harescript/src/wasm-hsvmvar";
 import { decryptForThisServer, type WebHareBlob } from "@webhare/services";
 import { beginWork, commitWork } from "@webhare/whdb";
+import { X509Certificate } from "node:crypto";
 
 type KeyPair = HSVMObject & {
   TestCertificate(certdata: WebHareBlob): Promise<{ success: boolean; message?: string; finalkey?: WebHareBlob }>;
@@ -14,27 +16,8 @@ type KeyPair = HSVMObject & {
   RecycleSelf(): Promise<void>;
 };
 
-type KeyPairRecord = {
-  name: string;
-};
-
-type DecodedCertificate = {
-  subjectfields: Array<{ fieldname: string; value: string }>;
-  issuerfields: Array<{ fieldname: string; value: string }>;
-  dns_altnames: string[];
-  valid_until: Date;
-};
-
 function getKeystoreLib() {
   return loadlib("mod::system/lib/keystore.whlib");
-}
-
-function getPkcsLib() {
-  return loadlib("wh::filetypes/pkcs.whlib");
-}
-
-function getDateTimeLib() {
-  return loadlib("wh::datetime.whlib");
 }
 
 async function openKey(rawkeyname: boolean, hostname: string): Promise<KeyPair> {
@@ -86,26 +69,21 @@ async function setKeyCertificate(rawkeyname: boolean, hostname: string, certdata
 }
 
 async function listKeys(_allkeys: boolean): Promise<void> {
-  const keystore = getKeystoreLib();
-  const pkcs = getPkcsLib();
-  const datetime = getDateTimeLib();
+  for (const keypair of await listStoredKeyPairsWithCertificates()) {
+    const certificate = splitPEMCertificateBundle(keypair.certificatechain)[0];
 
-  for (const record of await keystore.ListKeyPairs() as KeyPairRecord[]) {
-    const keypair = await keystore.OpenKeyPairByName(record.name) as KeyPair;
-    const certificate = await keypair.$get<HSVMBlob>("certificate");
-
-    console.log(`Key name: ${record.name}`);
-    if (certificate.size === 0) {
+    console.log(`Key name: ${keypair.name}`);
+    if (!certificate) {
       console.log("- No certificate");
     } else {
-      const decoded = await pkcs.DecodePEMFile(await certificate.text()) as DecodedCertificate;
-      const validUntil = await datetime.FormatISO8601DateTime(decoded.valid_until, "", "", "CET") as string;
-      const difference = await datetime.GetDateTimeDifference(await datetime.GetCurrentDateTime(), decoded.valid_until) as { days: number };
+      const parsed = new X509Certificate(certificate);
+      const validUntil = parsed.validToDate;
+      const daysRemaining = Math.trunc((validUntil.getTime() - Date.now()) / 86_400_000);
 
-      console.log(`- Common name: ${decoded.subjectfields.find(field => field.fieldname === "CN")?.value ?? ""}`);
-      console.log(`- DNS alternative names: ${decoded.dns_altnames.join(" ")}`);
-      console.log(`- Issuer: ${decoded.issuerfields.find(field => field.fieldname === "CN")?.value ?? ""}`);
-      console.log(`- Valid until: ${validUntil} (${difference.days} days)`);
+      console.log(`- Common name: ${parsed.subject.split("\n").find(field => field.startsWith("CN="))?.slice(3) ?? ""}`);
+      console.log(`- DNS alternative names: ${keypair.dns_altnames.join(" ")}`);
+      console.log(`- Issuer: ${parsed.issuer.split("\n").find(field => field.startsWith("CN="))?.slice(3) ?? ""}`);
+      console.log(`- Valid until: ${validUntil.toISOString()} (${daysRemaining} days)`);
       console.log();
     }
   }
