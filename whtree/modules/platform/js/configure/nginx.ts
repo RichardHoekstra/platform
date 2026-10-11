@@ -27,6 +27,14 @@ async function generateBaseConfig(webserverConfig: Configuration, params: { pidF
       continue;
 
     const listenAddress = (port.ip ? port.ip.includes('::') ? `[${port.ip}]:` : `${port.ip}:` : "") + port.port;
+    const proxySettings = `proxy_pass http://hswebserver;
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection $connection_upgrade;
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Forwarded-For $remote_addr;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-WH-Proxy "source=nginx;proto=$scheme;for=$remote_addr;local=$server_addr${port.istrustedport ? "" : `;binding=${port.id}`}";`;
     const serverSection = `
 listen ${listenAddress} ${port.privatekey ? "ssl" : ""};
 server_name _; # listen to all hosts
@@ -64,11 +72,17 @@ location / {
 }
 
 location @hswebserver {
-  proxy_pass http://hswebserver;
-  proxy_set_header Host $http_host;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header X-Forwarded-Proto $scheme;
-  proxy_set_header X-WH-Proxy "source=nginx;proto=$scheme;for=$remote_addr;local=$server_addr${port.istrustedport ? "" : `;binding=${port.id}`}";
+  error_page 419 = @hswebserver_websocket;
+  if ($http_upgrade ~* ^websocket$) {
+    return 419;
+  }
+  ${proxySettings}
+}
+
+location @hswebserver_websocket {
+  # for compatibility with the current tollium sockets, they should be pinging less than every 5 minutes?
+  proxy_read_timeout 5m;
+  ${proxySettings}
 }`; //end server block
     serverSections.push(`  server {\n${serverSection.split('\n').join('\n    ')}\n  }\n`);
   }
@@ -98,6 +112,11 @@ http {
 
   upstream hswebserver {
     server ${upstreamAddress};
+  }
+
+  map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
   }
 
   # Select QuickJS, recommened for new code (https://github.com/nginx/njs/blob/master/README.md#javascript-engines)
