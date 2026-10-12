@@ -20,6 +20,7 @@ export {
   throws,
   typeAssert,
   wait,
+  toggled,
   waitToggled,
   waitForEvent,
   scopedPrefix

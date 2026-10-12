@@ -165,6 +165,15 @@ async function testChecks() {
     test.eq(readOnlyExpect, { a: [{ b: [1] }] });
     test.eqPartial(readOnlyExpect, { a: [{ b: [1] }] });
   }
+
+  let x = 0;
+  await test.throws(/did not become true/, test.toggled({ test: () => x === 1, run: () => { x = 2; } }));
+
+  x = 0;
+  await test.throws(/became true before we even got/, test.toggled({ test: () => x++ === 1, run: () => { x = 2; } }));
+
+  x = 0;
+  await test.toggled({ test: () => x === 1, run: () => { x = 1; } });
 }
 
 async function testSupport() {
