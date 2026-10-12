@@ -49,6 +49,7 @@ async function testCatalogAPI() {
   {
     const bulk = cat.startBulkAction();
     await bulk.index({ title: "Doc 1", "@timestamp": new Date().toISOString() });
+    await bulk.index({ _id: "doc_xx", title: "Something else", "@timestamp": new Date().toISOString() });
     await bulk.commit({ refresh: true });
   }
 
@@ -74,6 +75,12 @@ async function testCatalogAPI() {
   }, docs1);
 
   test.assert(!("_source" in docs1.hits.hits[0]), "we didn't ask for _source so we shouldn't see it");
+  await test.throws(/Suffix must NOT be specified/, cat.delete("doc_xx", { refresh: true, suffix: "any" }));
+
+  await test.toggled({
+    test: async () => (await cat.search({ body: { query: { match: { "title": "Something else" } } } })).hits.hits.length === 0,
+    run: () => cat.delete("doc_xx", { refresh: true })
+  });
 
   const docs2 = await cat.search({
     body: {
@@ -166,6 +173,13 @@ async function testSuffixes() {
       _source: { no: { such: { field: { yet: 3 } } } }
     }
   ], sfx2docs_hits);
+
+  await test.throws(/Suffix must be specified for/, cat.delete("doc3", { refresh: true }));
+
+  await test.toggled({
+    test: async () => !(await cat.search({})).hits.hits.some(h => h._id === "doc3"),
+    run: () => cat.delete("doc3", { refresh: true, suffix: "sfx3" })
+  });
 
   //Verify the mapping on index -sfx3
   const clientinfo = await cat.getRawClient();
