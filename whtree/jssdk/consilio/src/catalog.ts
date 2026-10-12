@@ -185,11 +185,6 @@ class BulkAction<TDocument extends OpenSearchDocument = OpenSearchDocument> {
       for (const suffix of this.updatedSuffixes)
         await client.indices.refresh({ index: getOSIndexName(indexName, suffix) });
   }
-
-  /** @deprecated renamed to commit in WH 5.8*/
-  async finish({ refresh = false } = {}) {
-    return await this.commit({ refresh });
-  }
 }
 
 class CatalogObj<TDocument extends OpenSearchDocument = OpenSearchDocument> {

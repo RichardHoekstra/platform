@@ -70,6 +70,6 @@ runCli({
       }
     }
 
-    await inserter.finish();
+    await inserter.commit();
   }
 });

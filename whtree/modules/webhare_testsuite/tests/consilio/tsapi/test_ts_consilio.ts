@@ -42,14 +42,14 @@ async function testCatalogAPI() {
     const bulk = cat.startBulkAction();
     await bulk.index({ title: "Doc 1", invalidField: 1, "@timestamp": new Date().toISOString() });
 
-    const exc = await test.throws(/errors during/, bulk.finish({ refresh: true })) as BulkUploadError;
+    const exc = await test.throws(/errors during/, bulk.commit({ refresh: true })) as BulkUploadError;
     test.eqPartial([{ reason: /mapping set to strict/, doc: { title: "Doc 1" } }], exc.errors);
   }
 
   {
     const bulk = cat.startBulkAction();
     await bulk.index({ title: "Doc 1", "@timestamp": new Date().toISOString() });
-    await bulk.finish({ refresh: true });
+    await bulk.commit({ refresh: true });
   }
 
   //Find doc1
@@ -101,7 +101,7 @@ async function testCatalogAPI() {
     const bulk = cat.startBulkAction();
     await bulk.index({ title: "Doc 1", invalidField: 1, "@timestamp": new Date().toISOString(), _id: docs1.hits.hits[0]._id });
 
-    const exc = await test.throws(/errors during/, bulk.finish({ refresh: true })) as BulkUploadError;
+    const exc = await test.throws(/errors during/, bulk.commit({ refresh: true })) as BulkUploadError;
     test.eqPartial([{ reason: /mapping set to strict/, doc: { title: "Doc 1" }, _id: docs1.hits.hits[0]._id }], exc.errors);
   }
 }
@@ -141,7 +141,7 @@ async function testSuffixes() {
     await inserter.index({ _id: "doc1", no: { such: { field: { yet: 1 } } } }, { suffix: "sfx2" });
     await inserter.index({ _id: "doc2", no: { such: { field: { yet: 2 } } } }, { suffix: "sfx2" });
     await inserter.index({ _id: "doc3", no: { such: { field: { yet: 3 } } }, nosuchfieldyet_extra: "StringVeld" }, { suffix: "sfx3" });
-    await inserter.finish({ refresh: true });
+    await inserter.commit({ refresh: true });
   }
 
   test.eqPartial([{ suffix: "sfx2" }, { suffix: "sfx3" }], await cat.listSuffixes());
