@@ -198,6 +198,9 @@ export async function renderTSWidgetHS(context: {
     getInstance: async function <const Type extends keyof WHFSTypes | string & {}>(getType: string extends Type ? Type : WHFSTypeName, options?: { source?: "target" | "content" }): Promise<[Type] extends [WHFSTypeName] ? WHFSTypes[Type]["GetFormat"] : InstanceData> {
       return whfsType(getType).get(targetObject.id);
     },
+    getInstanceSource(): number {
+      return targetObject.id;
+    },
     webRequest: null,
     targetObject: targetObject,
     targetFolder: targetObject.isFolder ? targetObject : await whfs.openFolder(context.targetfolder),
