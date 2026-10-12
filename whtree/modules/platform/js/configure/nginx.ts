@@ -110,6 +110,9 @@ http {
   ${await generateMimeTypes(webserverConfig.types)}
   default_type  application/octet-stream;
 
+  # Disable version number reporting. pentesters love pointing this out so let's just avoid that discussion
+  server_tokens off;
+
   upstream hswebserver {
     server ${upstreamAddress};
   }
