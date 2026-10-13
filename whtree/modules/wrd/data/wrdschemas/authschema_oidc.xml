@@ -2,7 +2,13 @@
 
   <import definitionfile="/data/wrdschemas/authschema.xml" />
 
-  <object tag="wrdauth_oidc_client" keephistorydays="1100">
+  <migration tag="platform:rename_oidc_client"
+             at="update"
+             revision="1"
+             stage="beforeTypes"
+             updatefunction="mod::platform/lib/internal/migrations.whlib#RenameOIDCClient" />
+
+  <object tag="wrdauth_server" keephistorydays="1100" comment="A server we authorize against. Also known Authorization Server (OAuth2) or Identity Provider (OpenID Connect). Formerly known as wrdauth_oidc_client">
     <!-- keep history for about 3 years (1 or 2 rotations if secrets expire after 1 or 2 years) -->
 
     <!-- these are our OIDC Client Registrations, ie where this WRD Schema is a service provider to an external identity provider.
@@ -10,6 +16,7 @@
     -->
     <attributes>
       <free tag="wrd_title" required="true" unique="true" />
+      <boolean tag="is_idp" description="If set, this client is an identity provider" />
       <integer tag="wrd_ordering" />  <!-- TODO make this object a domain and then use the builtin wrd_ordering -->
       <free tag="metadataurl" />
       <free tag="clientid" />

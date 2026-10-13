@@ -163,7 +163,7 @@ async function setupOIDC() {
     const testsite = await test.getTestSiteJS();
 
     const schemaSP = wrd<WRDSchemaLike["wrd:testschema"]>("webhare_testsuite:oidc-sp");
-    await schemaSP.insert("wrdauthOidcClient", {
+    await schemaSP.insert("wrdauthServer", {
       wrdTag: "TESTFW_OIDC_SP",
       wrdTitle: "OIDC self sp",
       metadataurl: testsite.webRoot + ".well-known/openid-configuration", //TODO There should be an API getting this URL for us, using the identityprovider site configuration

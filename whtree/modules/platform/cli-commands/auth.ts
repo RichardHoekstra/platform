@@ -225,7 +225,7 @@ runCli({
 
         const wrdSchema = await getUserApiSchemaName(opts);
         const schema = wrd<System_UsermgmtSchemaType>(wrdSchema);
-        if (await schema.find("wrdauthOidcClient", { wrdTag: args.tag }))
+        if (await schema.find("wrdauthServer", { wrdTag: args.tag }))
           throw new Error(`OIDC Service provider with tag '${args.tag}' already exists`);
 
         if (!opts.metadataurl)
@@ -235,7 +235,7 @@ runCli({
         await loadlib("mod::wrd/lib/internal/auth/oidc.whlib").GetOIDCMetadata(opts.metadataurl);
 
         await beginWork();
-        const wrdId = await schema.insert("wrdauthOidcClient", {
+        const wrdId = await schema.insert("wrdauthServer", {
           wrdTag: args.tag,
           clientid: args.clientid,
           clientsecret: args.clientsecret,
@@ -254,12 +254,12 @@ runCli({
       main: async ({ opts, args }) => {
         const wrdSchema = await getUserApiSchemaName(opts);
         const schema = wrd<System_UsermgmtSchemaType>(wrdSchema);
-        const wrdId = await schema.find("wrdauthOidcClient", { wrdTag: args.tag });
+        const wrdId = await schema.find("wrdauthServer", { wrdTag: args.tag });
         if (!wrdId)
           throw new Error(`OIDC Service provider with tag '${args.tag}' not found`);
 
         await beginWork();
-        await schema.delete("wrdauthOidcClient", wrdId);
+        await schema.delete("wrdauthServer", wrdId);
         await commitWork();
 
         console.log(opts.json ? JSON.stringify({ wrdId }) : `Delete client #${wrdId} from schema ${wrdSchema}`);

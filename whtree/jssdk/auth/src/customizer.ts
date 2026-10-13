@@ -68,7 +68,7 @@ export interface LoginUsernameLookupOptions {
 export interface OpenIdAuthenticationParameters<S extends SchemaTypeDefinition = AnySchemaType> {
   /** Current WRD schema */
   wrdSchema: WRDSchemaType<S>;
-  /** Provider id (references wrdauthOidcClient) */
+  /** Provider id (references wrdauthServer) */
   provider: number;
   /** JWT payload */
   jwtPayload: JWTPayload;

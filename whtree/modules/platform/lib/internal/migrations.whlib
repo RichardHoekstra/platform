@@ -9,6 +9,20 @@ PUBLIC RECORD FUNCTION RenameSP(OBJECT wrdschema) {
   RETURN DEFAULT RECORD;
 }
 
+PUBLIC RECORD FUNCTION RenameOIDCClient(OBJECT wrdschema) {
+  OBJECT wrdauth_oidc_client := wrdschema->GetType("wrdauth_oidc_client");
+  IF(ObjectExists(wrdauth_oidc_client)) {
+    wrdauth_oidc_client->UpdateMetadata(CELL[ tag := "wrdauth_server" ]);
+
+    //We also add an 'is_idp' attribute to explicitly mark the upstream servers we recognize as an IDP
+    wrdauth_oidc_client->CreateAttribute("IS_IDP", "BOOLEAN");
+    FOREVERY(RECORD client FROM wrdauth_oidc_client->RunQuery([ outputcolumns := CELL["wrd_id"] ]))
+      wrdauth_oidc_client->UpdateEntity(client.wrd_id, CELL[ is_idp := TRUE ]);
+  }
+
+  RETURN DEFAULT RECORD;
+}
+
 PUBLIC RECORD FUNCTION MigrateAccountStatus(OBJECT wrdschema) {
   IF(NOT RecordExists(wrdschema->^wrd_person->GetAttribute("whuser_disabled")))
     RETURN DEFAULT RECORD; //this schema never had whuser_disabled. even though we use at=update this may happen if usermgmt is applied to an already created wrdschema

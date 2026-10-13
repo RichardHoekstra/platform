@@ -170,7 +170,7 @@ PUBLIC RECORD FUNCTION GetCacheableApplicationPortalConfigForApplyTester(OBJECT 
   IF(wrdschema != "")
   {
     OBJECT targetschema := OpenWRDSchema(wrdschema);
-    OBJECT oidcclient := targetschema->GetType("WRDAUTH_OIDC_CLIENT");
+    OBJECT oidcclient := targetschema->GetType("wrdauth_server");
     IF(ObjectExists(oidcclient))
     {
       eventmasks := eventmasks CONCAT oidcclient->GetEventMasks();

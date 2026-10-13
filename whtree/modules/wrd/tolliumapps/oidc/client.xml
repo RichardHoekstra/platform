@@ -20,7 +20,7 @@
                         onmaprows="mapproviders"
                         orderable="true"
                         requestcolumns="wrd_title clientid metadataurl"
-                        wrdtype="wrdauth_oidc_client">
+                        wrdtype="wrdauth_server">
         <column name="wrd_title" type="text" tid=".buttontitle" />
         <column name="metadataurl" type="text" />
         <column name="clientid" type="text" />
@@ -35,7 +35,7 @@
     </actions>
 
     <compositions>
-      <wrd:entity name="entity" wrdtype="wrdauth_oidc_client" />
+      <wrd:entity name="entity" wrdtype="wrdauth_server" />
     </compositions>
 
     <body>

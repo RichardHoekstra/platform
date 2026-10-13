@@ -118,6 +118,8 @@ RECORD ARRAY FUNCTION SetAttributeDefaults(RECORD ARRAY types, RECORD ARRAY attr
 
     IF (attr.attributetypename IN [ "DOMAIN", "DOMAINARRAY" ] AND attr.domaintag = "")
       THROW NEW Exception("No domain set for attribute '" || attr.tag || "'");
+    IF(ToUppercase(attr.domaintag) = "WRDAUTH_OIDC_CLIENT")
+      attr.domaintag := "WRDAUTH_SERVER"; //Temporary workaround for existing modules referring to old name (WH 6.1)
 
     IF (CellExists(attr, "ATTRS"))
       attr.attrs := SetAttributeDefaults(types, attr.attrs, tagbase || attr.tag || ".");

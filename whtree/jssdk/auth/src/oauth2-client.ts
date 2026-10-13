@@ -239,8 +239,8 @@ export class OAuth2Client {
 
 export async function createOAuth2Client<S extends SchemaTypeDefinition>(wrdSchemaIn: WRDSchemaType<S>, provider: number | string) {
   const wrdSchema = wrdSchemaIn as unknown as WRDSchema<System_UsermgmtSchemaType>; //TODO better schema type but at least this one has the OIDC Client
-  const providerId = typeof provider === "number" ? provider : await wrdSchema.find("wrdauthOidcClient", { wrdTag: provider }) ?? throwError(`No OIDC provider with tag ${provider} found`);
-  const spData = await wrdSchema.getFields("wrdauthOidcClient", providerId, ["metadataurl", "clientid", "clientsecret", "additionalscopes", "redirectUri", "clientSigning", "extraParams"]) ?? throwError(`No OIDC service provider #${providerId} found`);
+  const providerId = typeof provider === "number" ? provider : await wrdSchema.find("wrdauthServer", { wrdTag: provider }) ?? throwError(`No OIDC provider with tag ${provider} found`);
+  const spData = await wrdSchema.getFields("wrdauthServer", providerId, ["metadataurl", "clientid", "clientsecret", "additionalscopes", "redirectUri", "clientSigning", "extraParams"]) ?? throwError(`No OIDC service provider #${providerId} found`);
 
   return new OAuth2Client({
     metadataUrl: spData.metadataurl,
@@ -409,8 +409,8 @@ export async function handleOAuth2LandingPage(req: WebRequest): Promise<WebRespo
  * @param accessToken - Access token to use for the userinfo request
 */
 export async function fetchUserInfo(wrdSchema: AnyWRDSchema, provider: number | string, accessToken: string) {
-  const providerId = typeof provider === "number" ? provider : await wrdSchema.find("wrdauthOidcClient", { wrdTag: provider }) ?? throwError(`No OIDC provider with tag ${provider} found`);
-  const spData = await wrdSchema.getFields("wrdauthOidcClient", providerId, ["metadataurl"]);
+  const providerId = typeof provider === "number" ? provider : await wrdSchema.find("wrdauthServer", { wrdTag: provider }) ?? throwError(`No OIDC provider with tag ${provider} found`);
+  const spData = await wrdSchema.getFields("wrdauthServer", providerId, ["metadataurl"]);
   const providerInfo = await getOpenIDConnectMetadata(spData.metadataurl);
   if (!providerInfo.config.userinfo_endpoint)
     throw new Error(`OIDC provider at ${spData.metadataurl} has no userinfo_endpoint, can't fetch user info`);
