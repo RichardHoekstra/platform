@@ -159,7 +159,7 @@ export async function startAuthorizeFlow<T extends SchemaTypeDefinition>(provide
   if (!["query", "fragment", "form_post"].includes(response_mode))
     return { error: `Invalid response_mode '${response_mode}', allowed are 'query', 'fragment', or 'form_post'` };
 
-  const client = await provider.wrdschema.query("wrdauthServiceProvider").where("wrdGuid", "=", decompressUUID(clientid)).select(["callbackUrls", "wrdId"]).execute();
+  const client = await provider.wrdschema.query("wrdauthApplication").where("wrdGuid", "=", decompressUUID(clientid)).select(["callbackUrls", "wrdId"]).execute();
   if (client.length !== 1)
     return { error: "No such client" };
 
@@ -267,7 +267,7 @@ export async function retrieveTokens<T extends SchemaTypeDefinition>(provider: I
     return { error: "Missing parameter client_id" };
 
   const client = await provider.wrdschema.
-    query("wrdauthServiceProvider").
+    query("wrdauthApplication").
     where("wrdGuid", "=", decompressUUID(clientid)).
     select(["clientSecrets", "wrdId"]).
     execute();
@@ -358,7 +358,7 @@ export async function openIdRouter(req: WebRequest): Promise<WebResponse> {
 
   const wrdschemaTag = decodeURIComponent(endpoint[1] + ":" + endpoint[2]);
   const wrdschema = new WRDSchema<WRD_IdpSchemaType>(wrdschemaTag);
-  if (!await wrdschema.exists() || !await wrdschema.hasType("wrdauthServiceProvider"))
+  if (!await wrdschema.exists() || !await wrdschema.hasType("wrdauthApplication"))
     return createJSONResponse(404, { error: "Provider not configured" });
 
   //Determine the login page for this schema.

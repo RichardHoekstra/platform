@@ -478,7 +478,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
     */
     let clientInfo;
     if (client !== null) {
-      clientInfo = await this.wrdschema.getFields("wrdauthServiceProvider", client, ["wrdGuid", "subjectField"]);
+      clientInfo = await this.wrdschema.getFields("wrdauthApplication", client, ["wrdGuid", "subjectField"]);
       if (!clientInfo)
         throw new Error(`Unable to find serviceProvider #${client}`);
     }

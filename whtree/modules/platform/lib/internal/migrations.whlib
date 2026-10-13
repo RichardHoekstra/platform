@@ -2,6 +2,12 @@
 
 LOADLIB "mod::system/lib/configure.whlib";
 
+PUBLIC RECORD FUNCTION RenameSP(OBJECT wrdschema) {
+  OBJECT wrdauth_service_provider := wrdschema->GetType("wrdauth_service_provider");
+  IF(ObjectExists(wrdauth_service_provider))
+    wrdauth_service_provider->UpdateMetadata(CELL[ tag := "wrdauth_application" ]);
+  RETURN DEFAULT RECORD;
+}
 
 PUBLIC RECORD FUNCTION MigrateAccountStatus(OBJECT wrdschema) {
   IF(NOT RecordExists(wrdschema->^wrd_person->GetAttribute("whuser_disabled")))

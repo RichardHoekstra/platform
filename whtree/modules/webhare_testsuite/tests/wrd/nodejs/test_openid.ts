@@ -319,7 +319,7 @@ async function verifyOpenIDClient() {
 
   //update client to use firstname as subject
   await beginWork();
-  await oidcAuthSchema.update("wrdauthServiceProvider", clientWrdId, { subjectField: "wrdFirstName" });
+  await oidcAuthSchema.update("wrdauthApplication", clientWrdId, { subjectField: "wrdFirstName" });
   await commitWork();
 
   //verify using openid-client

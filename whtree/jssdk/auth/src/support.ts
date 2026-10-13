@@ -36,6 +36,11 @@ export const defaultWRDAuthLoginSettings: WRDAuthLoginSettings = {
   roundMinDuration: 3 * 3600 * 1000, // sessions last at least 3 hours
 };
 
+export type WRDDynamicRegistrationSettings = {
+  /** Is dynamic registration currently enabled */
+  enabled: boolean;
+};
+
 export type PrepAuthResult = {
   error: string;
 } | {

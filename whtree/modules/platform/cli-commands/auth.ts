@@ -275,8 +275,8 @@ runCli({
         const wrdSchema = await getUserApiSchemaName(opts);
         const schema = wrd<WRD_IdpSchemaType>(wrdSchema);
 
-        if (await schema.search("wrdauthServiceProvider", "wrdTitle", args.name, { matchCase: false }))
-          throw new CLIRuntimeError(`An relying party named '${args.name}' already exists`);
+        if (await schema.search("wrdauthApplication", "wrdTitle", args.name, { matchCase: false }))
+          throw new CLIRuntimeError(`A relying party named '${args.name}' already exists`);
 
         await beginWork();
         const newSp = {
@@ -302,7 +302,7 @@ runCli({
       main: async ({ opts, args }) => {
         const wrdSchema = await getUserApiSchemaName(opts);
         const schema = wrd<WRD_IdpSchemaType>(wrdSchema);
-        const sps = (await schema.query("wrdauthServiceProvider").
+        const sps = (await schema.query("wrdauthApplication").
           select(["wrdId", "wrdTitle", "wrdCreationDate", "wrdGuid"]).
           execute()).map((sp) => ({
             ...pick(sp, ["wrdId", "wrdTitle", "wrdCreationDate"]),
