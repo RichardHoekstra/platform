@@ -236,6 +236,7 @@ runCli({
 
         await beginWork();
         const wrdId = await schema.insert("wrdauthServer", {
+          isIdp: true,
           wrdTag: args.tag,
           clientid: args.clientid,
           clientsecret: args.clientsecret,
