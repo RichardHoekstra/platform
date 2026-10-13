@@ -3,21 +3,53 @@
 name: Auto Approve Internal PRs
 
 on:
+  # trigger auto-approval after ci.yml completes
+  workflow_run:
+    workflows: [Internal]
+    types: [completed]
+  # and auto-approve in cases PR is created after ci.yml completed
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened]
 
 jobs:
   auto-approve:
+    if: >-
+      (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ${{ vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     permissions:
+      actions: read
       contents: write # Our PR Approval was interpreted as 'Approved these changes with read-only permissions' - will this fix it?
       pull-requests: write
     env:
       WEBHARE_BOT_APPID: ${{ secrets.WEBHARE_BOT_APPID }}
 
     steps:
+      - name: Check Internal CI for PR Head
+        if: env.WEBHARE_BOT_APPID != '' && github.event_name == 'pull_request_target'
+        id: check-ci
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              ...context.repo,
+              workflow_id: 'internal-pr.yml',
+              head_sha: pr.head.sha,
+              branch: pr.head.ref,
+            });
+            const run = runs.find(candidate =>
+              candidate.head_sha === pr.head.sha &&
+              candidate.head_repository?.full_name === context.payload.repository.full_name
+            );
+            const passed = run?.status === 'completed' && run.conclusion === 'success';
+            core.setOutput('passed', passed ? 'true' : 'false');
+            if (!passed) {
+              console.log(`PR #${pr.number} has no completed successful Internal run for its current head. Skipping auto-approval.`);
+            }
+
       - name: Generate Bot Token
-        if: env.WEBHARE_BOT_APPID != ''
+        if: env.WEBHARE_BOT_APPID != '' && (github.event_name == 'workflow_run' || steps.check-ci.outputs.passed == 'true')
         id: generate-token
         uses: actions/create-github-app-token@v1
         with:
@@ -25,7 +57,7 @@ jobs:
           private-key: ${{ secrets.WEBHARE_BOT_PRIVATEKEY }}
 
       - name: Auto-Approve if PR is Internal
-        if: env.WEBHARE_BOT_APPID != ''
+        if: env.WEBHARE_BOT_APPID != '' && (github.event_name == 'workflow_run' || steps.check-ci.outputs.passed == 'true')
         uses: actions/github-script@v7
         env:
           BOT_LOGIN: ${{ steps.generate-token.outputs.app-slug }}[bot]
@@ -34,47 +66,61 @@ jobs:
           script: |
             const org = context.repo.owner;
             const repo = context.repo.repo;
-            const prNumber = context.payload.pull_request.number;
-            const prCreator = context.payload.pull_request.user.login;
-            const authorAssociation = context.payload.pull_request.author_association;
+            const run = context.payload.workflow_run;
+            const testedSha = run?.head_sha || context.payload.pull_request.head.sha;
+            // workflow_run.pull_requests is empty for fork PRs, which we never auto-approve
+            const prNumbers = run ? run.pull_requests.map(pr => pr.number) : [context.payload.pull_request.number];
+            const pullRequests = await Promise.all(prNumbers.map(async pull_number =>
+              (await github.rest.pulls.get({ owner: org, repo, pull_number })).data));
 
             // List of associations that count as Internal
             // Note that you need to a public member of the organization (https://github.com/orgs/WebHare/people) before creating the PR to get the auto-approve
             const internalRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
 
-            const isInternal = internalRoles.includes(authorAssociation);
+            for (const pr of pullRequests) {
+              if (pr.state !== 'open' || pr.head.repo?.full_name !== context.payload.repository.full_name || pr.head.sha !== testedSha) {
+                console.log(`PR #${pr.number} does not match the tested commit. Skipping auto-approval.`);
+                continue;
+              }
 
-            console.log(`PR Author: ${prCreator}`);
-            console.log(`Author Association: ${authorAssociation}`);
-            console.log(`Is Internal PR? ${isInternal}`);
+              const prNumber = pr.number;
+              const prCreator = pr.user.login;
+              const authorAssociation = pr.author_association;
+              const isInternal = internalRoles.includes(authorAssociation);
 
-            if (!isInternal) {
-              console.log(`PR is external (${authorAssociation}). Skipping auto-approval.`);
-              return;
+              console.log(`PR Author: ${prCreator}`);
+              console.log(`Author Association: ${authorAssociation}`);
+              console.log(`Is Internal PR? ${isInternal}`);
+
+              if (!isInternal) {
+                console.log(`PR is external (${authorAssociation}). Skipping auto-approval.`);
+                continue;
+              }
+
+              // Check if the bot has already approved to avoid duplicate spam on re-pushes
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner: org,
+                repo: repo,
+                pull_number: prNumber,
+              });
+
+              const alreadyApproved = reviews.some(
+                r => r.user.login === process.env.BOT_LOGIN && r.state === 'APPROVED'
+              );
+
+              if (alreadyApproved) {
+                console.log('Bot has already approved this PR.');
+                continue;
+              }
+
+              // Submit Auto-Approval for Internal PRs
+              console.log(`Auto-approving internal PR #${prNumber}...`);
+              await github.rest.pulls.createReview({
+                owner: org,
+                repo: repo,
+                pull_number: prNumber,
+                commit_id: testedSha,
+                event: 'APPROVE',
+                body: `🤖 **Auto-Approved:** PR author (@${prCreator}) is an internal organization/repository member.`,
+              });
             }
-
-            // Check if the bot has already approved to avoid duplicate spam on re-pushes
-            const { data: reviews } = await github.rest.pulls.listReviews({
-              owner: org,
-              repo: repo,
-              pull_number: prNumber,
-            });
-
-            const alreadyApproved = reviews.some(
-              r => r.user.login === process.env.BOT_LOGIN && r.state === 'APPROVED'
-            );
-
-            if (alreadyApproved) {
-              console.log('Bot has already approved this PR.');
-              return;
-            }
-
-            // Submit Auto-Approval for Internal PRs
-            console.log(`Auto-approving internal PR #${prNumber}...`);
-            await github.rest.pulls.createReview({
-              owner: org,
-              repo: repo,
-              pull_number: prNumber,
-              event: 'APPROVE',
-              body: `🤖 **Auto-Approved:** PR author (@${prCreator}) is an internal organization/repository member.`,
-            });
