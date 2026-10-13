@@ -1,14 +1,11 @@
-/* eslint-disable */
 /// @ts-nocheck -- Bulk rename to enable TypeScript validation
 
 import * as dompack from 'dompack';
 import * as $todd from "@mod-tollium/web/ui/js/support";
-import Keyboard from 'dompack/extra/keyboard';
-const menu = require('@mod-tollium/web/ui/components/basecontrols/menu');
+import * as menu from "@mod-tollium/web/ui/components/basecontrols/menu";
 import * as toddImages from "@mod-tollium/js/icons";
 import { getTid } from "@webhare/gettid";
-import { ToddImage } from "../components/jsx";
-import type IndyShell from '../shell';
+import type { IndyShell } from '../shell';
 import type { ApplicationBase } from '../application';
 
 
@@ -222,11 +219,11 @@ export default class ApplicationBar {
   }
 
   _onNavMenuClick(event) {
-    dompack.empty(this.appnavmenu);
-
     // Add all apps (first the fixed apps, then the unfixed ones)
-    this.apps.forEach(item => { if (item.fixed) this.appnavmenu.appendChild(item.menuitem); });
-    this.apps.forEach(item => { if (!item.fixed) this.appnavmenu.appendChild(item.menuitem); });
+    this.appnavmenu.replaceChildren(
+      ...this.apps.filter(item => item.fixed).map(item => item.menuitem),
+      ...this.apps.filter(item => !item.fixed).map(item => item.menuitem)
+    );
 
     menu.openAt(this.appnavmenu, this.nav_node, { direction: 'down', align: 'right' });
   }
