@@ -510,7 +510,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
 
     //ID tokens are only generated for 3rd party clients requesting an openid scope. They shouldn't be providing access to APIs and cannot be retracted by us, so they won't appear in the wrd.tokens table either
     let id_token: string | undefined;
-    const requestedScopes = options?.scopes || [];
+    const scopes = options?.scopes || []; //we expect our caller to filter unwanted scopes
     if (isOIDC) {
       if (!(client && clientInfo))
         throw new Error("Unable to create ID token without a thirdparty client");
@@ -529,7 +529,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
         await options?.customizer.onOpenIdToken({
           wrdSchema: this.wrdschema as unknown as WRDSchemaType<AnySchemaType>,
           user: subject,
-          scopes: requestedScopes,
+          scopes,
           client
         }, payload as JWTPayload);
 
@@ -542,13 +542,9 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
       id_token = this.signJWT(payload, config.signingKeys, "RSA");
     }
 
-    const scopes = type === "oidc"
-      ? requestedScopes.filter(scope => ["openid", "profile", "email"].includes(scope)) //filter out non-openid scopes to protect against misinterpretation, as these tokens were specified by the client!
-      : requestedScopes;
-
     /* We always generate access tokens for OpenID requests (skippable when client only requests an id_token)
-       For our convenience we use JWT for access tokens but we don't strictly have to. We do not set an audience as we're always the audience, and we do not really care
-       about the signature yet - our wrd.tokens table is leading (and we want to be able to show active sessions anyway) */
+     For our convenience we use JWT for access tokens but we don't strictly have to. We do not set an audience as we're always the audience, and we do not really care
+     about the signature yet - our wrd.tokens table is leading (and we want to be able to show active sessions anyway) */
     const atPayload = preparePayload(subjectValue, relativeTo, validUntil, { scopes });
     const prefix = options?.prefix ?? (type !== "id" ? "secret-token:" : ""); //if undefined/null, we fall back to the default
     if (options?.claims)

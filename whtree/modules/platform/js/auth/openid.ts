@@ -1,9 +1,9 @@
 import * as crypto from "node:crypto";
-import { type WebHareRouter, type WebRequest, type WebResponse, createJSONResponse, createRedirectResponse } from "@webhare/router";
+import { type WebHareRouter, type WebRequest, type WebResponse, createContentPageRequest, createJSONResponse, createRedirectResponse } from "@webhare/router";
 import { getApplyTesterForObject } from "@webhare/whfs/src/applytester";
 //TOOD make this a public export somewhere? but should it include wrdOrg and wrdPerson though
 import { wrd, type WRDSchema, type WRDSchemaLike, type WRDSchemaType } from "@webhare/wrd";
-import { listSites, openFolder, openSite } from "@webhare/whfs";
+import { listSites, openFileOrFolder, openFolder, openSite } from "@webhare/whfs";
 import { decompressUUID, hashClientSecret, IdentityProvider, type AuthTokenOptions } from "@webhare/auth/src/identity";
 import { closeServerSession, createServerSession, encryptForThisServer, getServerSession, importJSObject, updateServerSession } from "@webhare/services";
 import type { AuthCustomizer } from "@webhare/auth";
@@ -13,6 +13,7 @@ import { runInWork } from "@webhare/whdb";
 import type { AnySchemaType, SchemaTypeDefinition } from "@webhare/wrd/src/types";
 import type { ResponseModesScopes } from "@webhare/auth/src/types";
 import type { OAuth2PromptFlag } from "@webhare/auth/src/oauth2-client";
+import { litty } from "@webhare/litty";
 
 declare module "@webhare/services" {
   interface SessionScopes {
@@ -45,6 +46,12 @@ declare module "@webhare/services" {
 const validCodeChallengeMethods = ["plain", "S256"] as const;
 const logincontrolValidMsecs = 60 * 60 * 1000; // login control token is valid for 1 hour
 const openIdTokenExpiry = 60 * 60 * 1000; // openid id_token is valid for 1 hour
+
+const builtinScopes = ["openid", "profile", "email"];
+//TODO don't hardcode these, site/wrdauth config should explain them. different schemas do their own thing
+const supportedAccessScopes = {
+  "testfw": "Testframework scope"
+};
 
 export type CodeChallengeMethod = typeof validCodeChallengeMethods[number];
 
@@ -109,7 +116,7 @@ async function findLoginPageForSchema(schema: string) {
 
     loginPage = joinURL(site.webRoot, targeted[2]);
   }
-  return { loginPage, metadataUrl: candidates[0].webRoot + ".well-known/openid-configuration", wrdauth: candidates[0].wrdauth };
+  return { loginPage, metadataUrl: candidates[0].webRoot + ".well-known/openid-configuration", wrdauth: candidates[0].wrdauth, site: candidates[0].id };
 }
 
 function getOpenIdBase(wrdschema: WRDSchemaType<WRDSchemaLike["wrd:idp"]>) {
@@ -139,7 +146,7 @@ function verifyCodeChallenge(verifier: string, challenge: string, method: CodeCh
 export async function startAuthorizeFlow<T extends SchemaTypeDefinition>(provider: IdentityProvider<T>, url: string, loginPage: string, prompt: OAuth2PromptFlag, customizer?: AuthCustomizer): Promise<NavigateOrError> {
   const searchParams = new URL(url).searchParams;
   const clientid = searchParams.get("client_id") || '';
-  const scopes = searchParams.get("scope")?.split(" ") || [];
+  const scopes = (searchParams.get("scope")?.split(" ") || []).filter(scope => builtinScopes.includes(scope) || Object.keys(supportedAccessScopes).includes(scope));
   const redirect_uri = searchParams.get("redirect_uri") || '';
   const state = searchParams.get("state") || null;
   const nonce = searchParams.get("nonce") || null;
@@ -196,12 +203,12 @@ export async function startAuthorizeFlow<T extends SchemaTypeDefinition>(provide
 }
 
 /** Invoked by the /return/ endpoint after a user has completed logging in */
-export async function returnAuthorizeFlow<T extends SchemaTypeDefinition>(provider: IdentityProvider<T>, url: string, user: number, customizer?: AuthCustomizer): Promise<NavigateOrError> {
-  const searchParams = new URL(url).searchParams;
+export async function returnAuthorizeFlow<T extends SchemaTypeDefinition>(provider: IdentityProvider<T>, req: WebRequest, user: number, site: number, customizer?: AuthCustomizer): Promise<WebResponse> {
+  const searchParams = new URL(req.url).searchParams;
   const sessionid = searchParams.get("tok") || '';
   const returnInfo = await getServerSession("wrd:openid.idpstate", sessionid);
   if (!returnInfo)
-    return { error: "Session has expired" }; //TODO redirect the user to an explanatory page
+    return createJSONResponse(400, { error: "Session has expired" }); //TODO redirect the user to an explanatory page.
 
   //TODO verify this schema actually owns the entity (but not sure what the risks are if you mess up endpoints?)
   if (customizer?.onOpenIdReturn) {
@@ -214,16 +221,44 @@ export async function returnAuthorizeFlow<T extends SchemaTypeDefinition>(provid
 
     if (redirect) {
       await runInWork(() => closeServerSession(sessionid));
-      return { ...redirect, error: null };
+      return createRedirectResponse(redirect);
+    }
+  }
+
+  //Are any scopes requested which we wouldn't automatically honor?
+  //TODO validate the requested scopes and block unknown ones/or block the flow entirely - instead of just adding them to the requested token?
+  const finalRedirectURI = new URL(returnInfo.cbUrl);
+  const checkScopes = returnInfo.scopes.filter(scope => Object.keys(supportedAccessScopes).includes(scope)) as Array<keyof typeof supportedAccessScopes>;
+  if (checkScopes.length > 0) { //we need to explicitly ask the user for approval
+    if (req.method !== "POST") { //not POST-ing? render the permission page
+      const permissionrequest = await createContentPageRequest(await openFileOrFolder(site), { webRequest: req }); //TODO pass the webRequest too?
+      //TODO pass a true FormsAPI body. or delegate this fully to HareScript
+      //TODO Make it clear which client is asking. And if it's a dynamic clinet, make it especially clear that we can't verify the identity of the app
+      return await permissionrequest.buildWebPage(litty`
+        <form method="post" action="${req.url}" enctype="application/x-www-form-urlencoded">
+          <p>Do you approve the application to access the following on your behalf?</p>
+          <ul>
+            ${checkScopes.map(scope => litty`<li>${scope} - ${supportedAccessScopes[scope]}</li>`)}
+          </ul>
+          <button name="approve" value="no" type="submit">Deny</button>
+          <button name="approve" value="yes" type="submit">Approve</button>
+        </form>
+      `);
+    } else {
+      const formData = await req.formData();
+      const approve = formData.get("approve") === "yes";
+      if (!approve) {
+        finalRedirectURI.searchParams.set("error", "access_denied");
+        return createRedirectResponse(finalRedirectURI.toString());
+      }
     }
   }
 
   //Update session with user info
   await runInWork(() => updateServerSession("wrd:openid.idpstate", sessionid, { ...returnInfo, user }));
 
-  const finalRedirectURI = new URL(returnInfo.cbUrl);
   if (returnInfo.response_mode === "form_post") {
-    return {
+    return createRedirectResponse({
       type: "form",
       form: {
         action: finalRedirectURI.toString(),
@@ -231,9 +266,8 @@ export async function returnAuthorizeFlow<T extends SchemaTypeDefinition>(provid
           { name: "code", value: sessionid },
           ...returnInfo.state ? [{ name: "state", value: returnInfo.state }] : []
         ]
-      },
-      error: null
-    };
+      }
+    });
   }
 
   if (returnInfo.response_mode === "fragment") {
@@ -245,7 +279,7 @@ export async function returnAuthorizeFlow<T extends SchemaTypeDefinition>(provid
       finalRedirectURI.searchParams.set("state", returnInfo.state);
     finalRedirectURI.searchParams.set("code", sessionid);
   }
-  return { type: "redirect", url: finalRedirectURI.toString(), error: null };
+  return createRedirectResponse(finalRedirectURI.toString());
 }
 
 ///Implements the oauth2/openid endpoint
@@ -406,11 +440,7 @@ export async function openIdRouter(req: WebRequest): Promise<WebResponse> {
     if (!userinfo)
       throw new Error('Invalid login');
 
-    const redirect = await returnAuthorizeFlow(provider, req.url, userinfo.user, customizer);
-    if (redirect.error !== null)
-      return createJSONResponse(400, { error: redirect.error });
-
-    return createRedirectResponse(redirect);
+    return await returnAuthorizeFlow(provider, req, userinfo.user, login.site, customizer);
   }
 
   if (endpoint[3] === 'token') {

@@ -335,6 +335,16 @@ async function logoutAtIDP(context: Puppeteer.BrowserContext) {
       await context.deleteCookie(cookie);
 }
 
+async function consentToTestfwScope(page: Puppeteer.Page) {
+  //Handle consent question triggered by asking for 'testfw'
+  await page.waitForSelector('button[name="approve"][value="no"]');
+  test.eq([/testfw/], await page.$$eval("form ul li", items => items.map(item => item.textContent?.trim())));
+  await Promise.all([
+    page.waitForNavigation(),
+    page.click('button[name="approve"][value="yes"]')
+  ]);
+}
+
 async function verifyAsOpenIDSP() {
   const starttest = new Date();
   const testsite = await test.getTestSiteJS();
@@ -364,7 +374,7 @@ async function verifyAsOpenIDSP() {
   test.eq("testvalue", authrequest.searchParams.get("testparam"), "Extra param must be passed to authorize URL: " + authrequest);
 
   await runWebHareLoginFlow(page, { password: "pass$", changePasswordTo: newPassword });
-
+  await consentToTestfwScope(page);
   console.log("Password changed to: " + newPassword);
 
   { //wait for WebHare username
@@ -409,6 +419,7 @@ async function verifyAsOpenIDSP() {
   const portal1LoginRequest = testsite.webRoot + "portal1-oidc/wrdauthtest/?tryoidc=TESTFW_OIDC_SP";
   console.log(`portal1LoginRequest: ${portal1LoginRequest}`);
   await page.goto(portal1LoginRequest);
+  await consentToTestfwScope(page);
   test.eq(String(wrdId), await (await (await page.waitForSelector("#userid"))?.getProperty("textContent"))?.jsonValue());
 
   await logoutRelyingParty(context);
@@ -418,6 +429,7 @@ async function verifyAsOpenIDSP() {
   console.log(`portal1LoginRequestWithPrompt: ${portal1LoginRequestWithPrompt}`);
   await page.goto(portal1LoginRequestWithPrompt);
   await runWebHareLoginFlow(page, { password: newPassword });
+  await consentToTestfwScope(page);
   test.eq(String(wrdId), await (await (await page.waitForSelector("#userid"))?.getProperty("textContent"))?.jsonValue());
 
   await logoutRelyingParty(context);
@@ -437,6 +449,7 @@ async function verifyAsOpenIDSP() {
   console.log(`portal1LoginRequestBlocked: ${portal1LoginRequestBlocked}`);
   await page.goto(portal1LoginRequestBlocked);
   await runWebHareLoginFlow(page, { password: newPassword });
+  await consentToTestfwScope(page);
   test.eq(/The account has been disabled/, await (await (await page.waitForSelector("div.wh-wrdauth-extloginfailure"))?.getProperty("textContent"))?.jsonValue());
 
   await context.close();
@@ -466,6 +479,7 @@ async function verifyCustomOpenIDFlow() {
   await page.goto(portal1LoginRequest);
 
   await runWebHareLoginFlow(page, { user: "marge", password: "marge$", changePasswordTo: newPassword });
+  await consentToTestfwScope(page);
 
   //We're blocked so this should show Login failed page
   const heading = await page.waitForSelector("h2");
@@ -474,6 +488,7 @@ async function verifyCustomOpenIDFlow() {
   //Test NavigateInstruction now
   await runInWork(() => oidcAuthSchema.update("wrdPerson", test.getUser("marge").wrdId, { wrdLastName: "REDIRECTME" }));
   await page.goto(portal1LoginRequest);
+  await consentToTestfwScope(page);
 
   await test.wait(() => page.url().endsWith("/redirected-away"));
   await context.close();
@@ -492,6 +507,7 @@ async function testUserAutoCreation() {
   await page.goto(loginRequest);
 
   await runWebHareLoginFlow(page, { user: "bart", password: "bart$", changePasswordTo: newPassword });
+  await consentToTestfwScope(page);
   const newUser = await schemaSP.query("wrdPerson").where("wrdContactEmail", "=", test.getUser("bart").login).select(["wrdId", "wrdLastName", "whuserComment"]).executeRequireExactlyOne();
   test.eq(testsite.webRoot + "portal1-oidc/wrdauthtest/", newUser.whuserComment, "Autocreated user should have final URL in whuserComment");
 
@@ -531,6 +547,7 @@ async function verifySSOAPI() {
     console.log("Doing SSO login on ", startUrl);
     await page.click("#ssobutton");
     await runWebHareLoginFlow(page, { user: "bart", password: "bart$", changePasswordTo: newPassword });
+    await consentToTestfwScope(page);
 
     const schemaSP = wrd<"*">("webhare_testsuite:oidc-sp");
     const targetBart = await schemaSP.query("wrdPerson").where("wrdContactEmail", "=", test.getUser("bart").login).select(["wrdId", "wrdLastName", "whuserComment"]).executeRequireExactlyOne();
@@ -551,6 +568,7 @@ async function verifySSOAPI() {
     console.log("Doing second passive SSO login on ", startUrl);
     await page.goto(startUrl);
     await page.click("#ssopassivebutton");
+    await consentToTestfwScope(page);
     await test.wait(async () => {
       try {
         const result = await page.evaluate(`document.querySelector("#ssopassivestatus")?.textContent`) === "Completed passive SSO login";

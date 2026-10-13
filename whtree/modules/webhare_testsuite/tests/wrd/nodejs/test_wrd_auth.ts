@@ -13,6 +13,8 @@ import { loadlib } from "@webhare/harescript";
 import { calculateWRDSessionExpiry, defaultWRDAuthLoginSettings, prepAuthForURL } from "@webhare/auth/src/support";
 import type { PublicAuthData } from "@webhare/frontend/src/auth";
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
+import { HTTPSuccessCode } from "@webhare/router";
+import { IncomingWebRequest } from "@webhare/router/src/request";
 
 const cbUrl = "https://www.example.net/cb/";
 const loginUrl = "https://www.example.net/login/";
@@ -180,16 +182,17 @@ async function mockAuthorizeFlow<T extends SchemaTypeDefinition>(provider: Ident
 
   //We now have an url with wrdauth_logincontrol, decrypt it:
   const decryptLoginControl = decryptForThisServer("wrd:authplugin.logincontroltoken", new URL(startflow.url, loginUrl).searchParams.get("wrdauth_logincontrol")!);
-  const endFlow = await returnAuthorizeFlow(provider, new URL(decryptLoginControl.returnto, loginUrl).toString(), user, customizer);
+  const endFlow = await returnAuthorizeFlow(provider, new IncomingWebRequest(new URL(decryptLoginControl.returnto, loginUrl).toString()), user, (await test.getTestSiteJS()).id, customizer);
 
-  test.assert(endFlow.error === null && endFlow.type === "redirect");
-  if (!endFlow.url.startsWith(cbUrl))
-    return { blockedTo: endFlow.url };
+  test.eq(HTTPSuccessCode.SeeOther, endFlow.status);
+  const redirectedTo = endFlow.headers.get("location");
+  if (!redirectedTo?.startsWith(cbUrl))
+    return { blockedTo: redirectedTo };
 
   //Returned to callback, retrieve JWT
-  test.eq(state, new URL(endFlow.url).searchParams.get("state"));
+  test.eq(state, new URL(redirectedTo).searchParams.get("state"));
   const formparams = {
-    code: new URL(endFlow.url).searchParams.get("code")!,
+    code: new URL(redirectedTo).searchParams.get("code")!,
     client_id: clientId,
     client_secret: clientSecret,
     grant_type: "authorization_code",
