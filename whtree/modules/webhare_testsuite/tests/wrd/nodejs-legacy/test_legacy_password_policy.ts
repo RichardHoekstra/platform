@@ -1,17 +1,10 @@
 import { defaultDateTime, encodeHSON } from "@webhare/hscompat";
-import { generateRandomId } from "@webhare/std";
 import * as test from "@webhare/test";
 import { AuthenticationSettings, updateSchemaSettings } from "@webhare/wrd";
-import { checkPasswordCompliance, describePasswordChecks, getPasswordBreachCount, getPasswordMinValidFrom, parsePasswordChecks } from "@webhare/auth/src/passwords";
+import { checkPasswordCompliance, describePasswordChecks, getPasswordMinValidFrom, parsePasswordChecks } from "@webhare/auth/src/passwords";
 import { wrdTestschemaSchema } from "@mod-platform/generated/wrd/webhare";
 import { beginWork, rollbackWork } from "@webhare/whdb";
 import { getUserValidationSettings } from "@webhare/auth/src/support";
-
-async function testPasswordBreachCount() {
-  test.assert(await getPasswordBreachCount("a") > 700000);
-  test.assert(await getPasswordBreachCount("secret") > 1000000);
-  test.eq(0, await getPasswordBreachCount(generateRandomId()));
-}
 
 function testCheckParser() {
   test.eq([
@@ -104,7 +97,6 @@ async function testSettingOverrides() {
 }
 
 test.runTests([
-  testPasswordBreachCount,
   testCheckParser,
   testGetPasswordMinValueFrom,
   testDescribePasswordChecks,

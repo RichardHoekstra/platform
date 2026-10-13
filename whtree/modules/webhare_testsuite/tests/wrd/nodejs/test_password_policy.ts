@@ -2,18 +2,12 @@ import { defaultDateTime, encodeHSON } from "@webhare/hscompat";
 import { generateRandomId, throwError } from "@webhare/std";
 import * as test from "@webhare/test";
 import { AuthenticationSettings, updateSchemaSettings, wrd } from "@webhare/wrd";
-import { checkPasswordCompliance, describePasswordChecks, getPasswordBreachCount, getPasswordMinValidFrom, parsePasswordChecks, verifyPasswordCompliance } from "@webhare/auth/src/passwords";
+import { checkPasswordCompliance, describePasswordChecks, getPasswordMinValidFrom, parsePasswordChecks, verifyPasswordCompliance } from "@webhare/auth/src/passwords";
 import { beginWork, commitWork, db, rollbackWork, runInWork } from "@webhare/whdb";
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import { getUserValidationSettings } from "@webhare/auth/src/support";
 
 const wrdTestschemaSchema = wrd("wrd:testschema");
-
-async function testPasswordBreachCount() {
-  test.assert(await getPasswordBreachCount("a") > 700000);
-  test.assert(await getPasswordBreachCount("secret") > 1000000);
-  test.eq(0, await getPasswordBreachCount(generateRandomId()));
-}
 
 function testCheckParser() {
   test.eq([
@@ -150,7 +144,6 @@ async function testCompleteAccountExpiry() {
 
 test.runTests([
   testCompleteAccountExpiry,
-  testPasswordBreachCount,
   testCheckParser,
   testGetPasswordMinValueFrom,
   testDescribePasswordChecks,

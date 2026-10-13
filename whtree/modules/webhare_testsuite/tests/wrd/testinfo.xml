@@ -19,6 +19,7 @@
   <test script="testdeleteclosedafter.ts" />
   <test script="testkeephistory.whscr" />
   <test script="testpasswordpolicy.whscr" />
+  <test script="testpasswordbreachcount.whscr" tags="external" />
   <test name="api" path="api/" />
   <test name="payments" path="payments/" />
   <test name="address" path="address/" />

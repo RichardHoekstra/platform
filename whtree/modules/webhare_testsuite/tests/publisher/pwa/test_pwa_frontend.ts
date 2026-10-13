@@ -105,13 +105,14 @@ test.runTests(
 
     "check error handling",
     async function () {
-      //Load one never pre-reported asset
-      await test.getWin().fetch("https://beta.webhare.net/", { mode: 'no-cors' });
+      //Load one never pre-reported asset. Stay on the test site so the test doesn't depend on an external server
+      const unreportedurl = test.getTestSiteRoot() + "pwatest/never-reported-asset.txt";
+      await test.getWin().fetch(unreportedurl);
 
       const cachemissses = (await pwatests.getSWLog()).filter(entry => entry.event === 'miss');
       if (cachemissses.length > 1)
         console.table(cachemissses);
       test.eq(1, cachemissses.length);
-      test.eq("https://beta.webhare.net/", cachemissses[0].url);
+      test.eq(unreportedurl, cachemissses[0].url);
     }
   ]);
