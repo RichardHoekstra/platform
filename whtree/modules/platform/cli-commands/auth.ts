@@ -226,7 +226,7 @@ runCli({
         const wrdSchema = await getUserApiSchemaName(opts);
         const schema = wrd<System_UsermgmtSchemaType>(wrdSchema);
         if (await schema.find("wrdauthServer", { wrdTag: args.tag }))
-          throw new Error(`OIDC Service provider with tag '${args.tag}' already exists`);
+          throw new Error(`OIDC Identity provider with tag '${args.tag}' already exists`);
 
         if (!opts.metadataurl)
           throw new Error("--metadataurl is required");
@@ -257,7 +257,7 @@ runCli({
         const schema = wrd<System_UsermgmtSchemaType>(wrdSchema);
         const wrdId = await schema.find("wrdauthServer", { wrdTag: args.tag });
         if (!wrdId)
-          throw new Error(`OIDC Service provider with tag '${args.tag}' not found`);
+          throw new Error(`OIDC Identity provider with tag '${args.tag}' not found`);
 
         await beginWork();
         await schema.delete("wrdauthServer", wrdId);

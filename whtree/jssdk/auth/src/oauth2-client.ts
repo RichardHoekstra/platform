@@ -180,6 +180,7 @@ export class OAuth2Client {
   async createAuthorizeLink(finalurl: string, options?: OAuth2AuthorizeRequestOptions): Promise<NavigateInstruction> {
     const metadata = await getOpenIDConnectMetadata(this.clientinfo.metadataUrl);
     const redirecturl = this.clientinfo.redirectUrl || getDefaultOAuth2RedirectURL();
+    const authorizeurl = metadata.config.authorization_endpoint ?? throwError(`Authentication server at ${this.clientinfo.metadataUrl} has no authorization_endpoint`);
 
     //TODO avoid storing this all in webserver sessions, WRD clientid should often suffice. And link that up to JWT caching for apple logins
     const state: SessionScopes["system:oauth2"] = {
@@ -195,8 +196,8 @@ export class OAuth2Client {
         clientsigning: this.clientinfo.clientSigning ? toSnakeCase(this.clientinfo.clientSigning) : null,
         extra_params: this.clientinfo.extraParams,
         redirecturl,
-        authorizeurl: metadata.config.authorization_endpoint ?? throwError(`OIDC provider at ${this.clientinfo.metadataUrl} has no authorization_endpoint`),
-        authtokenurl: metadata.config.token_endpoint ?? throwError(`OIDC provider at ${this.clientinfo.metadataUrl} has no token_endpoint`),
+        authorizeurl,
+        authtokenurl: metadata.config.token_endpoint ?? throwError(`Authentication server at ${this.clientinfo.metadataUrl} has no token_endpoint`),
       }
     };
 
@@ -208,7 +209,7 @@ export class OAuth2Client {
       }
 
     const session = await runInWork(() => createServerSession("system:oauth2", state, { expires: "PT90M" }));
-    const authurl = new URL(metadata.config.authorization_endpoint ?? throwError(`OIDC provider at ${this.clientinfo.metadataUrl} has no authorization_endpoint`));
+    const authurl = new URL(authorizeurl);
     authurl.searchParams.set("state", session);
     authurl.searchParams.set("client_id", this.clientinfo.clientId);
     authurl.searchParams.set("response_type", "code");
@@ -239,8 +240,8 @@ export class OAuth2Client {
 
 export async function createOAuth2Client<S extends SchemaTypeDefinition>(wrdSchemaIn: WRDSchemaType<S>, provider: number | string) {
   const wrdSchema = wrdSchemaIn as unknown as WRDSchema<System_UsermgmtSchemaType>; //TODO better schema type but at least this one has the OIDC Client
-  const providerId = typeof provider === "number" ? provider : await wrdSchema.find("wrdauthServer", { wrdTag: provider }) ?? throwError(`No OIDC provider with tag ${provider} found`);
-  const spData = await wrdSchema.getFields("wrdauthServer", providerId, ["metadataurl", "clientid", "clientsecret", "additionalscopes", "redirectUri", "clientSigning", "extraParams"]) ?? throwError(`No OIDC service provider #${providerId} found`);
+  const providerId = typeof provider === "number" ? provider : await wrdSchema.find("wrdauthServer", { wrdTag: provider }) ?? throwError(`No wrdauthServer with tag ${provider} found`);
+  const spData = await wrdSchema.getFields("wrdauthServer", providerId, ["metadataurl", "clientid", "clientsecret", "additionalscopes", "redirectUri", "clientSigning", "extraParams"]) ?? throwError(`wrdauthServer #${providerId} not found`);
 
   return new OAuth2Client({
     metadataUrl: spData.metadataurl,
@@ -275,7 +276,7 @@ export async function handleOAuth2AuthorizeLanding(clientScope: string, oauth2Se
     const metadata = await getOpenIDConnectMetadata(sessdata.metadata_url || throwError("No metadata_url in oauth2 session"));
     const matchKey = metadata.jwks?.keys.find(k => k.kid === decoded?.header.kid);
     if (!matchKey)
-      throw new Error(`Unable to find key '${decoded?.header.kid}' in OIDC provider JWKS`);
+      throw new Error(`Unable to find key '${decoded?.header.kid}' in the authentication server's JWKS`);
 
     let verifyIssuer = metadata.config.issuer;
 
@@ -409,11 +410,11 @@ export async function handleOAuth2LandingPage(req: WebRequest): Promise<WebRespo
  * @param accessToken - Access token to use for the userinfo request
 */
 export async function fetchUserInfo(wrdSchema: AnyWRDSchema, provider: number | string, accessToken: string) {
-  const providerId = typeof provider === "number" ? provider : await wrdSchema.find("wrdauthServer", { wrdTag: provider }) ?? throwError(`No OIDC provider with tag ${provider} found`);
+  const providerId = typeof provider === "number" ? provider : await wrdSchema.find("wrdauthServer", { wrdTag: provider }) ?? throwError(`No authentication server with tag ${provider} found`);
   const spData = await wrdSchema.getFields("wrdauthServer", providerId, ["metadataurl"]);
   const providerInfo = await getOpenIDConnectMetadata(spData.metadataurl);
   if (!providerInfo.config.userinfo_endpoint)
-    throw new Error(`OIDC provider at ${spData.metadataurl} has no userinfo_endpoint, can't fetch user info`);
+    throw new Error(`Authentication server at ${spData.metadataurl} has no userinfo_endpoint, can't fetch user info`);
 
   const res = await fetch(providerInfo.config.userinfo_endpoint, {
     headers: {
