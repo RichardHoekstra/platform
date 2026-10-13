@@ -69,7 +69,7 @@ test.runTests(
         const filenameinput = test.qR(getUploadField(), '.file__name');
         test.eq('mytestfile.txt', filenameinput.value, 'should be a file present');
 
-        await test.waitToggled({
+        await test.waitForTransitionToTrue({
           test: () => !test.qS(getUploadField(), '.file:not(.file--placeholder) .file__name'),
           run: () => test.click(test.qR(getUploadField(), '.file__deletebutton'))
         }, 'should be no more file present after delete');

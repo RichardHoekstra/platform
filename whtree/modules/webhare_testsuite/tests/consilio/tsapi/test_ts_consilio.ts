@@ -77,7 +77,7 @@ async function testCatalogAPI() {
   test.assert(!("_source" in docs1.hits.hits[0]), "we didn't ask for _source so we shouldn't see it");
   await test.throws(/Suffix must NOT be specified/, cat.delete("doc_xx", { refresh: true, suffix: "any" }));
 
-  await test.toggled({
+  await test.transitionsToTrue({
     test: async () => (await cat.search({ body: { query: { match: { "title": "Something else" } } } })).hits.hits.length === 0,
     run: () => cat.delete("doc_xx", { refresh: true })
   });
@@ -176,7 +176,7 @@ async function testSuffixes() {
 
   await test.throws(/Suffix must be specified for/, cat.delete("doc3", { refresh: true }));
 
-  await test.toggled({
+  await test.transitionsToTrue({
     test: async () => !(await cat.search({})).hits.hits.some(h => h._id === "doc3"),
     run: () => cat.delete("doc3", { refresh: true, suffix: "sfx3" })
   });

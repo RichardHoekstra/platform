@@ -20,8 +20,8 @@ export {
   throws,
   typeAssert,
   wait,
-  toggled,
-  waitToggled,
+  transitionsToTrue,
+  waitForTransitionToTrue,
   waitForEvent,
   scopedPrefix
 } from './checks';

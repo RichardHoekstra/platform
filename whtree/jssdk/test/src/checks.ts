@@ -756,12 +756,12 @@ export async function wait<T>(waitfor: (() => T | Promise<T>) | Promise<T>, opti
  *
  * This is generally equivalent to `assert(!test); run(); assert(test);` but helps prevent mistakes if the two test conditions weren't identical, or if they became true because of another side effect rather than the run() function.
  *
- * @param toggle - Toggle set
- * @param toggle.test - A function that should resolve to falsy value before run() is invoked (tested immediatley and after one tick), and to a truthy value once run() has completed
- * @param toggle.run - The function to run
+ * @param transition - Transition check
+ * @param transition.test - A function that should resolve to falsy value before run() is invoked (tested immediatley and after one tick), and to a truthy value once run() has completed
+ * @param transition.run - The function to run
  * @param options - Test compare options or annotation
 */
-export async function toggled<T>({ test, run }: {
+export async function transitionsToTrue<T>({ test, run }: {
   test: () => T | Promise<T>;
   run: () => unknown | Promise<unknown>;
 }, options?: string | { timeout?: number; annotation?: Annotation }): Promise<void> {
@@ -773,7 +773,7 @@ export async function toggled<T>({ test, run }: {
     result = await result;
 
   if (result)
-    throw new TestError("toggled: the test condition is already initially true", options);
+    throw new TestError("transitionsToTrue: the test condition is already initially true", options);
 
   //Re-evaluate
   result = test();
@@ -781,7 +781,7 @@ export async function toggled<T>({ test, run }: {
     result = await result;
 
   if (result)
-    throw new TestError("toggled: the test condition became true before we even got to invoke the action!", options);
+    throw new TestError("transitionsToTrue: the test condition became true before we even got to invoke the action!", options);
 
   await run();
 
@@ -790,19 +790,19 @@ export async function toggled<T>({ test, run }: {
     result = await result;
 
   if (!result)
-    throw new TestError("toggled: the test condition did not become true after the action was invoked!", options);
+    throw new TestError("transitionsToTrue: the test condition did not become true after the action was invoked!", options);
 }
 
 /** Wait for a condition from false to true when executing a specific code.
  *
  * This is generally equivalent to `assert(!test); run(); wait(test);` but helps prevent mistakes if the two test conditions weren't identical, or if they became true because of another side effect rather than the run() function.
  *
- * @param wait - Toggle set
- * @param wait.test - A function that should resolve to falsy value before run() is invoked (tested immediatley and after one tick), and to a truthy value once run() has completed
- * @param wait.run - The function to run
+ * @param transition - Transition check
+ * @param transition.test - A function that should resolve to falsy value before run() is invoked (tested immediatley and after one tick), and to a truthy value once run() has completed
+ * @param transition.run - The function to run
  * @param options - Test compare options or annotation
 */
-export async function waitToggled<T>({ test, run }: {
+export async function waitForTransitionToTrue<T>({ test, run }: {
   test: () => T | Promise<T>;
   run: () => unknown | Promise<unknown>;
 }, options?: string | { timeout?: number; annotation?: Annotation }): PositiveWaitRetVal<T> {
@@ -814,7 +814,7 @@ export async function waitToggled<T>({ test, run }: {
     result = await result;
 
   if (result)
-    throw new TestError("waitToggled: the test condition is already initially true", options);
+    throw new TestError("waitForTransitionToTrue: the test condition is already initially true", options);
 
   await sleep(1);
 
@@ -824,7 +824,7 @@ export async function waitToggled<T>({ test, run }: {
     result = await result;
 
   if (result)
-    throw new TestError("waitToggled: the test condition became true before we even got to invoke the action!", options);
+    throw new TestError("waitForTransitionToTrue: the test condition became true before we even got to invoke the action!", options);
 
   await run();
   return await wait(test, options);

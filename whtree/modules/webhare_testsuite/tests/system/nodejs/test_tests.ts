@@ -167,13 +167,13 @@ async function testChecks() {
   }
 
   let x = 0;
-  await test.throws(/did not become true/, test.toggled({ test: () => x === 1, run: () => { x = 2; } }));
+  await test.throws(/did not become true/, test.transitionsToTrue({ test: () => x === 1, run: () => { x = 2; } }));
 
   x = 0;
-  await test.throws(/became true before we even got/, test.toggled({ test: () => x++ === 1, run: () => { x = 2; } }));
+  await test.throws(/became true before we even got/, test.transitionsToTrue({ test: () => x++ === 1, run: () => { x = 2; } }));
 
   x = 0;
-  await test.toggled({ test: () => x === 1, run: () => { x = 1; } });
+  await test.transitionsToTrue({ test: () => x === 1, run: () => { x = 1; } });
 }
 
 async function testSupport() {

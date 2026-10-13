@@ -29,7 +29,7 @@ async function testSimpleElement() {
 async function testAttributeSyncingSimple() {
   //Test the disabled attribute
   test.eq(false, test.qR("my-simple-field").disabled);
-  await test.waitToggled({
+  await test.waitForTransitionToTrue({
     test: () => test.qR("my-simple-field").disabled,
     run: () => test.qR("my-simple-field").setAttribute("disabled", "disabled")
   });
