@@ -617,7 +617,22 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
     if (!tokeninfo.client)
       return { error: "WRDAuth login tokens are not valid for OpenID /userinfo endpoints" };
 
-    const userfields = await this.wrdschema.getFields("wrdPerson", tokeninfo.entity, ["wrdFullName", "wrdFirstName", "wrdLastName"/*,"wrdContactEmail"*/]);
+    const authsettings = await this.getAuthSettings(false);
+    const getfields: Record<string, string> = {
+      name: "wrdFullName",
+      given_name: "wrdFirstName",
+      family_name: "wrdLastName",
+    };
+    if (tokeninfo.scopes?.includes("email") && authsettings?.emailAttribute)
+      getfields.email = authsettings.emailAttribute;
+
+    const accountType = authsettings?.accountType || "wrdPerson";
+    const userfields = await (this.wrdschema as AnyWRDSchema).getFields(accountType, tokeninfo.entity, getfields) as {
+      name: string;
+      given_name: string;
+      family_name: string;
+      email?: string | null;
+    } | null;
     if (!userfields)
       return { error: "No such user" };
 
@@ -627,11 +642,13 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
 
     const userinfo: Record<string, unknown> = { //TODO limit by the fields by requested scope and client access
       sub: decoded.payload.sub,
-      name: userfields.wrdFullName,
-      given_name: userfields.wrdFirstName,
-      family_name: userfields.wrdLastName,
-      // email: userinfo.wrdContactEmail
+      name: userfields.name,
+      given_name: userfields.given_name,
+      family_name: userfields.family_name,
     };
+
+    if (userfields.email)
+      userinfo.email = userfields.email;
 
     if (customizer?.onOpenIdUserInfo)
       await customizer?.onOpenIdUserInfo({

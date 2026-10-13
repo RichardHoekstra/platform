@@ -358,7 +358,7 @@ async function verifyOpenIDClient() {
   await test.throws(/unexpected HTTP response status code/, fetchUserInfo(config, tokenSet.id_token, tokenSet.claims()!.sub!), "Shouldn't accept id_token");
   const userinfo = await fetchUserInfo(config, tokenSet.access_token!, tokenSet.claims()!.sub!);
 
-  test.eqPartial({ "sub": "Sysop", "name": "Sysop McTestsuite", "given_name": "Sysop", "family_name": "McTestsuite", answer: 43 }, userinfo);
+  test.eqPartial({ "sub": "Sysop", "name": "Sysop McTestsuite", "given_name": "Sysop", "family_name": "McTestsuite", email: "sysop@beta.webhare.net", answer: 43 }, userinfo);
 
   //Now with a nonce
   const nonce = randomNonce();
