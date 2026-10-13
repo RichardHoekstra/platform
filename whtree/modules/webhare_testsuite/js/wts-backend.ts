@@ -9,7 +9,7 @@ export * from "@webhare/test-backend";
 import { loadlib } from "@webhare/harescript";
 
 import { beginWork, commitWork } from "@webhare/whdb";
-import { openFileOrFolder, openFolder, openSite } from "@webhare/whfs";
+import { openFileOrFolder, openFolder, openSite, type Site } from "@webhare/whfs";
 import { ensureFallbackCertficate } from "@mod-platform/js/webserver/config";
 
 export const wellKnownHashes = {
@@ -27,12 +27,18 @@ export async function getTestSiteHSTemp() {
 export async function getTestSiteJSTemp() {
   return await openFolder("site::webhare_testsuite.testsitejs/tmp");
 }
+async function getTestSite(name: string): Promise<Site & { webRoot: string }> {
+  const site = await openSite(name);
+  if (!site.webRoot)
+    throw new Error(`Test site '${name}' is not published`);
+  return site as Site & { webRoot: string };
+}
 
 export async function getTestSiteHS() {
-  return await openSite("webhare_testsuite.testsite");
+  return await getTestSite("webhare_testsuite.testsite");
 }
 export async function getTestSiteJS() {
-  return await openSite("webhare_testsuite.testsitejs");
+  return await getTestSite("webhare_testsuite.testsitejs");
 }
 
 export async function getWHFSTestRoot() {
