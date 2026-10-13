@@ -185,11 +185,6 @@ class BulkAction<TDocument extends OpenSearchDocument = OpenSearchDocument> {
       for (const suffix of this.updatedSuffixes)
         await client.indices.refresh({ index: getOSIndexName(indexName, suffix) });
   }
-
-  /** @deprecated renamed to commit in WH 5.8*/
-  async finish({ refresh = false } = {}) {
-    return await this.commit({ refresh });
-  }
 }
 
 class CatalogObj<TDocument extends OpenSearchDocument = OpenSearchDocument> {
@@ -349,17 +344,25 @@ class CatalogObj<TDocument extends OpenSearchDocument = OpenSearchDocument> {
     return (await client.search({ index: indexName + suffix, ...req })).body as SearchResult<SearchDocument>;
   }
 
-  /** Bulk upload */
-
-  /* TODO should Catalog still wrap Suffix management, or shouldn't they?) */
-  async delete(docid: string) {
+  /** Delete a document by id */
+  async delete(docid: string, { refresh = false, suffix = "" } = {}) {
     const indices = await this.listFullAttachedIndices();
     if (!indices.length)
       throw new Error(`No indices attached to catalog ${this.id}`);
+    if (indices.length > 1)
+      throw new Error(`Cannot yet delete document when multiple indices are attached to catalog ${this.id}`); //TODO until we figure out how to deal with partial delete success
 
-    const res = await fetch(indices[0].baseurl + "_doc/" + docid, { method: "delete" });
-    if (!res.ok)
-      throw new Error(`Failed to delete document ${docid}: ${res.status} ${await res.text()}`);
+    if (indices[0].suffix && !suffix)
+      throw new Error(`Suffix must be specified for suffixed index '${this.tag}'`);
+    if (!indices[0].suffix && suffix)
+      throw new Error(`Suffix must NOT be specified for unsuffixed index '${this.tag}'`);
+
+    const { client, indexName } = await this.getRawClient();
+    await client.delete({
+      index: indexName + (suffix ? "-" + suffix : ""),
+      id: docid,
+      refresh: refresh ? "true" : "false"
+    });
   }
 }
 

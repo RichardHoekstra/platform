@@ -87,7 +87,7 @@ test.runTests(
 
         test.assert(!test.qR("#rtdtest-img").hasAttribute("disabled"));
 
-        await test.waitToggled({
+        await test.waitForTransitionToTrue({
           test: () => !test.qS(imgCompRoot, 'img'),
           run: () => test.click(test.qR(imgCompRoot, '.image__deletebutton'))
         }, 'image should have gone away after clicking delete');

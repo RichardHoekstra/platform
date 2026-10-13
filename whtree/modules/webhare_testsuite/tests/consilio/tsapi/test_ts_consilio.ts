@@ -42,14 +42,15 @@ async function testCatalogAPI() {
     const bulk = cat.startBulkAction();
     await bulk.index({ title: "Doc 1", invalidField: 1, "@timestamp": new Date().toISOString() });
 
-    const exc = await test.throws(/errors during/, bulk.finish({ refresh: true })) as BulkUploadError;
+    const exc = await test.throws(/errors during/, bulk.commit({ refresh: true })) as BulkUploadError;
     test.eqPartial([{ reason: /mapping set to strict/, doc: { title: "Doc 1" } }], exc.errors);
   }
 
   {
     const bulk = cat.startBulkAction();
     await bulk.index({ title: "Doc 1", "@timestamp": new Date().toISOString() });
-    await bulk.finish({ refresh: true });
+    await bulk.index({ _id: "doc_xx", title: "Something else", "@timestamp": new Date().toISOString() });
+    await bulk.commit({ refresh: true });
   }
 
   //Find doc1
@@ -74,6 +75,12 @@ async function testCatalogAPI() {
   }, docs1);
 
   test.assert(!("_source" in docs1.hits.hits[0]), "we didn't ask for _source so we shouldn't see it");
+  await test.throws(/Suffix must NOT be specified/, cat.delete("doc_xx", { refresh: true, suffix: "any" }));
+
+  await test.transitionsToTrue({
+    test: async () => (await cat.search({ body: { query: { match: { "title": "Something else" } } } })).hits.hits.length === 0,
+    run: () => cat.delete("doc_xx", { refresh: true })
+  });
 
   const docs2 = await cat.search({
     body: {
@@ -101,7 +108,7 @@ async function testCatalogAPI() {
     const bulk = cat.startBulkAction();
     await bulk.index({ title: "Doc 1", invalidField: 1, "@timestamp": new Date().toISOString(), _id: docs1.hits.hits[0]._id });
 
-    const exc = await test.throws(/errors during/, bulk.finish({ refresh: true })) as BulkUploadError;
+    const exc = await test.throws(/errors during/, bulk.commit({ refresh: true })) as BulkUploadError;
     test.eqPartial([{ reason: /mapping set to strict/, doc: { title: "Doc 1" }, _id: docs1.hits.hits[0]._id }], exc.errors);
   }
 }
@@ -141,7 +148,7 @@ async function testSuffixes() {
     await inserter.index({ _id: "doc1", no: { such: { field: { yet: 1 } } } }, { suffix: "sfx2" });
     await inserter.index({ _id: "doc2", no: { such: { field: { yet: 2 } } } }, { suffix: "sfx2" });
     await inserter.index({ _id: "doc3", no: { such: { field: { yet: 3 } } }, nosuchfieldyet_extra: "StringVeld" }, { suffix: "sfx3" });
-    await inserter.finish({ refresh: true });
+    await inserter.commit({ refresh: true });
   }
 
   test.eqPartial([{ suffix: "sfx2" }, { suffix: "sfx3" }], await cat.listSuffixes());
@@ -166,6 +173,13 @@ async function testSuffixes() {
       _source: { no: { such: { field: { yet: 3 } } } }
     }
   ], sfx2docs_hits);
+
+  await test.throws(/Suffix must be specified for/, cat.delete("doc3", { refresh: true }));
+
+  await test.transitionsToTrue({
+    test: async () => !(await cat.search({})).hits.hits.some(h => h._id === "doc3"),
+    run: () => cat.delete("doc3", { refresh: true, suffix: "sfx3" })
+  });
 
   //Verify the mapping on index -sfx3
   const clientinfo = await cat.getRawClient();
