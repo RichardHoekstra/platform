@@ -18,6 +18,7 @@ LOADLIB "mod::wrd/lib/internal/auth/support.whlib";
 PUBLIC STATIC OBJECTTYPE Providers EXTEND TolliumScreenBase <
   MACRO Init(RECORD data) {
     ^providers->embeddedlist->rowiconname := "idpicon";
+    ^providers->entitycontext := CELL[ is_idp := TRUE ];
   }
 
   RECORD ARRAY FUNCTION MapProviders(RECORD ARRAY rows) {

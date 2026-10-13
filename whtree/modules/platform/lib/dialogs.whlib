@@ -12,7 +12,7 @@ PUBLIC MACRO RunManageOIDCProvidersDialog(OBJECT opener, RECORD options DEFAULTS
   options := ValidateOptions(CELL[ wrdschema := DEFAULT OBJECT], options);
 
   OBJECT wrdschema := options.wrdschema ?? opener->contexts->wrdschema;
-  IF(NOT ObjectExists(wrdschema) OR NOT ObjectExists(wrdschema->GetType("WRDAUTH_OIDC_CLIENT"))) {
+  IF(NOT ObjectExists(wrdschema) OR NOT ObjectExists(wrdschema->GetType("wrdauth_server"))) {
     opener->RunSimpleScreen("error", GetTid("wrd:browser.main.oidcclient-not-configured"));
     RETURN;
   }
