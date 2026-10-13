@@ -23,10 +23,9 @@ export class TestAuthCustomizer implements AuthCustomizer {
   }
 
   async onFrontendUserInfo(params: FrontendRequestParameters) {
-    const testSchema = wrd("webhare_testsuite:testschema");
-    if (params.wrdSchema.tag !== testSchema.tag)
-      throw new Error(`Invalid schema - invoked for ${params.wrdSchema.tag} instead of ${testSchema.tag}`);
-    const userinfo = await testSchema.getFields("wrdPerson", params.user, ["wrdFirstName"]);
+    if (params.wrdSchema.tag !== "webhare_testsuite:testschema")
+      throw new Error(`Invalid schema - invoked for ${params.wrdSchema.tag} instead of webhare_testsuite:testschema`);
+    const userinfo = await params.wrdSchema.getFields("wrdPerson", params.user, ["wrdFirstName"]);
     return { firstName: userinfo.wrdFirstName, aDate: new Date("2025-03-18") };
   }
 }
