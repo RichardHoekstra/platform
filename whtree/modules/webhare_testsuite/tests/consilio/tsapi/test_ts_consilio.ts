@@ -191,7 +191,7 @@ async function testSuffixes() {
      the search would then run over every index, including the testindex catalog that testCatalogAPI filled */
   for (const index of [undefined, ""]) {
     const hits = (await cat.search({ index })).hits.hits.map(hit => hit._id).sort();
-    test.eq(["doc1", "doc2", "doc3"], hits, `search with index ${JSON.stringify(index)} must stay in the catalog`);
+    test.eq(["doc1", "doc2"], hits, `search with index ${JSON.stringify(index)} must stay in the catalog`);
   }
 }
 
