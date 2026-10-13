@@ -12,7 +12,7 @@ import { beginWork, commitWork } from "@webhare/whdb";
 import { openFileOrFolder, openFolder, openSite } from "@webhare/whfs";
 import { ensureFallbackCertficate } from "@mod-platform/js/webserver/config";
 import type { Puppeteer } from "@webhare/deps";
-import { allowInsecureRequests, authorizationCodeGrant, buildAuthorizationUrl, discovery } from "openid-client";
+import { allowInsecureRequests, authorizationCodeGrant, buildAuthorizationUrl, calculatePKCECodeChallenge, discovery } from "openid-client";
 
 export class RequestRecorder implements Disposable {
   public urls: URL[] = [];
@@ -71,6 +71,7 @@ export async function runOpenIDLoginFlow(browser: Puppeteer.Browser, options: {
   callbackUrl: string;
   scope?: string;
   nonce?: string;
+  pkceCodeVerifier?: string;
 }) {
   const config = await discovery(new URL(options.metadataUrl), options.clientId, options.clientSecret, undefined, {
     execute: [allowInsecureRequests]
@@ -78,7 +79,11 @@ export async function runOpenIDLoginFlow(browser: Puppeteer.Browser, options: {
   const authorizeUrl = buildAuthorizationUrl(config, {
     scope: options.scope ?? "openid email",
     redirect_uri: options.callbackUrl,
-    ...options.nonce ? { nonce: options.nonce } : {}
+    ...options.nonce ? { nonce: options.nonce } : {},
+    ...options.pkceCodeVerifier ? {
+      code_challenge: await calculatePKCECodeChallenge(options.pkceCodeVerifier),
+      code_challenge_method: "S256"
+    } : {}
   });
 
   const context = await browser.createBrowserContext();
@@ -105,7 +110,10 @@ export async function runOpenIDLoginFlow(browser: Puppeteer.Browser, options: {
       runWebHareLoginFlow(page),
       page.waitForRequest(isCallback, { timeout: 30000 })
     ]);
-    const tokenSet = await authorizationCodeGrant(config, new URL(callbackRequest.url()), { expectedNonce: options.nonce });
+    const tokenSet = await authorizationCodeGrant(config, new URL(callbackRequest.url()), {
+      expectedNonce: options.nonce,
+      pkceCodeVerifier: options.pkceCodeVerifier
+    });
     return { config, tokenSet };
   } finally {
     await context.close();

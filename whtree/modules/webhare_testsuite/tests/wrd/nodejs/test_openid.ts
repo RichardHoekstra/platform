@@ -6,7 +6,7 @@ import { loadlib, makeObject } from "@webhare/harescript";
 import * as test from "@mod-webhare_testsuite/js/wts-backend";
 
 import { beginWork, commitWork, runInWork } from "@webhare/whdb";
-import { fetchUserInfo, randomNonce } from 'openid-client';
+import { fetchUserInfo, randomNonce, randomPKCECodeVerifier } from 'openid-client';
 import type { Puppeteer } from "@webhare/deps";
 import { registerRelyingParty, initializeIssuer, type WRDAuthLoginSettings } from "@webhare/auth";
 import { createCodeVerifier, IdentityProvider } from "@webhare/auth/src/identity";
@@ -307,6 +307,19 @@ async function verifyOpenIDClient() {
   });
 
   test.eq("Sysop", tokenSet2.claims()?.sub);
+
+  // Verify discovery advertises S256 and complete a login using its verifier.
+  test.eq(true, config.serverMetadata().supportsPKCE("S256"));
+  const { tokenSet: pkceTokenSet } = await test.runOpenIDLoginFlow(puppeteer!, {
+    metadataUrl: testsite.webRoot + '.well-known/openid-configuration',
+    clientId,
+    clientSecret,
+    callbackUrl,
+    pkceCodeVerifier: randomPKCECodeVerifier()
+  });
+  test.eq("bearer", pkceTokenSet.token_type);
+  test.assert(pkceTokenSet.id_token);
+  test.eq("Sysop", pkceTokenSet.claims()?.sub);
 }
 
 //delete the cookeies associated with /portal1-oidc/ but not our parent portal
