@@ -1,12 +1,11 @@
-/// @ts-nocheck -- Bulk rename to enable TypeScript validation
-
-import * as dompack from 'dompack';
+import * as dompack from '@webhare/dompack';
 import * as $todd from "@mod-tollium/web/ui/js/support";
 import * as menu from "@mod-tollium/web/ui/components/basecontrols/menu";
 import * as toddImages from "@mod-tollium/js/icons";
 import { getTid } from "@webhare/gettid";
 import type { IndyShell } from '../shell';
 import type { ApplicationBase } from '../application';
+import type { AppMenuItem } from '../types';
 
 
 /****************************************************************************************************************************
@@ -15,24 +14,50 @@ import type { ApplicationBase } from '../application';
  *                                                                                                                          *
  ****************************************************************************************************************************/
 
-const appbarsymbol = Symbol();
+const appbarsymbol: unique symbol = Symbol();
+
+// These runtime app properties are missing from ApplicationBase's legacy declaration.
+type AppBarApplication = ApplicationBase & {
+  appiconwidth: number;
+  appiconheight: number;
+  hasissues: boolean;
+  isdebugged: boolean;
+  isdebugpaused: boolean;
+  tabmodifier: string;
+};
+
+type AppBarTabRoot = HTMLDivElement & {
+  [appbarsymbol]: { tabmodifier: string; tab: ApplicationTab };
+};
+
+type ScreenUpdateEvent = CustomEvent<{
+  screen: { parentwindow?: unknown };
+  allowclose: boolean;
+}>;
+
+type ScrollState = { time: number; start: number; isleft: boolean };
 
 class ApplicationTab {
   readonly _appbar: ApplicationBar;
-  app: ApplicationBase | null = null;
-  fixed;
+  app: AppBarApplication | null = null;
+  fixed: boolean;
   menuitem: HTMLLIElement;
-  root: HTMLDivElement;
+  root: AppBarTabRoot;
+  icon: HTMLImageElement;
+  close: HTMLSpanElement;
+  title: HTMLSpanElement;
+  private readonly updatescreenListener: (event: Event) => void;
+  private readonly updateappListener: (event: Event) => void;
 
-  constructor(appbar, app, fixed) {
+  constructor(appbar: ApplicationBar, app: AppBarApplication, fixed: boolean) {
     this._appbar = appbar;
 
     // New application
     this.root =
       <div className="t-apptab t-apptab--hasicon"
         on={{
-          "contextmenu": event => this.onTabContextMenu(event),
-          "click": event => this.onTabClick(event)
+          "contextmenu": (event: MouseEvent) => this.onTabContextMenu(event),
+          "click": (event: MouseEvent) => this.onTabClick(event)
         }}>
         {this.icon = toddImages.createImage(app.appicon || 'tollium:tollium/tollium', app.appiconwidth || 16, app.appiconheight || 16, "w", { className: "t-apptab__icon" })}
         {this.close = <span className="t-apptab__close" onMousedown={
@@ -43,28 +68,30 @@ class ApplicationTab {
         <span className="t-apptab__dirty" title={getTid("tollium:shell.appdirty")} />
       </div>;
 
-    this.root[appbarsymbol] = {
+    // Cache the modifier so updates can remove the previous CSS class.
+    (this.root as AppBarTabRoot)[appbarsymbol] = {
       tabmodifier: '',
       tab: this
     };
-    this.menuitem = <li onClick={evt => this._onActivateTab(evt)}>{app.title}</li>;
+    this.menuitem = <li onClick={(evt: MouseEvent) => this.onActivateTab(evt)}>{app.title}</li>;
     this.fixed = fixed;
 
-    this._onupdatescreen = event => this.onUpdateScreen(event);
-    this._onupdateapp = event => this.onUpdateApp(event);
+    this.updatescreenListener = event => this.onUpdateScreen(event);
+    this.updateappListener = event => this.onUpdateApp(event);
     this.replaceApp(app);
   }
 
-  replaceApp(newapp) {
+  replaceApp(newapp: AppBarApplication | null) {
     const wasactive = this.app && this.app === $todd.getActiveApplication();
     if (this.app) {
-      this.app.appnodes.root.removeEventListener("tollium:updatescreen", this._onupdatescreen);
-      this.app.appnodes.root.removeEventListener("tollium:updateapp", this._onupdateapp);
+      this.app.appnodes.root.removeEventListener("tollium:updatescreen", this.updatescreenListener);
+      this.app.appnodes.root.removeEventListener("tollium:updateapp", this.updateappListener);
     }
     this.app = newapp;
     if (this.app) {
-      this.app.appnodes.root.addEventListener("tollium:updatescreen", this._onupdatescreen);
-      this.app.appnodes.root.addEventListener("tollium:updateapp", this._onupdateapp);
+      this.app.appnodes.root.addEventListener("tollium:updatescreen", this.updatescreenListener);
+      this.app.appnodes.root.addEventListener("tollium:updateapp", this.updateappListener);
+      // Preserve activation when replacing the currently active application.
       if (wasactive)
         this._appbar.shell.appmgr.activate(this.app);
     }
@@ -75,17 +102,21 @@ class ApplicationTab {
     this.root.remove();
   }
 
-  _onActivateTab(event) {
+  private onActivateTab(event: Event) {
     dompack.stop(event);
-    this._appbar.shell.appmgr.activate(this.app);
+    if (this.app)
+      this._appbar.shell.appmgr.activate(this.app);
   }
 
-  onUpdateScreen(event) {
-    if (event.detail.screen.parentwindow === null || event.detail.screen.parentwindow === undefined) //we only honor updates from the toplevel screen
-      this.root.classList.toggle("t-apptab--allowclose", event.detail.allowclose);
+  onUpdateScreen(event: Event) {
+    const update = event as ScreenUpdateEvent;
+    if (update.detail.screen.parentwindow === null || update.detail.screen.parentwindow === undefined) //we only honor updates from the toplevel screen
+      this.root.classList.toggle("t-apptab--allowclose", update.detail.allowclose);
   }
 
-  onUpdateApp(event) {
+  onUpdateApp(_event: Event) {
+    if (!this.app)
+      return;
     this.root.classList.toggle('t-apptab--hasicon', Boolean(this.app.appicon));
     this.root.classList.toggle('t-apptab--hasissues', this.app.hasissues);
     this.root.classList.toggle('t-apptab--isdebugrunning', this.app.isdebugged && !this.app.isdebugpaused);
@@ -108,26 +139,30 @@ class ApplicationTab {
     this._appbar._resize();
   }
 
-  onTabClick(event) {
+  onTabClick(event: MouseEvent) {
+    if (!this.app)
+      return;
     this._appbar.shell.appmgr.activate(this.app);
-    if (event.target.closest(".t-apptab__close")) //it's the closer being clicked
+    if (event.target instanceof Element && event.target.closest(".t-apptab__close")) //it's the closer being clicked
       this.app.requestClose();
   }
-  onTabContextMenu(event) {
+  onTabContextMenu(event: MouseEvent) {
+    if (!this.app)
+      return;
     dompack.stop(event);
 
     const appmenu = this.app.generateAppMenu();
-    dompack.empty(this._appbar.apptabmenu);
+    this._appbar.apptabmenu.replaceChildren();
     appmenu.forEach(menuitem => {
-      const item = menuitem.isdivider ? <li class="divider" /> : <li onClick={evt => this.onTabContextMenuClick(evt, menuitem)}>{menuitem.title}</li>;
+      const item = <li onClick={(evt: MouseEvent) => this.onTabContextMenuClick(evt, menuitem)}>{menuitem.title}</li>;
       this._appbar.apptabmenu.appendChild(item);
     });
 
     menu.openAt(this._appbar.apptabmenu, event);
   }
-  onTabContextMenuClick(event, menuitem) {
+  onTabContextMenuClick(event: Event, menuitem: AppMenuItem) {
     dompack.stop(event);
-    if (menuitem.cmd)
+    if (menuitem.cmd && this.app)
       this.app.executeCommand(menuitem.cmd);
   }
 }
@@ -141,13 +176,20 @@ export default class ApplicationBar {
   readonly node: HTMLElement;
   apps: ApplicationTab[] = [];
   readonly appnavmenu = document.createElement("ul");
+  readonly name: string;
+  readonly fixed_node: HTMLElement;
+  readonly dyn_node: HTMLElement;
+  readonly dyn_content_node: HTMLElement;
+  readonly nav_node: HTMLElement;
+  readonly scroll_left_node: HTMLElement;
+  readonly scroll_right_node: HTMLElement;
+  readonly apptabmenu: HTMLUListElement;
+  scrollstate: ScrollState | null;
+  scrollstepscheduled: boolean;
+  tabmodifier: string;
 
   constructor(shell: IndyShell, appbar: HTMLElement) {
-    this.fixed_node = null;
-    this.dyn_node = null;
-    this.nav_node = null;
     this.name = "(applicationbar)";
-    this.apptabmenu = null;
     this.scrollstate = null;
     this.scrollstepscheduled = false;
     this.tabmodifier = '';
@@ -159,29 +201,28 @@ export default class ApplicationBar {
 
     this.apptabmenu = dompack.create("ul");
 
-    this.fixed_node = this.node.querySelector(".t-apptabs__fixed");
-    this.dyn_node = this.node.querySelector(".t-apptabs__dynamic");
-    this.dyn_content_node = this.dyn_node.querySelector(".t-apptabs__content");
-    this.nav_node = this.dyn_node.querySelector(".t-apptabs__navtab");
-    this.scroll_left_node = this.dyn_node.querySelector(".t-apptabs__leftscroll");
-    this.scroll_right_node = this.dyn_node.querySelector(".t-apptabs__rightscroll");
+    this.fixed_node = dompack.qR(this.node, ".t-apptabs__fixed");
+    this.dyn_node = dompack.qR(this.node, ".t-apptabs__dynamic");
+    this.dyn_content_node = dompack.qR(this.dyn_node, ".t-apptabs__content");
+    this.nav_node = dompack.qR(this.dyn_node, ".t-apptabs__navtab");
+    this.scroll_left_node = dompack.qR(this.dyn_node, ".t-apptabs__leftscroll");
+    this.scroll_right_node = dompack.qR(this.dyn_node, ".t-apptabs__rightscroll");
 
-    const navtab = this.dyn_node.querySelector(".t-apptabs__navtab");
-    navtab.addEventListener("click", this._onNavMenuClick.bind(this));
+    this.nav_node.addEventListener("click", this.onNavMenuClick.bind(this));
 
-    this.scroll_left_node.addEventListener("mouseover", evt => this._scrollMouseOver(evt, -1));
-    this.scroll_left_node.addEventListener("mouseout", evt => this._scrollCancel(evt));
-    this.scroll_right_node.addEventListener("mouseover", evt => this._scrollMouseOver(evt, 1));
-    this.scroll_right_node.addEventListener("mouseout", evt => this._scrollCancel(evt));
+    this.scroll_left_node.addEventListener("mouseover", evt => this.scrollMouseOver(evt, -1));
+    this.scroll_left_node.addEventListener("mouseout", evt => this.scrollCancel(evt));
+    this.scroll_right_node.addEventListener("mouseover", evt => this.scrollMouseOver(evt, 1));
+    this.scroll_right_node.addEventListener("mouseout", evt => this.scrollCancel(evt));
 
     this._resize();
     window.addEventListener("resize", () => this._resize());
   }
 
-  _scrollCancel() {
+  private scrollCancel(_event?: Event) {
     this.scrollstate = null;
   }
-  _scrollMouseOver(event, dir) {
+  private scrollMouseOver(event: MouseEvent, dir: number) {
     dompack.stop(event);
     this.scrollstate =
     {
@@ -189,12 +230,15 @@ export default class ApplicationBar {
       start: this.dyn_content_node.scrollLeft,
       isleft: dir < 0
     };
-    this._handleScrollStep();
+    this.handleScrollStep();
   }
-  _calcScrollDistance() {
+  private calcScrollDistance() {
+    const scrollstate = this.scrollstate;
+    if (!scrollstate)
+      return 0;
     const speed = 400; // pixels per second
     const acctime = 2; // accelerate to final speed in this much seconds (normal acceleration)
-    const timediff = (Date.now() - this.scrollstate.time) / 1000;
+    const timediff = (Date.now() - scrollstate.time) / 1000;
 
     const accphasepart = timediff > acctime ? 2 : timediff;
     const accphase = .5 * (speed / acctime) * accphasepart * accphasepart;
@@ -202,23 +246,24 @@ export default class ApplicationBar {
 
     return accphase + linearphase;
   }
-  _handleScrollStep(from_raf) {
+  private handleScrollStep(from_raf = false) {
     if (from_raf)
       this.scrollstepscheduled = false;
     if (!this.scrollstate)
       return;
 
-    const dist = this._calcScrollDistance();
+    const dist = this.calcScrollDistance();
     this.dyn_content_node.scrollLeft = this.scrollstate.start + (this.scrollstate.isleft ? -1 : 1) * dist;
     this._resize();
 
     if (this.scrollstate) {
+      // Continue the animation until scrolling is canceled or reaches an edge.
       this.scrollstepscheduled = true;
-      requestAnimationFrame(this._handleScrollStep.bind(this, true));
+      requestAnimationFrame(this.handleScrollStep.bind(this, true));
     }
   }
 
-  _onNavMenuClick(event) {
+  private onNavMenuClick(_event: Event) {
     // Add all apps (first the fixed apps, then the unfixed ones)
     this.appnavmenu.replaceChildren(
       ...this.apps.filter(item => item.fixed).map(item => item.menuitem),
@@ -228,30 +273,34 @@ export default class ApplicationBar {
     menu.openAt(this.appnavmenu, this.nav_node, { direction: 'down', align: 'right' });
   }
 
-  _gotoApp(how, idx) {
+  _gotoApp(how: string, idx: number) {
     if (how === 'relative') {
       const appidx = this.apps.findIndex(app => app.app === $todd.getActiveApplication());
       if (appidx < 0)
         return;
 
+      // Wrap around when cycling past either end of the tab list.
       const gotoappidx = (appidx + this.apps.length + idx) % this.apps.length;
-      this.shell.appmgr.activate(this.apps[gotoappidx].app);
+      const app = this.apps[gotoappidx]?.app;
+      if (app)
+        this.shell.appmgr.activate(app);
     } else if (how === 'absolute') {
-      if (idx < this.apps.length)
-        this.shell.appmgr.activate(this.apps[idx].app);
+      const app = idx >= 0 ? this.apps[idx]?.app : null;
+      if (app)
+        this.shell.appmgr.activate(app);
     }
   }
 
   // shortcut.app Application object
   // shortcut.icononly Only show icon (e.g. for homescreen app)
-  toggleShortcut(app, show, fixed) {
+  toggleShortcut(app: ApplicationBase, show: boolean, fixed = false) {
     const appidx = this.apps.findIndex(elt => elt.app === app);
     fixed = fixed || false;
 
     if (show) {
       let newtab: ApplicationTab;
       if (appidx < 0) {
-        newtab = new ApplicationTab(this, app, fixed);
+        newtab = new ApplicationTab(this, app as AppBarApplication, fixed);
       } else {
         // Already exists
         newtab = this.apps[appidx];
@@ -281,12 +330,12 @@ export default class ApplicationBar {
       this.apps.splice(appidx, 1);
     }
 
-    this._recalculateCSSClasses();
+    this.recalculateCSSClasses();
 
     this._resize();
   }
 
-  _recalculateCSSClasses() {
+  private recalculateCSSClasses() {
     const allnodes = dompack.qSA(this.node, ".t-apptab");
 
     allnodes.forEach(function (item, idx) {
@@ -297,15 +346,19 @@ export default class ApplicationBar {
   }
 
   _resize() {
-    const total_width = this.node.parentNode.offsetWidth;
+    const parent = this.node.parentElement;
+    if (!parent)
+      return;
+    const total_width = parent.offsetWidth;
     const fixed_width = this.fixed_node.offsetWidth;
     const dyn_scroll_pos = this.dyn_content_node.scrollLeft;
     const nav_width = this.nav_node.offsetWidth;
 
     // Calc the requested width from the width of the content
     let dyn_scroll_width = 0;
-    if (this.dyn_content_node.lastChild)
-      dyn_scroll_width = this.dyn_content_node.lastChild.offsetLeft + this.dyn_content_node.lastChild.offsetWidth;
+    const lasttab = this.dyn_content_node.lastElementChild as HTMLElement | null;
+    if (lasttab)
+      dyn_scroll_width = lasttab.offsetLeft + lasttab.offsetWidth;
 
     const dyn_width = total_width - fixed_width;
     const overflow = dyn_scroll_width > dyn_width;
@@ -321,10 +374,11 @@ export default class ApplicationBar {
     this.node.classList.toggle("t-apptabs--canscrollleft", can_scroll_left);
     this.node.classList.toggle("t-apptabs--canscrollright", can_scroll_right);
 
-    if (this.scrollstate) {
-      if (!can_scroll_left && this.scrollstate.isleft)
+    const scrollstate = this.scrollstate;
+    if (scrollstate) {
+      if (!can_scroll_left && scrollstate.isleft)
         this.scrollstate = null;
-      if (!can_scroll_right && !this.scrollstate.isleft)
+      if (!can_scroll_right && !scrollstate.isleft)
         this.scrollstate = null;
     }
   }
@@ -344,16 +398,16 @@ export default class ApplicationBar {
 
       this._resize();
     }
-    this._recalculateCSSClasses();
+    this.recalculateCSSClasses();
   }
   anyShortcuts() {
     return this.apps.length > 0;
   }
-  replaceAppWith(oldapp, newapp) {
+  replaceAppWith(oldapp: ApplicationBase, newapp: ApplicationBase) {
     const idx = this.apps.findIndex(_ => _.app === oldapp);
     if (idx === -1) //old app isn't on the bar either
       return;
 
-    this.apps[idx].replaceApp(newapp);
+    this.apps[idx].replaceApp(newapp as AppBarApplication);
   }
 }
