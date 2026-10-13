@@ -68,16 +68,10 @@ jobs:
             const repo = context.repo.repo;
             const run = context.payload.workflow_run;
             const testedSha = run?.head_sha || context.payload.pull_request.head.sha;
-            const pullRequests = run ? await github.paginate(github.rest.pulls.list, {
-              owner: org,
-              repo,
-              state: 'open',
-              head: `${org}:${run.head_branch}`,
-            }) : [(await github.rest.pulls.get({
-              owner: org,
-              repo,
-              pull_number: context.payload.pull_request.number,
-            })).data];
+            // workflow_run.pull_requests is empty for fork PRs, which we never auto-approve
+            const prNumbers = run ? run.pull_requests.map(pr => pr.number) : [context.payload.pull_request.number];
+            const pullRequests = await Promise.all(prNumbers.map(async pull_number =>
+              (await github.rest.pulls.get({ owner: org, repo, pull_number })).data));
 
             // List of associations that count as Internal
             const internalRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
