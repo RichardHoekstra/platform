@@ -1,7 +1,7 @@
 // @webhare/cli: Manage registry keys
 
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
-import { CLIRuntimeError, runCli } from "@webhare/cli";
+import { CLIRuntimeError, enumOption, runCli } from "@webhare/cli";
 import { decodeHSON, determineType, encodeHSON, getHSTypeName, type IPCMarshallableData } from "@webhare/hscompat/src/hson";
 import { createWebHarePasswordHash } from "@webhare/hscompat/src/passwords";
 import { readRegistryKey, writeRegistryKey } from "@webhare/services";
@@ -73,9 +73,9 @@ runCli({
       }
     },
     set: {
-      description: "Set a registry key",
+      description: "Set a registry key. Will fail if the key doesn't exist yet unless --type is set",
       options: {
-        type: { description: "Value type (string, boolean, integer, or record)" },
+        type: { description: "Value type", type: enumOption(["string", "boolean", "integer", "record"]) },
       },
       flags: {
         password: { default: false, description: "Hash a string value as a password" },
@@ -85,19 +85,22 @@ runCli({
         { name: "<value>", description: "Value to write" },
       ],
       async main({ args, opts }) {
-        const createIfNeeded = typeof opts.type === "string";
+        const createIfNeeded = Boolean(opts.type); //if a type is set, we can create the key
         let valueType = opts.type;
-        if (typeof valueType !== "string") {
+        if (!valueType) {
           const existingValue = await readRegistryKey<unknown>(args.keyname, undefined, registryKeyOptions);
-          valueType = getHSTypeName(determineType(existingValue));
-        }
-        const keytype = valueType.toLowerCase();
+          const gotType = getHSTypeName(determineType(existingValue)).toLowerCase();
+          if (gotType !== "string" && gotType !== "boolean" && gotType !== "integer" && gotType !== "record")
+            throw new CLIRuntimeError(`Unsupported value type '${gotType}'`);
 
-        if (opts.password && keytype !== "string")
+          valueType = gotType;
+        }
+
+        if (opts.password && valueType !== "string")
           throw new CLIRuntimeError("Only keys of type 'string' can be set as a --password");
 
         let value: unknown;
-        switch (keytype) {
+        switch (valueType) {
           case "string":
             value = opts.password ? await createWebHarePasswordHash(args.value) : args.value;
             break;
@@ -117,7 +120,8 @@ runCli({
             break;
           }
           default:
-            throw new CLIRuntimeError(`Not sure how to store value of type '${keytype}'`);
+            valueType satisfies never; //assert that we've handled all cases
+            throw new CLIRuntimeError(`Not sure how to store value of type '${valueType}'`);
         }
 
         await runInWork(() => writeRegistryKey(args.keyname, value, { ...registryKeyOptions, createIfNeeded }));
