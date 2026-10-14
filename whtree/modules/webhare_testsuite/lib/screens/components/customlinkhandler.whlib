@@ -56,7 +56,6 @@ PUBLIC STATIC OBJECTTYPE CustomLinkHandler2 EXTEND TolliumLinkHandlerBase
 
   UPDATE PUBLIC OBJECT ARRAY FUNCTION CreateComponents(OBJECT screen)
   {
-    //we need to retrigger the fragment loader to hit the unsaved-SetLocalRefs bug
     this->subobject := screen->CreateTolliumComponent("textedit");
     this->subobject->title := "asdf";
     this->subobject->placeholder := "customlinkhandler2";
