@@ -31,6 +31,7 @@ import { debugFlags } from "@webhare/env";
 import { mkdirSync } from "node:fs";
 import { addTestFinalizer } from "@webhare/test/src/testrunner";
 export { profileCPU } from "./profiling";
+import { startWebHareRepl } from "@mod-platform/js/cli/repl.ts";
 
 export const passwordHashes = {
   //CreateWebharePasswordHash is SLOW. prepping passwords is worth the trouble. Using snakecase so the text exactly matches the password
@@ -409,12 +410,14 @@ export async function deleteTestModule(name: string) {
 }
 
 export async function openTestPuppeteer(): Promise<Puppeteer.Browser & AsyncDisposable> {
-  const headless = !debugFlags["test-showbrowser"];
+  const headless = !debugFlags["test-showbrowser"] && !debugFlags["test-keepbrowser"];
   if (!puppeteer) {
     puppeteer = await launchPuppeteer({ headless });
     addTestFinalizer({
       onCatch: async () => dumpTestPuppeteer(),
       onDone: async () => {
+        if (debugFlags["test-keepbrowser"] && puppeteer)
+          await runTestPuppeteerRepl();
         await puppeteer?.close();
         puppeteer = undefined;
       }
@@ -426,7 +429,7 @@ export async function openTestPuppeteer(): Promise<Puppeteer.Browser & AsyncDisp
 /** Dump state for disk for post-test insepection */
 export async function dumpTestPuppeteer() {
   if (!puppeteer)
-    throw new Error("Test puppeteer instance is not running (was openTestPuppeteer run?");
+    throw new Error("Test puppeteer instance is not running (was openTestPuppeteer run?)");
 
   mkdirSync(`/tmp/jstests`, { recursive: true });
   const outbase = `/tmp/jstests/puppeteeer.${generateRandomId()}`;
@@ -440,6 +443,17 @@ export async function dumpTestPuppeteer() {
   }
 }
 
+/** Run a repl connectedd to the current test puppeteer. Use this to debug its state, look for proper selectors, etc */
+export async function runTestPuppeteerRepl(): Promise<void> {
+  if (!puppeteer)
+    throw new Error("Test puppeteer instance is not running (was openTestPuppeteer run?)");
+
+  console.log("Starting WebHare REPL. Use .help for help. Use 'page' for current puppeteer page. Use .exit (or CTRL+D) when done");
+  const repl = startWebHareRepl();
+  repl.context.page = (await puppeteer.pages())[0]; //TODO actually figure out the 'currently' focused page
+  await new Promise(resolve => repl.on("exit", resolve));
+  console.log("Exited WebHare REPL");
+}
 
 //Initialize whtest.ts
 setTestPageToken(generateTestPageToken());
