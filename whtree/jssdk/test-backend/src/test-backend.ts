@@ -443,7 +443,7 @@ export async function dumpTestPuppeteer() {
   }
 }
 
-/** Run a repl connectedd to the current test puppeteer. Use this to debug its state, look for proper selectors, etc */
+/** Run a repl connected to the current test puppeteer. Use this to debug its state, look for proper selectors, etc */
 export async function runTestPuppeteerRepl(): Promise<void> {
   if (!puppeteer)
     throw new Error("Test puppeteer instance is not running (was openTestPuppeteer run?)");

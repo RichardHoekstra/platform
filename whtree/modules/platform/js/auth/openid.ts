@@ -314,7 +314,7 @@ export async function returnAuthorizeFlow<T extends SchemaTypeDefinition>(provid
     if (req.method !== "POST") { //not POST-ing? render the permission page
       const permissionrequest = await createContentPageRequest(await openFileOrFolder(site), { webRequest: req }); //TODO pass the webRequest too?
       //TODO pass a true FormsAPI body. or delegate this fully to HareScript
-      //TODO Make it clear which client is asking. And if it's a dynamic clinet, make it especially clear that we can't verify the identity of the app
+      //TODO Make it clear which client is asking. And if it's a dynamic client, make it especially clear that we can't verify the identity of the app
       return await permissionrequest.buildWebPage(litty`
         <form method="post" action="${req.url}" enctype="application/x-www-form-urlencoded">
           <p>Do you approve the application to access the following on your behalf?</p>

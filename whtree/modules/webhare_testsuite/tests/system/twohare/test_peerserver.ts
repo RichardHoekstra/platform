@@ -1,10 +1,10 @@
 /* Note: you need two webhares to run this test. See twoharetests.sh
 
    To see what Puppeteer is doing:
-   WEBHARE_DEBUG=test-showbrowser wh run mod::webhare_testsuite/tests/system/twohare/test_peerserver2.ts
+   WEBHARE_DEBUG=test-showbrowser wh run mod::webhare_testsuite/tests/system/twohare/test_peerserver.ts
 
    To get a REPL if the test fails:
-   WEBHARE_DEBUG=test-keepbrowser wh run mod::webhare_testsuite/tests/system/twohare/test_peerserver2.ts
+   WEBHARE_DEBUG=test-keepbrowser wh run mod::webhare_testsuite/tests/system/twohare/test_peerserver.ts
 */
 
 import { loadlib } from "@webhare/harescript";
