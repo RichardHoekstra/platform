@@ -201,6 +201,31 @@ The following types have been predefined:
 - floatOption: Accepts numbers (optional with minimum and maximum value)
 - enumOption: Accepts a specific set of strings
 
+Some examples:
+
+```typescript
+import { enumOption, floatOption, runCli } from "@webhare/cli";
+
+runCli({
+  options: {
+    threshold: {
+      default: 0.75,
+      description: "Threshold between 0 and 1",
+      type: floatOption({ start: 0, end: 1 }),
+    },
+    format: {
+      default: "json",
+      description: "Output format",
+      type: enumOption(["json", "text"]),
+    },
+  },
+  main({ opts }) {
+    // opts.threshold is a number; opts.format is "json" | "text"
+    console.log(`Threshold: ${opts.threshold}, format: ${opts.format}`);
+  },
+});
+```
+
 ### Autocompletion
 To enable autocompletion for an option you can need to define a custom type
 with parseValue and autoComplete eg:
