@@ -54,7 +54,7 @@ class Session
         ///Time of last use of this cached account
         Blex::DateTime lastcacheuse;
 
-        ///Socket address of this accesss
+        ///Socket address of this access
         Blex::SocketAddress ipaddr;
 
         ///WebHare User id for this user

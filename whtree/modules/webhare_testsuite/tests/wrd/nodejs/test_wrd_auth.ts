@@ -243,7 +243,7 @@ async function mockAuthorizeFlow<T extends SchemaTypeDefinition>(provider: Ident
   const userinfo = await provider.getUserInfo(tokens.body.access_token);
   if (tokens.body.id_token) {
     const decoded = decodeJWT(tokens.body.id_token);
-    test.eqPartial({ sub: /@beta.webhare.net$/ }, userinfo, "sub should always be theere");
+    test.eqPartial({ sub: /@beta.webhare.net$/ }, userinfo, "sub should always be there");
     const expectKeys = ["sub", ...scopes.includes('email') ? ['email'] : [], ...scopes.includes('profile') ? ['given_name', 'family_name', 'name'] : []];
     test.eq(expectKeys.sort(), Object.keys(userinfo).sort());
 
