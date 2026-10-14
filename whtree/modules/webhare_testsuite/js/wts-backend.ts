@@ -1,7 +1,7 @@
 /* wts-backend extends @webhare/test-backend with resources that only exist in webhare_testsuite, eg the webhare_testsuite.testsite* sites */
 import { WebServer } from "@mod-platform/js/webserver/webserver";
 import { whconstant_whfsid_webhare_tests } from "@mod-system/js/internal/webhareconstants";
-import { generateRandomId } from "@webhare/std";
+import { generateRandomId, throwError } from "@webhare/std";
 import type { Configuration } from "@mod-platform/js/webserver/webconfig";
 import * as test from "@webhare/test-backend";
 import * as net from "node:net";
@@ -32,14 +32,14 @@ export class RequestRecorder implements Disposable {
   }
 }
 
-export async function runWebHareLoginFlow(page: Puppeteer.Page, options?: { user?: string; password?: string; changePasswordTo?: string }) {
+export async function runWebHareLoginFlow(page: Puppeteer.Page, options?: { user?: string; rawUser?: string; password?: string; changePasswordTo?: string }) {
   const password = options?.password || test.getUser("sysop").password;
-  const user = test.getUser(options?.user || "sysop");
+  const loginName = options?.rawUser ?? test.getUser(options?.user || "sysop")?.login ?? throwError(`Login name not found`);
   using recorder = new RequestRecorder(page);
 
-  console.log("Login with", user.login);
+  console.log("Login with %s on %s", loginName, page.url());
   await page.waitForSelector('.wh-wrdauth-login [name=login]');
-  await page.type('[name=login]', user.login);
+  await page.type('[name=login]', loginName);
   await page.type('[name=password]', password);
 
   await Promise.all([

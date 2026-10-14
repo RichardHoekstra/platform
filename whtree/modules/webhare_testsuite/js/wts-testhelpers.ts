@@ -9,7 +9,6 @@ export type TestSetupData =
     testportalurl: string;
     overridetoken: string;
     rtdid: number;
-    peerserver: string;
     links: {
       rtdpublisher?: string;
       rtdedit?: string;
@@ -20,7 +19,6 @@ export type TestSetupData =
 export async function invokeSetupForTestSetup(options?:
   {
     createsysop?: boolean;
-    onpeerserver?: boolean;
     preprtd?: boolean;
   }): Promise<TestSetupData> {
 

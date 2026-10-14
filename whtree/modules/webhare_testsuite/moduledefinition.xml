@@ -294,7 +294,7 @@
       <obsoletekey name="alttestsitehost" />
       <string name="hashedpassword" />
       <string name="secondhareinterface" />
-      <string name="secondharetesttoken" />
+      <obsoletekey name="secondharetesttoken" />
       <record name="addressverification" />
       <datetime name="lastaftercompile" />
       <boolean name="taskthrownow" />

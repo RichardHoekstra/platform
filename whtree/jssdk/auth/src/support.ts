@@ -92,7 +92,7 @@ export function prepAuth(settings: WRDAuthPluginSettings_Request): PrepAuthResul
     httpOnly: true, //XSS protection
     secure: settings.secureRequest, //mirror secure if the request was
     path: "/", //we don't support limiting WRD cookies to subpaths as various helper pages are at /.wh/
-    sameSite: settings.sameSite,
+    sameSite: settings.secureRequest ? settings.sameSite : "Lax", //Without secure flag sameSite=None is unsupported by browsers and they won't honor the cookie
   };
 
   return {
