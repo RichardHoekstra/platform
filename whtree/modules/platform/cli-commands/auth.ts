@@ -1,13 +1,12 @@
 // @webhare/cli: Control WebHare users and rights
 
 import jwt from "jsonwebtoken";
-import { type AnyWRDSchema, type WRDSchemaType, getSchemaSettings, isValidWRDTag, wrd } from '@webhare/wrd';
+import { type AnyWRDSchema, type WRDSchemaLike, type WRDSchemaType, getSchemaSettings, isValidWRDTag, wrd } from '@webhare/wrd';
 import { loadlib } from '@webhare/harescript/src/contextvm';
 import type { HSVMObject } from '@webhare/harescript/src/harescript';
 import { backendConfig, importJSObject, type SessionScopes } from '@webhare/services';
 import { beginWork, commitWork, db } from '@webhare/whdb';
 import { compressUUID, createFirstPartyToken, IdentityProvider, type AuthTokenOptions } from "@webhare/auth/src/identity";
-import type { System_UsermgmtSchemaType, WRD_IdpSchemaType } from "@mod-platform/generated/wrd/webhare";
 import { pick } from '@webhare/std';
 import { CLIRuntimeError, runCli } from "@webhare/cli";
 import { registerRelyingParty, initializeIssuer, getOpenIDMetadataURL, type AuthCustomizer, getDefaultOAuth2RedirectURL } from '@webhare/auth';
@@ -23,7 +22,7 @@ async function getUserApiSchemaName(opts: { schema?: string }): Promise<string> 
   return await (await primaryPlugin.$get<HSVMObject>("wrdschema")).$get<string>("tag");
 }
 
-async function describeIdp(schema: WRDSchemaType<WRD_IdpSchemaType>) {
+async function describeIdp(schema: WRDSchemaType<WRDSchemaLike["wrd:idp"]>) {
   const settings = await getSchemaSettings(schema, ["issuer", "signingKeys"]);
   return {
     issuer: settings.issuer,
@@ -67,7 +66,7 @@ runCli({
       shortDescription: "Describe current authentication settings",
       main: async ({ opts, args }) => {
         const wrdSchema = await getUserApiSchemaName(opts);
-        const schema = wrd<WRD_IdpSchemaType>(wrdSchema);
+        const schema = wrd<WRDSchemaLike["wrd:idp"]>(wrdSchema);
         const idp = await describeIdp(schema);
 
         if (opts.json) {
@@ -110,7 +109,7 @@ runCli({
       options: { "issuer": { description: "Issuer name. Defaults to " + backendConfig.backendURL } },
       main: async ({ opts, args }) => {
         const wrdSchema = await getUserApiSchemaName(opts);
-        const schema = wrd<WRD_IdpSchemaType>(wrdSchema);
+        const schema = wrd<WRDSchemaLike["wrd:idp"]>(wrdSchema);
         const settings = await getSchemaSettings(schema, ["issuer"]);
 
         if (settings.issuer)
@@ -224,7 +223,7 @@ runCli({
           throw new Error(`Invalid wrdTag '${args.tag}'`);
 
         const wrdSchema = await getUserApiSchemaName(opts);
-        const schema = wrd<System_UsermgmtSchemaType>(wrdSchema);
+        const schema = wrd<WRDSchemaLike["system:usermgmt"]>(wrdSchema);
         if (await schema.find("wrdauthServer", { wrdTag: args.tag }))
           throw new Error(`OIDC Identity provider with tag '${args.tag}' already exists`);
 
@@ -254,7 +253,7 @@ runCli({
       arguments: [{ name: "<tag>", description: "Identity provider wrdTag" }],
       main: async ({ opts, args }) => {
         const wrdSchema = await getUserApiSchemaName(opts);
-        const schema = wrd<System_UsermgmtSchemaType>(wrdSchema);
+        const schema = wrd<WRDSchemaLike["system:usermgmt"]>(wrdSchema);
         const wrdId = await schema.find("wrdauthServer", { wrdTag: args.tag });
         if (!wrdId)
           throw new Error(`OIDC Identity provider with tag '${args.tag}' not found`);
@@ -274,7 +273,7 @@ runCli({
       ],
       main: async ({ opts, args }) => {
         const wrdSchema = await getUserApiSchemaName(opts);
-        const schema = wrd<WRD_IdpSchemaType>(wrdSchema);
+        const schema = wrd<WRDSchemaLike["wrd:idp"]>(wrdSchema);
 
         if (await schema.search("wrdauthApplication", "wrdTitle", args.name, { matchCase: false }))
           throw new CLIRuntimeError(`A relying party named '${args.name}' already exists`);
@@ -302,11 +301,11 @@ runCli({
       shortDescription: "List relying parties and service providers",
       main: async ({ opts, args }) => {
         const wrdSchema = await getUserApiSchemaName(opts);
-        const schema = wrd<WRD_IdpSchemaType>(wrdSchema);
+        const schema = wrd<WRDSchemaLike["wrd:idp"]>(wrdSchema);
         const sps = (await schema.query("wrdauthApplication").
-          select(["wrdId", "wrdTitle", "wrdCreationDate", "wrdGuid"]).
+          select(["wrdId", "wrdTitle", "wrdCreated", "wrdGuid"]).
           execute()).map((sp) => ({
-            ...pick(sp, ["wrdId", "wrdTitle", "wrdCreationDate"]),
+            ...pick(sp, ["wrdId", "wrdTitle", "wrdCreated"]),
             clientId: compressUUID(sp.wrdGuid)
           }));
         if (opts.json) {

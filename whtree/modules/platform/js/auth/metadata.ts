@@ -1,8 +1,7 @@
 import { HTTPErrorCode, type WebHareRouter, type WebRequest, type WebResponse, createJSONResponse } from "@webhare/router";
 import { getApplyTesterForObject } from "@webhare/whfs/src/applytester";
 //TOOD make this a public export somewhere? but should it include wrdOrg and wrdPerson though
-import type { Platform_BasewrdschemaSchemaType } from "@mod-platform/generated/wrd/webhare";
-import { WRDSchema } from "@webhare/wrd";
+import { wrd, type WRDSchemaLike } from "@webhare/wrd";
 import { getSchemaSettings } from "@webhare/wrd/src/settings";
 import type { IdTokenSigningAlgValuesSupported, OpenIdConfiguration } from "@webhare/auth/src/types";
 import { lookupURL, openFileOrFolder } from "@webhare/whfs";
@@ -19,7 +18,7 @@ export async function wellKnownRouter(req: WebRequest): Promise<WebResponse> {
   if (!wrdSchemaTag)
     return createJSONResponse(HTTPErrorCode.NotFound, { error: `No WRD schema defined for this location` });
 
-  const authSchema = new WRDSchema<Platform_BasewrdschemaSchemaType>(wrdSchemaTag);
+  const authSchema = wrd<WRDSchemaLike["platform:basewrdschema"]>(wrdSchemaTag);
   const settings = await getSchemaSettings(authSchema, ["issuer", "signingKeys"]);
   if (!settings.issuer)
     return createJSONResponse(HTTPErrorCode.NotFound, { error: `WRD schema '${wrdSchemaTag}' is not configured with a JWKS issuer` });

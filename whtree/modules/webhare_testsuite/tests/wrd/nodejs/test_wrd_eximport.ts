@@ -9,8 +9,7 @@ import type { ExportedResource } from "@webhare/services/src/descriptor";
 import { buildInstance } from "@webhare/services/src/richdocument";
 import { whconstant_whfsid_webharebackend } from "@mod-system/js/internal/webhareconstants";
 
-type WRD_TestschemaSchemaType = WRDSchemaLike["wrd:testschema"];
-type TestSchemaType = Combine<[WRD_TestschemaSchemaType, CustomExtensions]>;
+type TestSchemaType = Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensions]>;
 
 async function testExport() { //  tests
   const wrdschema = wrd<TestSchemaType>(testSchemaTag);

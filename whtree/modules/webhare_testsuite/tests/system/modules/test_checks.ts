@@ -1,21 +1,22 @@
-import { systemConfigSchema } from "@mod-platform/generated/wrd/webhare";
+import { wrd } from "@webhare/wrd";
 import { loadlib } from "@webhare/harescript/src/contextvm";
 import { scheduleTimedTask, writeRegistryKey } from "@webhare/services";
 import { omit } from "@webhare/std";
 import * as test from "@webhare/test";
 import * as whdb from "@webhare/whdb";
 
-function byDateId(lhs: { wrdCreationDate: Date | null; wrdId: number }, rhs: { wrdCreationDate: Date | null; wrdId: number }) {
-  return (lhs.wrdCreationDate!.getTime() - rhs.wrdCreationDate!.getTime()) || (lhs.wrdId - rhs.wrdId);
+function byDateId(lhs: { wrdCreated: Temporal.Instant | null; wrdId: number }, rhs: { wrdCreated: Temporal.Instant | null; wrdId: number }) {
+  return Temporal.Instant.compare(lhs.wrdCreated!, rhs.wrdCreated!) || (lhs.wrdId - rhs.wrdId);
 }
 
 async function listTestChecks(type: string) {
-  const rows = await systemConfigSchema.query("serverCheck").historyMode("all").select(
-    ["type", "wrdId", "wrdCreationDate", "wrdModificationDate", "messageText", "messageTid", "metadata", "wrdLimitDate", "snoozedUntil"]).
+  const configSchema = wrd("system:config");
+  const rows = await configSchema.query("serverCheck").historyMode("all").select(
+    ["type", "wrdId", "wrdCreated", "wrdModified", "messageText", "messageTid", "metadata", "wrdClosed", "snoozedUntil"]).
     where("checkTask", "=", type).execute();
 
-  const history = await systemConfigSchema.query("serverCheckHistory").
-    select(["comment", "wrdLeftEntity", "messageText", "messageTid", "snoozedUntil", "event", "wrdCreationDate", "wrdId"]).
+  const history = await configSchema.query("serverCheckHistory").
+    select(["comment", "wrdLeftEntity", "messageText", "messageTid", "snoozedUntil", "event", "wrdCreated", "wrdId"]).
     where("wrdLeftEntity", "in", rows.map((row) => row.wrdId)).
     execute();
 
@@ -25,11 +26,12 @@ async function listTestChecks(type: string) {
 }
 
 async function testCheckAPI() {
+  const configSchema = wrd("system:config");
   //Cleanup curent checks
   await whdb.beginWork();
 
   for (const row of await listTestChecks("webhare_testsuite:checks"))
-    await systemConfigSchema.delete("serverCheck", row.wrdId);
+    await configSchema.delete("serverCheck", row.wrdId);
 
   await whdb.commitWork();
 
@@ -46,12 +48,12 @@ async function testCheckAPI() {
 
   const checks1 = await listTestChecks("webhare_testsuite:checks");
   test.eqPartial([
-    { type: "webhare_testsuite:check0", metadata: null, messageText: "Test #0 failed", history: [{ event: "start", messageText: "Test #0 failed" }], wrdLimitDate: null },
-    { type: "webhare_testsuite:check1", metadata: null, messageText: "Test #1 failed", history: [{ event: "start", messageText: "Test #1 failed" }], wrdLimitDate: null },
-    { type: "webhare_testsuite:check2", metadata: null, messageText: "Test #2 failed", history: [{ event: "start", messageText: "Test #2 failed" }], wrdLimitDate: null }
+    { type: "webhare_testsuite:check0", metadata: null, messageText: "Test #0 failed", history: [{ event: "start", messageText: "Test #0 failed" }], wrdClosed: null },
+    { type: "webhare_testsuite:check1", metadata: null, messageText: "Test #1 failed", history: [{ event: "start", messageText: "Test #1 failed" }], wrdClosed: null },
+    { type: "webhare_testsuite:check2", metadata: null, messageText: "Test #2 failed", history: [{ event: "start", messageText: "Test #2 failed" }], wrdClosed: null }
   ], checks1);
-  test.eq(checks1[0].wrdCreationDate, checks1[0].history[0].wrdCreationDate);
-  test.eq(checks1[0].wrdCreationDate, checks1[1].wrdCreationDate);
+  test.eq(checks1[0].wrdCreated, checks1[0].history[0].wrdCreated);
+  test.eq(checks1[0].wrdCreated, checks1[1].wrdCreated);
 
   await loadlib("mod::system/lib/checks.whlib").UpdateCheckStatus(
     "webhare_testsuite:checks",
@@ -72,18 +74,18 @@ async function testCheckAPI() {
           { event: "stop" }
         ]
     },
-    { type: "webhare_testsuite:check1", metadata: null, messageText: "Test #1 failed", history: [{ event: "start", messageText: "Test #1 failed" }], wrdLimitDate: null },
+    { type: "webhare_testsuite:check1", metadata: null, messageText: "Test #1 failed", history: [{ event: "start", messageText: "Test #1 failed" }], wrdClosed: null },
     {
-      type: "webhare_testsuite:check2", metadata: null, messageText: "Test #2 changed", wrdCreationDate: checks1[1].wrdCreationDate, history: [
-        { event: "start", messageText: "Test #2 failed", wrdCreationDate: checks1[1].wrdCreationDate },
+      type: "webhare_testsuite:check2", metadata: null, messageText: "Test #2 changed", wrdCreated: checks1[1].wrdCreated, history: [
+        { event: "start", messageText: "Test #2 failed", wrdCreated: checks1[1].wrdCreated },
         { event: "change", messageText: "Test #2 changed" }
-      ], wrdLimitDate: null
+      ], wrdClosed: null
     },
-    { type: "webhare_testsuite:check2", metadata: { sub: 1 }, messageText: "Test #2.1 now failing", history: [{ event: "start", messageText: "Test #2.1 now failing" }], wrdLimitDate: null }
+    { type: "webhare_testsuite:check2", metadata: { sub: 1 }, messageText: "Test #2.1 now failing", history: [{ event: "start", messageText: "Test #2.1 now failing" }], wrdClosed: null }
   ], checks2);
 
-  test.assert(checks2[0].wrdLimitDate, "should now have a set limitdate on check[0]");
-  test.eq(checks2[0].wrdLimitDate, checks2[0].history[1].wrdCreationDate);
+  test.assert(checks2[0].wrdClosed, "should now have a set limitdate on check[0]");
+  test.eq(checks2[0].wrdClosed, checks2[0].history[1].wrdCreated);
 
   await loadlib("mod::system/lib/checks.whlib").UpdateCheckStatus(
     "webhare_testsuite:checks",
@@ -103,13 +105,13 @@ async function testCheckAPI() {
           { event: "stop" }
         ]
     },
-    { type: "webhare_testsuite:check2", metadata: null, messageText: "Test #2 changed", wrdLimitDate: null },
-    { type: "webhare_testsuite:check2", metadata: { sub: 1 }, messageText: "Test #2.1 now failing", wrdLimitDate: null }
+    { type: "webhare_testsuite:check2", metadata: null, messageText: "Test #2 changed", wrdClosed: null },
+    { type: "webhare_testsuite:check2", metadata: { sub: 1 }, messageText: "Test #2.1 now failing", wrdClosed: null }
   ], checks3);
 
-  test.eq(checks3[0].wrdLimitDate!, checks2[0].wrdLimitDate, "test failure #0 should be untouched");
-  test.assert(checks3[1].wrdLimitDate, "should now have a set limitdate on check[1]");
-  test.eq(checks3[0].wrdLimitDate, checks3[0].history[1].wrdCreationDate);
+  test.eq(checks3[0].wrdClosed!, checks2[0].wrdClosed, "test failure #0 should be untouched");
+  test.assert(checks3[1].wrdClosed, "should now have a set limitdate on check[1]");
+  test.eq(checks3[0].wrdClosed, checks3[0].history[1].wrdCreated);
 
   await loadlib("mod::system/lib/checks.whlib").UpdateCheckStatus(
     "webhare_testsuite:checks",
@@ -128,7 +130,7 @@ async function testCheckAPI() {
           { event: "start", messageText: "Test #0 failed" },
           { event: "stop" },
           { event: "start", messageText: "Test #0 refailed" }
-        ], wrdCreationDate: checks1[0].wrdCreationDate, wrdLimitDate: null, snoozedUntil: null
+        ], wrdCreated: checks1[0].wrdCreated, wrdClosed: null, snoozedUntil: null
     },
     { type: "webhare_testsuite:check1", metadata: null, messageText: "Test #1 failed" },
     { type: "webhare_testsuite:check2", metadata: null, messageText: "Test #2 changed" },
@@ -137,6 +139,7 @@ async function testCheckAPI() {
 
   //snooze that first issue
   const snoozeuntil = new Date(Date.now() + 10000);
+  const snoozedUntil = Temporal.Instant.fromEpochMilliseconds(snoozeuntil.getTime());
   await whdb.beginWork();
   await loadlib("mod::system/lib/checks.whlib").SnoozeIssue(checks4[0].wrdId, snoozeuntil, { comment: "Stop bothering us" });
   await whdb.commitWork();
@@ -149,8 +152,8 @@ async function testCheckAPI() {
           { event: "start", messageText: "Test #0 failed" },
           { event: "stop" },
           { event: "start", messageText: "Test #0 refailed" },
-          { event: "snooze", comment: "Stop bothering us", snoozedUntil: snoozeuntil }
-        ], wrdCreationDate: checks1[0].wrdCreationDate, wrdLimitDate: null, snoozedUntil: snoozeuntil
+          { event: "snooze", comment: "Stop bothering us", snoozedUntil }
+        ], wrdCreated: checks1[0].wrdCreated, wrdClosed: null, snoozedUntil
     }, ...checks4.slice(1)
   ], checks5);
 
@@ -158,19 +161,20 @@ async function testCheckAPI() {
   await whdb.beginWork();
   await loadlib("mod::system/lib/checks.whlib").UnsnoozeIssue(checks4[0].wrdId);
   await whdb.commitWork();
-  test.eqPartial(omit(checks4, ["wrdModificationDate"]), await listTestChecks("webhare_testsuite:checks"));
+  test.eqPartial(omit(checks4, ["wrdModified"]), await listTestChecks("webhare_testsuite:checks"));
 }
 
 async function listTestSuiteIntervalIssues() {
-  return (await listTestChecks("system:intervalchecks")).filter(_ => _.type.startsWith("webhare_testsuite:") && !_.wrdLimitDate);
+  return (await listTestChecks("system:intervalchecks")).filter(_ => _.type.startsWith("webhare_testsuite:") && !_.wrdClosed);
 }
 
 async function testTheChecks() {
+  const configSchema = wrd("system:config");
   //Cleanup curent checks and schedule the interval checks
   await whdb.beginWork();
   await writeRegistryKey("webhare_testsuite.tests.response", "checker.ts test");
   for (const row of await listTestSuiteIntervalIssues())
-    await systemConfigSchema.delete("serverCheck", row.wrdId);
+    await configSchema.delete("serverCheck", row.wrdId);
 
   const task1 = await scheduleTimedTask("system:intervalchecks");
   await whdb.commitWork();

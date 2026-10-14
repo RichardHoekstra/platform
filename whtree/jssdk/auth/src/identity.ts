@@ -1,7 +1,6 @@
 import * as crypto from "node:crypto";
 import jwt, { type JwtPayload, type SignOptions, type VerifyOptions } from "jsonwebtoken";
 import type { AnyWRDSchema, SchemaTypeDefinition, WRDSchemaType } from "@webhare/wrd/src/schema";
-import type { WRD_IdpSchemaType, WRD_Idp_WRDPerson } from "@mod-platform/generated/wrd/webhare";
 import { compareProperties, convertWaitPeriodToDate, generateRandomId, isPromise, parseTyped, pick, stringify, throwError, updateURL, type WaitPeriod } from "@webhare/std";
 import { generateKeyPair, type KeyObject, createPrivateKey, createPublicKey } from "node:crypto";
 import { getSchemaSettings, updateSchemaSettings } from "@webhare/wrd/src/settings";
@@ -20,7 +19,7 @@ import { tagToHS, tagToJS } from "@webhare/wrd/src/wrdsupport";
 import type { PublicAuthData } from "@webhare/frontend/src/auth";
 import { checkPasswordCompliance, verifyPasswordCompliance, type PasswordCheck, type PasswordCheckResult } from "./passwords";
 import { getCompleteAccountNavigation, type LoginTweaks, type LoginErrorCode, type LoginResult } from "./shared";
-import { AuthenticationSettings, describeEntity, wrd, type AnySchemaType } from "@webhare/wrd";
+import { AuthenticationSettings, describeEntity, wrd, type AnySchemaType, type WRDSchemaLike } from "@webhare/wrd";
 import { getGuidForEntity } from "@webhare/wrd/src/accessors";
 
 const defaultPasswordResetExpiry = 3 * 86400_000; //default 3 days epxiry
@@ -355,7 +354,7 @@ function haveValidKeys(keys: SigningKey[]) {
 }
 
 type SigningKey = {
-  availableSince: Date;
+  availableSince: Temporal.Instant;
   keyId: string;
   privateKey: JsonWebKey;
 };
@@ -365,12 +364,12 @@ type SigningKey = {
  * @param wrdschema - The schema to create the token for
 */
 export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
-  readonly wrdschema: WRDSchemaType<WRD_IdpSchemaType>;
+  readonly wrdschema: WRDSchemaType<WRDSchemaLike["wrd:idp"]>;
   private authsettings?: WRDAuthSettings | null;
 
   constructor(wrdschema: WRDSchemaType<SchemaType>) {
-    //TODO can we cast to a 'real' base type instead of abusing System_UsermgmtSchemaType for the wrdSettings type?
-    this.wrdschema = wrdschema as unknown as WRDSchemaType<WRD_IdpSchemaType>;
+    //TODO can we cast to a 'real' base type instead of abusing WRDSchemaLike["wrd:idp"] for the wrdSettings type?
+    this.wrdschema = wrd<WRDSchemaLike["wrd:idp"]>(wrdschema.tag);
   }
 
   getAuthSettings(required: true): Promise<WRDAuthSettings & { loginAttribute: string; passwordAttribute: string; passwordIsAuthSettings: true }>;
@@ -400,12 +399,12 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
         if (!validity.valid_ec) {
           //TODO keyIds aren't sensitive, we can use much smaller keyIds if we check for dupes ourselves to avoid collisions
           const primarykeyid = generateRandomId();
-          signingKeys.push({ availableSince: new Date, keyId: primarykeyid, privateKey: await createSigningKey("ec") });
+          signingKeys.push({ availableSince: Temporal.Now.instant(), keyId: primarykeyid, privateKey: await createSigningKey("ec") });
         }
         if (!validity.valid_rsa) {
           //TODO keyIds aren't sensitive, we can use much smaller keyIds if we check for dupes ourselves to avoid collisions
           const primarykeyid = generateRandomId();
-          signingKeys.push({ availableSince: new Date, keyId: primarykeyid, privateKey: await createSigningKey("rsa") });
+          signingKeys.push({ availableSince: Temporal.Now.instant(), keyId: primarykeyid, privateKey: await createSigningKey("rsa") });
         }
         await updateSchemaSettings(this.wrdschema, { signingKeys });
       }
@@ -439,7 +438,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
     /** Prefer ec over non-ec, then look for most recente key */
     keys = keys.sort((a, b) =>
       (Number(b.privateKey.kty === "EC") - Number(a.privateKey.kty === "EC"))
-      || b.availableSince.getTime() - a.availableSince.getTime()
+      || Temporal.Instant.compare(b.availableSince, a.availableSince)
     );
 
     if (!keys.length)
@@ -733,7 +732,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
         ...pick(options || {}, ["site"])
       });
 
-    const user = await (this.wrdschema as AnyWRDSchema).search(authsettings.accountType, authsettings.loginAttribute as AttrRef<WRD_Idp_WRDPerson>, loginname);
+    const user = await (this.wrdschema as AnyWRDSchema).search(authsettings.accountType, authsettings.loginAttribute as AttrRef<WRDSchemaLike["wrd:idp"]["wrdPerson"]>, loginname);
     return user || null;
   }
 

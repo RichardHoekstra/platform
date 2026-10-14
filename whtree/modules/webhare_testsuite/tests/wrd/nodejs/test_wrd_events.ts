@@ -6,7 +6,6 @@ import { wrd, type WRDSchemaLike } from "@webhare/wrd";
 import { subscribeToEventStream, toResourcePath, type BackendEvent } from "@webhare/services";
 import { loadlib } from "@webhare/harescript";
 
-type WRD_TestschemaSchemaType = WRDSchemaLike["wrd:testschema"];
 
 async function testEventMasks() {
   const schema = await getExtendedWRDSchema();
@@ -48,7 +47,7 @@ async function expectEvent(itr: AsyncIterator<BackendEvent>, options?: { check?:
 }
 
 async function testEvents() {
-  const schema = wrd<Combine<[WRD_TestschemaSchemaType, CustomExtensions]>>(testSchemaTag);
+  const schema = wrd<Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensions]>>(testSchemaTag);
   const wrdPersonTypeId = await schema.__toWRDTypeId("wrdPerson");
   const testDomain_1TypeId = await schema.__toWRDTypeId("testDomain_1");
 
@@ -154,7 +153,7 @@ async function testEvents() {
   }, event.data);
 
   // STORY: delete through a type removes entities of that type and its subtypes, reported under their own type
-  const domains = wrd<Combine<[WRD_TestschemaSchemaType, CustomExtensions, { testDomain1Child: WRDTypeBaseSettings }]>>(testSchemaTag);
+  const domains = wrd<Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensions, { testDomain1Child: WRDTypeBaseSettings }]>>(testSchemaTag);
   const testDomain1ChildTypeId = await domains.__toWRDTypeId("testDomain1Child");
   await whdb.beginWork();
   const own = await domains.insert("testDomain_1", {});

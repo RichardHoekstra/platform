@@ -4,7 +4,7 @@ import { beginWork, isWorkOpen } from "@webhare/whdb";
 import * as test from "@webhare/test";
 import { createFirstPartyToken } from "@webhare/auth";
 import { getLastAuthAuditEvent } from "@mod-webhare_testsuite/js/wts-backend";
-import { wrdTestschemaSchema } from "@mod-platform/generated/wrd/webhare";
+import { wrd } from "@webhare/wrd";
 import { ResourceDescriptor, WebHareBlob } from "@webhare/services";
 import { openFile } from "@webhare/whfs/src/objects";
 import { loadlib } from "@webhare/harescript/src/contextvm";
@@ -120,8 +120,9 @@ export async function setThrowingProperty(p: HSVMObjectWrapper) {
 }
 
 export async function testTokenAudit(user: number) {
-  await createFirstPartyToken(wrdTestschemaSchema, "id", user);
-  return toSnakeCase(await getLastAuthAuditEvent(wrdTestschemaSchema));
+  const testSchema = wrd("wrd:testschema");
+  await createFirstPartyToken(testSchema, "id", user);
+  return toSnakeCase(await getLastAuthAuditEvent(testSchema));
 }
 
 export async function getResourceFromDisk(path: string) {

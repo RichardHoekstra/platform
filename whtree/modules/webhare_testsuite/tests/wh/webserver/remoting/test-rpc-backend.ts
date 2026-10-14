@@ -11,16 +11,14 @@ import { newWebRequestFromInfo } from '@webhare/router/src/request';
 import { parseTyped } from '@webhare/std';
 import { getTypedStringifyableData } from '@mod-webhare_testsuite/js/ci/testdata';
 import { createFirstPartyToken } from '@webhare/auth';
-import { WRDSchema } from '@webhare/wrd';
-import type { Platform_BasewrdschemaSchemaType } from '@mod-platform/generated/wrd/webhare';
+import { wrd, type WRDSchemaLike } from '@webhare/wrd';
 import { runInWork } from '@webhare/whdb';
-import { testschemaSchema } from 'wh:wrd/webhare_testsuite';
 
-const jsAuthSchema = new WRDSchema<Platform_BasewrdschemaSchemaType>("webhare_testsuite:testschema");
+const jsAuthSchema = wrd<WRDSchemaLike["platform:basewrdschema"]>("webhare_testsuite:testschema");
 
 async function prep() {
   await test.reset({ wrdSchema: "webhare_testsuite:testschema" });
-  await runInWork(() => testschemaSchema.updateSchema({ accountType: "wrdPerson" }));
+  await runInWork(() => wrd("webhare_testsuite:testschema").updateSchema({ accountType: "wrdPerson" }));
 }
 
 async function testRPCCaller() {

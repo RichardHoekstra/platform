@@ -1,4 +1,4 @@
-import { systemConfigSchema } from "@mod-platform/generated/wrd/webhare";
+import { wrd } from "@webhare/wrd";
 import {
   type AcmeAccount,
   AcmeClient,
@@ -197,7 +197,7 @@ class UpdateHandler {
 
 export async function getProviderForDomains(domains: string[], staging?: boolean) {
   // Find the relevant certificate provider
-  const providers = await systemConfigSchema
+  const providers = await wrd("system:config")
     .query("certificateProvider")
     .select([
       "wrdId", "issuerDomain", "acmeDirectory", "accountPrivatekey", "eabKid", "eabHmackey", "email", "allowlist",

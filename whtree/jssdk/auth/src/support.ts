@@ -1,6 +1,6 @@
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import type { SchemaTypeDefinition } from "@webhare/wrd/src/types";
-import type { WRDSchema, WRDSchemaType } from "@webhare/wrd";
+import type { WRDSchema, WRDSchemaLike, WRDSchemaType } from "@webhare/wrd";
 import type { WRDAuthSettings } from "./identity";
 import { db } from "@webhare/whdb";
 import { tagToJS } from "@webhare/wrd/src/wrdsupport";
@@ -8,7 +8,6 @@ import { getApplyTesterForURL, type WRDAuthPluginSettings } from "@webhare/whfs/
 import { getIdCookieName } from "@webhare/auth/src/authfrontend";
 import type { ServersideCookieOptions } from "@webhare/dompack/src/cookiebuilder";
 import { getSchemaSettings } from "@webhare/wrd/src/settings";
-import type { System_UsermgmtSchemaType } from "@mod-platform/generated/wrd/webhare";
 import { updateURL } from "@webhare/std";
 
 //TODO Export from @webhare/auth? but camelcase first
@@ -109,7 +108,7 @@ export function prepAuth(settings: WRDAuthPluginSettings_Request): PrepAuthResul
 }
 
 export async function getUserValidationSettings<T extends SchemaTypeDefinition>(wrdschema: WRDSchemaType<T>, unit: number | null): Promise<string> {
-  const s = wrdschema as unknown as WRDSchema<System_UsermgmtSchemaType>;
+  const s = wrdschema as unknown as WRDSchema<WRDSchemaLike["system:usermgmt"]>;
 
   if (unit) {
     let maxDepth = 16;

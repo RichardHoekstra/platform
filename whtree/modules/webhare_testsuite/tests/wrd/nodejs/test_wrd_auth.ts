@@ -20,7 +20,6 @@ let robotClient: ClientConfig | undefined;
 let peopleClient: ClientConfig | undefined;
 let evilClient: ClientConfig | undefined;
 
-const systemUsermgmtSchema = wrd("system:usermgmt");
 const oidcAuthSchema = wrd<WRDSchemaLike["webhare_testsuite:oidcschema"]>("webhare_testsuite:testschema");
 
 declare module "@webhare/auth" {
@@ -226,7 +225,7 @@ async function mockAuthorizeFlow<T extends SchemaTypeDefinition>(provider: Ident
   test.eqPartial({ error: "Token is invalid" }, await provider.verifyAccessToken("id", tokens.body.id_token!));
   test.eqPartial({ entity: user, scopes: ["openid"], client: clientWrdId, accountStatus: { status: "active" } }, await provider.verifyAccessToken("oidc", tokens.body.access_token));
   // Wrong schema
-  test.eqPartial({ error: /Token owner #\d+ does not exist anymore/ }, await new IdentityProvider(systemUsermgmtSchema).verifyAccessToken("oidc", tokens.body.access_token));
+  test.eqPartial({ error: /Token owner #\d+ does not exist anymore/ }, await new IdentityProvider(wrd("system:usermgmt")).verifyAccessToken("oidc", tokens.body.access_token));
 
   const verifyresult = await provider.validateToken(tokens.body.id_token!);
   test.eqPartial({ aud: clientId, iss: "https://my.webhare.dev/testfw/issuer" }, verifyresult);
