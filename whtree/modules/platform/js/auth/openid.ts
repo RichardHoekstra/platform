@@ -4,7 +4,7 @@ import { getApplyTesterForObject } from "@webhare/whfs/src/applytester";
 //TOOD make this a public export somewhere? but should it include wrdOrg and wrdPerson though
 import { wrd, type WRDSchema, type WRDSchemaLike, type WRDSchemaType } from "@webhare/wrd";
 import { listSites, openFileOrFolder, openFolder, openSite } from "@webhare/whfs";
-import { decompressUUID, hashClientSecret, IdentityProvider, type AuthTokenOptions } from "@webhare/auth/src/identity";
+import { decompressUUID, hashClientSecret, IdentityProvider, listTokens, type AuthTokenOptions } from "@webhare/auth/src/identity";
 import { closeServerSession, createServerSession, encryptForThisServer, getServerSession, importJSObject, updateServerSession } from "@webhare/services";
 import type { AuthCustomizer, JWTPayload } from "@webhare/auth";
 import { getCookieBasedUser } from "@webhare/auth/src/authfrontend";
@@ -29,6 +29,7 @@ declare module "@webhare/services" {
       nonce: string | null;
       code_challenge: string | null;
       code_challenge_method: CodeChallengeMethod | null;
+      prompt: OAuth2PromptFlag;
       /** User id to set */
       user?: number;
     };
@@ -242,6 +243,7 @@ export async function startAuthorizeFlow<T extends SchemaTypeDefinition>(provide
     nonce,
     code_challenge,
     code_challenge_method: code_challenge_method as CodeChallengeMethod,
+    prompt
   }));
 
   //Sets up a WRD Auth request that will return the user after logging in locally to the openid /return/ endpoint in openIdRouter
@@ -288,8 +290,27 @@ export async function returnAuthorizeFlow<T extends SchemaTypeDefinition>(provid
   //Are any scopes requested which we wouldn't automatically honor?
   //TODO validate the requested scopes and block unknown ones/or block the flow entirely - instead of just adding them to the requested token?
   const finalRedirectURI = new URL(returnInfo.cbUrl);
-  const checkScopes = returnInfo.scopes.filter(scope => Object.keys(supportedAccessScopes).includes(scope)) as Array<keyof typeof supportedAccessScopes>;
+
+  const protectedScopes = returnInfo.scopes.filter(scope => Object.keys(supportedAccessScopes).includes(scope)) as Array<keyof typeof supportedAccessScopes>;
+  const checkScopes: Array<keyof typeof supportedAccessScopes> = [];
+  if (protectedScopes.length > 0) {
+    //What are the user's current scopes?
+    //TODO should we enforce a user having just one session?
+    //TODO optimize query by directly requesting - and only if we need to add scopes. add a better identity.ts API to gather currently allowed scopes
+    const currentTokens = new Set<string>;
+    for (const activeRow of (await listTokens(provider.wrdschema, user)).filter(_ => _.type === "api" && _.client === returnInfo.clientid))
+      for (const scope of activeRow.scopes)
+        currentTokens.add(scope);
+
+    for (const scope of protectedScopes)
+      if (!currentTokens.has(scope))
+        checkScopes.push(scope);
+  }
+
   if (checkScopes.length > 0) { //we need to explicitly ask the user for approval
+    if (returnInfo.prompt === "none") //TODO look at scopes we already granted - if you didn't ask anything new, prompt=none should be fine?
+      return createOIDCErrorResponse(returnInfo, "interaction_required", "Cannot request scopes in prompt=none request");
+
     if (req.method !== "POST") { //not POST-ing? render the permission page
       const permissionrequest = await createContentPageRequest(await openFileOrFolder(site), { webRequest: req }); //TODO pass the webRequest too?
       //TODO pass a true FormsAPI body. or delegate this fully to HareScript
@@ -307,10 +328,8 @@ export async function returnAuthorizeFlow<T extends SchemaTypeDefinition>(provid
     } else {
       const formData = await req.formData();
       const approve = formData.get("approve") === "yes";
-      if (!approve) {
-        finalRedirectURI.searchParams.set("error", "access_denied");
-        return createRedirectResponse(finalRedirectURI.toString());
-      }
+      if (!approve)
+        return createOIDCErrorResponse(returnInfo, "interaction_required", "User must grant scopes");
     }
   }
 

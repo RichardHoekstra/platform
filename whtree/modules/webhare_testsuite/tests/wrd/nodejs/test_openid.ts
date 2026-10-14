@@ -430,7 +430,6 @@ async function verifyAsOpenIDSP() {
   const portal1LoginRequest = testsite.webRoot + "portal1-oidc/wrdauthtest/?tryoidc=TESTFW_OIDC_SP";
   console.log(`portal1LoginRequest: ${portal1LoginRequest}`);
   await page.goto(portal1LoginRequest);
-  await consentToTestfwScope(page);
   test.eq(String(wrdId), await (await (await page.waitForSelector("#userid"))?.getProperty("textContent"))?.jsonValue());
 
   await logoutRelyingParty(context);
@@ -440,7 +439,6 @@ async function verifyAsOpenIDSP() {
   console.log(`portal1LoginRequestWithPrompt: ${portal1LoginRequestWithPrompt}`);
   await page.goto(portal1LoginRequestWithPrompt);
   await runWebHareLoginFlow(page, { password: newPassword });
-  await consentToTestfwScope(page);
   test.eq(String(wrdId), await (await (await page.waitForSelector("#userid"))?.getProperty("textContent"))?.jsonValue());
 
   await logoutRelyingParty(context);
@@ -460,7 +458,6 @@ async function verifyAsOpenIDSP() {
   console.log(`portal1LoginRequestBlocked: ${portal1LoginRequestBlocked}`);
   await page.goto(portal1LoginRequestBlocked);
   await runWebHareLoginFlow(page, { password: newPassword });
-  await consentToTestfwScope(page);
   test.eq(/The account has been disabled/, await (await (await page.waitForSelector("div.wh-wrdauth-extloginfailure"))?.getProperty("textContent"))?.jsonValue());
 
   await context.close();
@@ -499,7 +496,6 @@ async function verifyCustomOpenIDFlow() {
   //Test NavigateInstruction now
   await runInWork(() => oidcAuthSchema.update("wrdPerson", test.getUser("marge").wrdId, { wrdLastName: "REDIRECTME" }));
   await page.goto(portal1LoginRequest);
-  await consentToTestfwScope(page);
 
   await test.wait(() => page.url().endsWith("/redirected-away"));
   await context.close();
@@ -558,7 +554,6 @@ async function verifySSOAPI() {
     console.log("Doing SSO login on ", startUrl);
     await page.click("#ssobutton");
     await runWebHareLoginFlow(page, { user: "bart", password: "bart$", changePasswordTo: newPassword });
-    await consentToTestfwScope(page);
 
     const schemaSP = wrd<"*">("webhare_testsuite:oidc-sp");
     const targetBart = await schemaSP.query("wrdPerson").where("wrdContactEmail", "=", test.getUser("bart").login).select(["wrdId", "wrdLastName", "whuserComment"]).executeRequireExactlyOne();
@@ -576,10 +571,10 @@ async function verifySSOAPI() {
       }
     });
 
+    //TODO improve these 'prompt=none with scopes' tests/scenarios. eg automatic rejection if you try to add scopes with prompt=none. Or have test_wrd_auth do those
     console.log("Doing second passive SSO login on ", startUrl);
     await page.goto(startUrl);
     await page.click("#ssopassivebutton");
-    await consentToTestfwScope(page);
     await test.wait(async () => {
       try {
         const result = await page.evaluate(`document.querySelector("#ssopassivestatus")?.textContent`) === "Completed passive SSO login";
