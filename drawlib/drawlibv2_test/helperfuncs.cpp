@@ -103,6 +103,7 @@ bool DoErrorCompare(std::string filename, const DrawLib::Bitmap32 & result_bitma
         if (generate_on_error)
         {
                 SaveBitmap(result_bitmap, filename +"_gen.png",false);
+                SaveBitmap(*reference_bitmap, filename +"_ref.png",false);
 
                 std::unique_ptr<DrawLib::Bitmap32 > difference_bitmap;
                 difference_bitmap.reset(DrawLib::DifferenceBitmap(*(reference_bitmap.get()), result_bitmap, false));

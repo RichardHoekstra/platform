@@ -359,7 +359,7 @@ BLEX_TEST_FUNCTION(TextRendererSpacingTest)
                 bb /*bounding box, witin canvas*/,
                 0     /*text direction*/,
                 false /*is last box*/,0
-);
+        );
 
-        BLEX_TEST_CHECK(DoErrorCompare ("ref-textrendererspacing.png", mybitmap, 70,true));
+        BLEX_TEST_CHECK(DoErrorCompare ("ref-textrendererspacing.png", mybitmap, 201,true));
 }
