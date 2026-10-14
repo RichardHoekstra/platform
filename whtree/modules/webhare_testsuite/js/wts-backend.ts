@@ -89,7 +89,6 @@ export async function runOpenIDLoginFlow(browser: Puppeteer.Browser, options: {
   const context = await browser.createBrowserContext();
   try {
     const page = await context.newPage();
-    await page.goto(authorizeUrl.toString());
     await page.setRequestInterception(true);
 
     const callback = new URL(options.callbackUrl);
@@ -106,15 +105,31 @@ export async function runOpenIDLoginFlow(browser: Puppeteer.Browser, options: {
         void request.continue();
     });
 
+    //We may be redirected straight to the callback if our authorize parameters were invalid. So first check where we end up before we attempt to login
+    await Promise.race([
+      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+      page.goto(authorizeUrl.toString())
+    ]);
+
+    if (page.url().startsWith(options.callbackUrl)) { //immediate failure (TODO or prompt=none, add tests for that!)
+      const url = new URL(page.url());
+      return {
+        config: null,
+        tokenSet: null,
+        error: url.searchParams.get("error"),
+        error_description: url.searchParams.get("error_description")
+      };
+    }
+
     const [, callbackRequest] = await Promise.all([
       runWebHareLoginFlow(page),
       page.waitForRequest(isCallback, { timeout: 30000 })
     ]);
     const tokenSet = await authorizationCodeGrant(config, new URL(callbackRequest.url()), {
       expectedNonce: options.nonce,
-      pkceCodeVerifier: options.pkceCodeVerifier
+      pkceCodeVerifier: options.pkceCodeVerifier,
     });
-    return { config, tokenSet };
+    return { config, tokenSet, error: null, error_description: null };
   } finally {
     await context.close();
   }

@@ -4,7 +4,7 @@ import { createFirstPartyToken, type LookupUsernameParameters, type OpenIdReques
 import { AuthenticationSettings, createSchema, describeEntity, extendSchema, getSchemaSettings, updateSchemaSettings, wrd, type WRDSchemaLike } from "@webhare/wrd";
 import { createSigningKey, createJWT, verifyJWT, IdentityProvider, compressUUID, decompressUUID, decodeJWT, createCodeVerifier, type FrontendAuthResult, type FrontendLoginRequest } from "@webhare/auth/src/identity";
 import { createCodeChallenge, retrieveTokens, returnAuthorizeFlow, startAuthorizeFlow, type CodeChallengeMethod } from "@mod-platform/js/auth/openid.ts";
-import { addDuration, convertWaitPeriodToDate, generateRandomId, isLikeRandomId, parseTyped, throwError } from "@webhare/std";
+import { addDuration, convertWaitPeriodToDate, generateRandomId, isLikeRandomId, parseTyped, throwError, updateURL } from "@webhare/std";
 import { decryptForThisServer, readLogLines, toResourcePath } from "@webhare/services";
 import type { NavigateInstruction } from "@webhare/env/src/navigation";
 import type { SchemaTypeDefinition } from "@webhare/wrd/src/types";
@@ -172,16 +172,32 @@ async function testLowLevelAuthAPIs() {
   test.eq("00000001-0002-0003-0004-000000000005", decompressUUID('AAAAAQACAAMABAAAAAAABQ'));
 }
 
-async function mockAuthorizeFlow<T extends SchemaTypeDefinition>(provider: IdentityProvider<T>, { wrdId: clientWrdId = 0, clientId = '', clientSecret = '', code_verifier = '', challenge_method = '' }, user: number, customizer?: AuthCustomizer, scopes: string[] = ['openid', 'invalidscope']) {
+async function mockAuthorizeFlow<T extends SchemaTypeDefinition>(provider: IdentityProvider<T>, { wrdId: clientWrdId = 0, clientId = '', clientSecret = '', code_verifier = '', challenge_method = '' }, user: number, customizer?: AuthCustomizer, scopes: string[] = ['openid']) {
   const state = generateRandomId();
   const challenge = code_verifier && challenge_method ? createCodeChallenge(code_verifier, challenge_method as CodeChallengeMethod) : "";
-  const robotClientAuthURL = `http://example.net/?client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scopes.join(' '))}&redirect_uri=${encodeURIComponent(cbUrl)}&state=${state}${challenge ? `&code_challenge=${challenge}&code_challenge_method=${challenge_method}` : ""}`;
+  const robotClientAuthURL = updateURL("http://example.net/", {
+    client_id: clientId,
+    response_type: "code",
+    scope: scopes.join(' '),
+    redirect_uri: cbUrl,
+    state,
+    ...(challenge ? { code_challenge: challenge, code_challenge_method: challenge_method } : {})
+  });
 
-  const startflow = await startAuthorizeFlow(provider, robotClientAuthURL, loginUrl, "", customizer);
-  test.assert(startflow.error === null && startflow.type === "redirect");
+  const startflow = await startAuthorizeFlow(provider, robotClientAuthURL.toString(), loginUrl, null, customizer);
+  test.eq(HTTPSuccessCode.SeeOther, startflow.status);
+  const starturl = new URL(startflow.headers.get("location") ?? throwError("No location header in startAuthorizeFlow response"));
+  if (starturl.toString().startsWith(cbUrl)) {
+    const errobj = {
+      error: starturl.searchParams.get("error"),
+      error_description: starturl.searchParams.get("error_description")
+    };
+    console.log("mockAuthorizeFlow error response:", errobj);
+    return { ...errobj, idToken: null };
+  }
 
   //We now have an url with wrdauth_logincontrol, decrypt it:
-  const decryptLoginControl = decryptForThisServer("wrd:authplugin.logincontroltoken", new URL(startflow.url, loginUrl).searchParams.get("wrdauth_logincontrol")!);
+  const decryptLoginControl = decryptForThisServer("wrd:authplugin.logincontroltoken", starturl.searchParams.get("wrdauth_logincontrol")!);
   const endFlow = await returnAuthorizeFlow(provider, new IncomingWebRequest(new URL(decryptLoginControl.returnto, loginUrl).toString()), user, (await test.getTestSiteJS()).id, customizer);
 
   test.eq(HTTPSuccessCode.SeeOther, endFlow.status);
@@ -228,7 +244,7 @@ async function mockAuthorizeFlow<T extends SchemaTypeDefinition>(provider: Ident
   test.eq({ error: /Invalid or expired/, }, await retrieveTokens(provider, new URLSearchParams(formparams), new Headers, { customizer }));
   if (tokens.body.id_token)
     test.eqPartial({ error: "Token is invalid" }, await provider.verifyAccessToken("id", tokens.body.id_token));
-  test.eqPartial({ entity: user, scopes: scopes.filter(_ => _ !== "invalidscope"), client: clientWrdId, accountStatus: { status: "active" } }, await provider.verifyAccessToken("api", tokens.body.access_token));
+  test.eqPartial({ entity: user, scopes: scopes, client: clientWrdId, accountStatus: { status: "active" } }, await provider.verifyAccessToken("api", tokens.body.access_token));
   // Wrong schema
   test.eqPartial({ error: /Token owner #\d+ does not exist anymore/ }, await new IdentityProvider(wrd("system:usermgmt")).verifyAccessToken("api", tokens.body.access_token));
 
@@ -418,8 +434,12 @@ async function testAuthAPI() {
 
   //TODO verify audit
 
+  //try in invalid scope
+  test.eqPartial({ error: "invalid_scope" }, await mockAuthorizeFlow(provider, robotClient!, testuser, undefined, ['openid', 'invalidscope']));
+
   //validate openid flow
   const authresult = await mockAuthorizeFlow(provider, robotClient!, testuser);
+  console.log(authresult);
   test.assert("idToken" in authresult);
 
   //Fonzie-check the token. because its json.json.sig we'll see at least "ey" twice (encoded {})

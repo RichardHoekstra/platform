@@ -1,31 +1,34 @@
 import * as crypto from "node:crypto";
-import { type WebHareRouter, type WebRequest, type WebResponse, createContentPageRequest, createJSONResponse, createRedirectResponse } from "@webhare/router";
+import { type WebHareRouter, type WebRequest, type WebResponse, createContentPageRequest, createJSONResponse, createRedirectResponse, createWebResponse } from "@webhare/router";
 import { getApplyTesterForObject } from "@webhare/whfs/src/applytester";
 //TOOD make this a public export somewhere? but should it include wrdOrg and wrdPerson though
 import { wrd, type WRDSchema, type WRDSchemaLike, type WRDSchemaType } from "@webhare/wrd";
 import { listSites, openFileOrFolder, openFolder, openSite } from "@webhare/whfs";
 import { decompressUUID, hashClientSecret, IdentityProvider, type AuthTokenOptions } from "@webhare/auth/src/identity";
 import { closeServerSession, createServerSession, encryptForThisServer, getServerSession, importJSObject, updateServerSession } from "@webhare/services";
-import type { AuthCustomizer } from "@webhare/auth";
+import type { AuthCustomizer, JWTPayload } from "@webhare/auth";
 import { getCookieBasedUser } from "@webhare/auth/src/authfrontend";
-import type { NavigateInstruction } from "@webhare/env";
 import { runInWork } from "@webhare/whdb";
 import type { AnySchemaType, SchemaTypeDefinition } from "@webhare/wrd/src/types";
-import type { ResponseModesScopes } from "@webhare/auth/src/types";
+import type { OAuth2EndpointErrorCodes, OIDCEndpointErrorCodes, ResponseModesScopes, ResponseType } from "@webhare/auth/src/types";
 import type { OAuth2PromptFlag } from "@webhare/auth/src/oauth2-client";
 import { litty } from "@webhare/litty";
 
+type OIDCCallerInfo = {
+  state: string | null;
+  response_mode: ResponseModesScopes | null;
+  response_type: Array<ResponseType>;
+  cbUrl: string;
+};
+
 declare module "@webhare/services" {
   interface SessionScopes {
-    "wrd:openid.idpstate": {
+    "wrd:openid.idpstate": OIDCCallerInfo & {
       clientid: number;
       scopes: string[];
-      state: string | null;
       nonce: string | null;
       code_challenge: string | null;
       code_challenge_method: CodeChallengeMethod | null;
-      response_mode: ResponseModesScopes;
-      cbUrl: string;
       /** User id to set */
       user?: number;
     };
@@ -54,8 +57,6 @@ const supportedAccessScopes = {
 };
 
 export type CodeChallengeMethod = typeof validCodeChallengeMethods[number];
-
-type NavigateOrError = (NavigateInstruction & { error: null }) | { error: string };
 
 type TokenResponse = {
   access_token: string;
@@ -142,47 +143,106 @@ function verifyCodeChallenge(verifier: string, challenge: string, method: CodeCh
   return createCodeChallenge(verifier, method) === challenge;
 }
 
+/** Wrap an OIDC error response into a redirect back to the original SP. */
+function createOIDCErrorResponse(callerInfo: OIDCCallerInfo, errorCode: OAuth2EndpointErrorCodes | OIDCEndpointErrorCodes, errorDescription?: string): WebResponse {
+  const params = new URLSearchParams({ error: errorCode });
+  if (errorDescription)
+    params.set("error_description", errorDescription);
+  if (callerInfo.state !== null)
+    params.set("state", callerInfo.state);
+
+  const responseMode: ResponseModesScopes = callerInfo.response_mode || (callerInfo.response_type.includes("id_token" as const) || callerInfo.response_type.includes("token") ? "fragment" : "query");
+
+  if (responseMode === "form_post") {
+    return createRedirectResponse({
+      type: "form",
+      form: {
+        action: callerInfo.cbUrl,
+        vars: [...params.entries()].map(([name, value]) => ({ name, value }))
+      }
+    });
+  }
+
+  const targetUrl = new URL(callerInfo.cbUrl);
+  if (responseMode === "fragment")
+    targetUrl.hash = params.toString();
+  else
+    for (const [name, value] of params)
+      targetUrl.searchParams.set(name, value);
+
+  return createRedirectResponse(targetUrl.toString());
+}
+
+
 /** Start an oauth2/openid authorization flow */
-export async function startAuthorizeFlow<T extends SchemaTypeDefinition>(provider: IdentityProvider<T>, url: string, loginPage: string, prompt: OAuth2PromptFlag, customizer?: AuthCustomizer): Promise<NavigateOrError> {
+export async function startAuthorizeFlow<T extends SchemaTypeDefinition>(provider: IdentityProvider<T>, url: string, loginPage: string, curuser: { user: number; claims: JWTPayload } | null, customizer?: AuthCustomizer): Promise<WebResponse> {
   const searchParams = new URL(url).searchParams;
   const clientid = searchParams.get("client_id") || '';
-  const scopes = (searchParams.get("scope")?.split(" ") || []).filter(scope => builtinScopes.includes(scope) || Object.keys(supportedAccessScopes).includes(scope));
+  const scopes = (searchParams.get("scope")?.split(" ") || []);
   const redirect_uri = searchParams.get("redirect_uri") || '';
   const state = searchParams.get("state") || null;
   const nonce = searchParams.get("nonce") || null;
   const code_challenge = searchParams.get("code_challenge") || null;
   const code_challenge_method = searchParams.get("code_challenge_method") || null;
-  const response_mode = (searchParams.get("response_mode") || "query") as ResponseModesScopes;
+  const response_type = (searchParams.get("response_type")?.split(' ') || []) as Array<ResponseType>;
+  const response_mode = searchParams.get("response_mode") as ResponseModesScopes | null;
+  const prompt: OAuth2PromptFlag = (searchParams.get("prompt") || "") as OAuth2PromptFlag;
+
+  //Verify the client and callback URL first. If these are not okay, we're NOT allowed to use the provided callback URL (and thus cannot use createOIDCErrorResponse) as we haven't validated it
+  const client = await provider.wrdschema.query("wrdauthApplication").where("wrdGuid", "=", decompressUUID(clientid)).select(["callbackUrls", "wrdId"]).execute();
+  if (client.length !== 1)
+    return createWebResponse(litty`<html><p>No such client: ${clientid}</p></html>`);
+
+  if (!client[0].callbackUrls.find((cb) => cb.url === redirect_uri))
+    return createWebResponse(litty`<html><p>Unauthorized callback URL: ${redirect_uri} for client '${clientid}'</p></html>`);
+
+  if (!response_type.length)
+    return createWebResponse(litty`<html><p>Missing response type for client '${clientid}'</p></html>`);
+
+  const invalidResponseTypes = response_type.filter(rt => !["code", "token", "id_token"].includes(rt));
+  if (invalidResponseTypes.length > 0)
+    return createWebResponse(litty`<html><p>Unrecognized response type(s): ${invalidResponseTypes.join(", ")} for client '${clientid}'</p></html>`);
+
+  //At this point it's safe to use the callback url
+  const callerInfo: OIDCCallerInfo = {
+    cbUrl: redirect_uri,
+    state,
+    response_mode,
+    response_type
+  };
+
+  if (response_mode && !["query", "fragment", "form_post"].includes(response_mode)) {
+    return createOIDCErrorResponse(callerInfo, "invalid_request", `Invalid response_mode value '${response_mode}', allowed are 'query', 'fragment', or 'form_post'`);
+  }
+
+  if (!["", "none", "login", "consent", "select_account"].includes(prompt)) {
+    return createOIDCErrorResponse(callerInfo, "invalid_request", `Invalid prompt value '${prompt}', allowed are 'none', 'login', 'consent', or 'select_account'`);
+  }
 
   //If a code challenge was supplied, check the challenge method
   if (code_challenge) {
     if (!code_challenge_method)
-      return { error: "Missing code_challenge_method for code_challenge" };
+      return createOIDCErrorResponse(callerInfo, "invalid_request", `Missing code_challenge_method for code_challenge`);
     if (!validCodeChallengeMethods.includes(code_challenge_method as CodeChallengeMethod))
-      return { error: `Invalid code challenge method '${code_challenge_method}', allowed are 'plain' or 'S256` };
+      return createOIDCErrorResponse(callerInfo, "invalid_request", `Invalid code challenge method '${code_challenge_method}', allowed are 'plain' or 'S256`);
   }
 
-  if (!["query", "fragment", "form_post"].includes(response_mode))
-    return { error: `Invalid response_mode '${response_mode}', allowed are 'query', 'fragment', or 'form_post'` };
+  const invalidScopes = scopes.filter(scope => !builtinScopes.includes(scope) && !Object.keys(supportedAccessScopes).includes(scope));
+  if (invalidScopes.length > 0)
+    return createOIDCErrorResponse(callerInfo, "invalid_scope", `Invalid scope requested: ${invalidScopes.join(", ")}`);
 
-  const client = await provider.wrdschema.query("wrdauthApplication").where("wrdGuid", "=", decompressUUID(clientid)).select(["callbackUrls", "wrdId"]).execute();
-  if (client.length !== 1)
-    return { error: "No such client" };
+  if (prompt === "none" && !curuser) { //TODO can we also shortcircuit the wrdauth redirects below in case prompt===none but a user IS logged in?
+    return createOIDCErrorResponse(callerInfo, "login_required", `Prompt is 'none' but no user is logged in`);
+  }
 
-  if (!client[0].callbackUrls.find((cb) => cb.url === redirect_uri))
-    return { error: "Unauthorized callback URL " + redirect_uri };
-
-  const returnInfo = await runInWork(() => createServerSession("wrd:openid.idpstate",
-    {
-      clientid: client[0].wrdId,
-      scopes: scopes || [],
-      state,
-      nonce,
-      code_challenge,
-      code_challenge_method: code_challenge_method as CodeChallengeMethod,
-      response_mode,
-      cbUrl: redirect_uri
-    }));
+  const returnInfo = await runInWork(() => createServerSession("wrd:openid.idpstate", {
+    ...callerInfo,
+    clientid: client[0].wrdId,
+    scopes: scopes || [],
+    nonce,
+    code_challenge,
+    code_challenge_method: code_challenge_method as CodeChallengeMethod,
+  }));
 
   //Sets up a WRD Auth request that will return the user after logging in locally to the openid /return/ endpoint in openIdRouter
   const currentRedirectURI = `${getOpenIdBase(provider.wrdschema)}return?tok=${returnInfo}`;
@@ -199,7 +259,7 @@ export async function startAuthorizeFlow<T extends SchemaTypeDefinition>(provide
   const target = new URL(loginPage);
   target.searchParams.set("wrdauth_logincontrol", loginToken);
 
-  return { type: "redirect", url: target.toString(), error: null };
+  return createRedirectResponse(target.toString());
 }
 
 /** Invoked by the /return/ endpoint after a user has completed logging in */
@@ -367,21 +427,6 @@ export async function getOpenIDMetadataURL(schema: string) {
   return null;
 }
 
-function handleAuthorizationFlowError(url: URL, error: string, error_description?: string) {
-  const redirect_uri = url.searchParams.get("redirect_uri");
-  if (!redirect_uri) //FIXME any error where we don't trust redirect_uri or clientid should redirect to an error page on our side explaining the issue
-    throw new Error("Invalid redirect_uri parameter: " + redirect_uri);
-
-  const gotoURL = new URL(redirect_uri);
-  const state = url.searchParams.get("state") || null;
-  if (state)
-    gotoURL.searchParams.set("state", state);
-
-  gotoURL.searchParams.set("error", error);
-  gotoURL.searchParams.set("error_description", error_description || "An error occurred during the authorization flow");
-  return createRedirectResponse(gotoURL.toString());
-}
-
 export async function openIdRouter(req: WebRequest): Promise<WebResponse> {
   const pathname = new URL(req.url).pathname;
 
@@ -419,20 +464,8 @@ export async function openIdRouter(req: WebRequest): Promise<WebResponse> {
 
   const provider = new IdentityProvider(wrdschema);
   if (endpoint[3] === 'authorize') {
-    const url = new URL(req.url); //TODO merge back into startAuthorizeFlow ? but then it needs to know about login/logout states too
-    const prompt: OAuth2PromptFlag = url.searchParams.get("prompt") as OAuth2PromptFlag || ''; //TODO trigger 400 if prompt value misunderstood?
-
-    if (prompt) {
-      const curuser = await getCookieBasedUser(req, wrdschema, login.wrdauth);
-      if (prompt === 'none' && !curuser) { //we're not logged in and not supposed to start an authorization flow
-        return handleAuthorizationFlowError(url, "login_required");
-      }
-    }
-    const redirect = await startAuthorizeFlow(provider, req.url, login.loginPage, prompt, customizer);
-    if (redirect.error !== null)
-      return createJSONResponse(400, { error: redirect.error });
-
-    return createRedirectResponse(redirect);
+    const curuser = await getCookieBasedUser(req, wrdschema, login.wrdauth);
+    return await startAuthorizeFlow(provider, req.url, login.loginPage, curuser, customizer);
   }
 
   if (endpoint[3] === 'return') {

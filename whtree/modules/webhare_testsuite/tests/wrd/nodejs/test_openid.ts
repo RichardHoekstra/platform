@@ -274,15 +274,24 @@ async function verifyOpenIDClient() {
   await oidcAuthSchema.update("wrdauthApplication", clientWrdId, { subjectField: "wrdFirstName" });
   await commitWork();
 
-  const { config, tokenSet } = await test.runOpenIDLoginFlow(puppeteer!, {
+  test.eqPartial({ error: "invalid_scope" }, await test.runOpenIDLoginFlow(puppeteer!, {
     metadataUrl: testsite.webRoot + '.well-known/openid-configuration',
     clientId,
     clientSecret,
     callbackUrl,
     scope: 'openid email invalidscope'
+  }));
+
+  const { config, tokenSet } = await test.runOpenIDLoginFlow(puppeteer!, {
+    metadataUrl: testsite.webRoot + '.well-known/openid-configuration',
+    clientId,
+    clientSecret,
+    callbackUrl,
+    scope: 'openid email'
   });
 
-  test.assert('https://beta.webhare.net/', config.serverMetadata().issuer);
+  test.eq('https://my.webhare.dev/testfw/issuer', config?.serverMetadata().issuer);
+  test.assert(tokenSet);
 
   test.eq("bearer", tokenSet.token_type);
   const accesTokenClaims = JSON.parse(Buffer.from(tokenSet.access_token!.split(".")[1], "base64url").toString());
@@ -306,6 +315,7 @@ async function verifyOpenIDClient() {
     nonce
   });
 
+  test.assert(tokenSet2);
   test.eq("Sysop", tokenSet2.claims()?.sub);
 
   // Verify discovery advertises S256 and complete a login using its verifier.
@@ -317,6 +327,7 @@ async function verifyOpenIDClient() {
     callbackUrl,
     pkceCodeVerifier: randomPKCECodeVerifier()
   });
+  test.assert(pkceTokenSet);
   test.eq("bearer", pkceTokenSet.token_type);
   test.assert(pkceTokenSet.id_token);
   test.eq("Sysop", pkceTokenSet.claims()?.sub);
