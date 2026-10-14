@@ -508,7 +508,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
     if (!config || !config.signingKeys?.length)
       throw new Error(`Schema ${this.wrdschema.tag} is not configured properly. Missing issuer or signingKeys`);
 
-    //ID tokens are only generated for 3rd party clients requesting an openid scope. They shouldn't be providing access to APIs and cannot be retracted by us
+    //ID tokens are only generated for 3rd party clients requesting an openid scope. They shouldn't be providing access to APIs and cannot be retracted by us, so they won't appear in the wrd.tokens table either
     let id_token: string | undefined;
     const requestedScopes = options?.scopes || [];
     if (isOIDC) {
@@ -567,7 +567,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
     return await runInWork(async () => {
       const hash = hashSHA256(access_token);
       const insertres = await db<PlatformDB>().insertInto("wrd.tokens").values({
-        type: type,
+        type: type === "id" ? "id" : "api",
         creationdate: new Date(atPayload.nbf! * 1000),
         expirationdate: atPayload.exp ? new Date(atPayload.exp * 1000) : defaultDateTime,
         entity: subject,
@@ -611,13 +611,33 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
   async getUserInfo(token: string, customizer?: AuthCustomizer): Promise<ReportedUserInfo | { error: string }> {
     /* We do not verify the token's signature currently - we just look it up in our database. TODO we might not have to store access tokens if we verify its
        signature and just reuse it and save a bit of database churn unless other reasons appear to store these tokens */
-    const tokeninfo = await this.verifyAccessToken("oidc", token);
+    const tokeninfo = await this.verifyAccessToken("api", token, { requireScopes: ["openid"] });
     if ("error" in tokeninfo)
       return { error: tokeninfo.error };
     if (!tokeninfo.client)
-      return { error: "WRDAuth login tokens are not valid for OpenID /userinfo endpoints" };
+      return { error: "An API token without a client cannot be used to get userinfo" };
 
-    const userfields = await this.wrdschema.getFields("wrdPerson", tokeninfo.entity, ["wrdFullName", "wrdFirstName", "wrdLastName"/*,"wrdContactEmail"*/]);
+    const getfields: Record<string, string> = {};
+    const authsettings = await this.getAuthSettings(false);
+
+    if (tokeninfo.scopes.includes("profile")) {
+      getfields.name = "wrdFullName";
+      getfields.given_name = "wrdFirstName";
+      getfields.family_name = "wrdLastName";
+    }
+
+    if (tokeninfo.scopes.includes("email")) {
+      if (authsettings?.emailAttribute)
+        getfields.email = authsettings.emailAttribute;
+    }
+
+    const accountType = authsettings?.accountType || "wrdPerson";
+    const userfields = await (this.wrdschema as AnyWRDSchema).getFields(accountType, tokeninfo.entity, getfields) as {
+      name?: string;
+      given_name?: string;
+      family_name?: string;
+      email?: string | null;
+    } | null;
     if (!userfields)
       return { error: "No such user" };
 
@@ -627,10 +647,10 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
 
     const userinfo: Record<string, unknown> = { //TODO limit by the fields by requested scope and client access
       sub: decoded.payload.sub,
-      name: userfields.wrdFullName,
-      given_name: userfields.wrdFirstName,
-      family_name: userfields.wrdLastName,
-      // email: userinfo.wrdContactEmail
+      ...userfields.name ? { name: userfields.name } : {},
+      ...userfields.given_name ? { given_name: userfields.given_name } : {},
+      ...userfields.family_name ? { family_name: userfields.family_name } : {},
+      ...userfields.email ? { email: userfields.email } : {},
     };
 
     if (customizer?.onOpenIdUserInfo)
@@ -664,7 +684,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
    * @param token - The token to verify
    * @param options - Optional parameters for token verification
   */
-  async verifyAccessToken(type: "id" | "api" | "oidc", token: string, options?: { ignoreAccountStatus?: boolean; requireScopes?: string[] }): Promise<VerifyAccessTokenResult | { error: string }> {
+  async verifyAccessToken(type: "id" | "api", token: string, options?: { ignoreAccountStatus?: boolean; requireScopes?: string[] }): Promise<VerifyAccessTokenResult | { error: string }> {
     const hashed = hashSHA256(token);
     const matchToken = await db<PlatformDB>().
       selectFrom("wrd.tokens").

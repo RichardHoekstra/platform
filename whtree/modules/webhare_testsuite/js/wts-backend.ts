@@ -11,6 +11,114 @@ import { loadlib } from "@webhare/harescript";
 import { beginWork, commitWork } from "@webhare/whdb";
 import { openFileOrFolder, openFolder, openSite } from "@webhare/whfs";
 import { ensureFallbackCertficate } from "@mod-platform/js/webserver/config";
+import type { Puppeteer } from "@webhare/deps";
+import { allowInsecureRequests, authorizationCodeGrant, buildAuthorizationUrl, calculatePKCECodeChallenge, discovery } from "openid-client";
+
+export class RequestRecorder implements Disposable {
+  public urls: URL[] = [];
+  private page: Puppeteer.Page;
+
+  constructor(page: Puppeteer.Page) {
+    this.page = page;
+    page.on('request', this.logUrl);
+  }
+
+  private logUrl = (req: Puppeteer.HTTPRequest) => {
+    this.urls.push(new URL(req.url()));
+  };
+
+  [Symbol.dispose]() {
+    this.page.off('request', this.logUrl);
+  }
+}
+
+export async function runWebHareLoginFlow(page: Puppeteer.Page, options?: { user?: string; password?: string; changePasswordTo?: string }) {
+  const password = options?.password || test.getUser("sysop").password;
+  const user = test.getUser(options?.user || "sysop");
+  using recorder = new RequestRecorder(page);
+
+  console.log("Login with", user.login);
+  await page.waitForSelector('.wh-wrdauth-login [name=login]');
+  await page.type('[name=login]', user.login);
+  await page.type('[name=password]', password);
+
+  await Promise.all([
+    page.waitForNavigation(),
+    page.click('button[type=submit]')
+  ]);
+  if (options?.changePasswordTo) {
+    // Wait until the form's JavaScript has enabled submission.
+    await page.waitForSelector('.wh-form--allowsubmit #completeaccountpassword-passwordnew');
+    await page.type('#completeaccountpassword-passwordnew', options.changePasswordTo);
+    await page.type('#completeaccountpassword-passwordrepeat', options.changePasswordTo);
+    await page.click('button[type=submit]');
+
+    await page.waitForSelector('[data-wh-form-action="exit"]');
+    await Promise.all([
+      page.waitForNavigation(),
+      page.click('[data-wh-form-action="exit"]')
+    ]);
+  }
+
+  // Wait for the final navigation above before returning the recorded redirects.
+  return recorder.urls;
+}
+
+export async function runOpenIDLoginFlow(browser: Puppeteer.Browser, options: {
+  metadataUrl: string;
+  clientId: string;
+  clientSecret: string;
+  callbackUrl: string;
+  scope?: string;
+  nonce?: string;
+  pkceCodeVerifier?: string;
+}) {
+  const config = await discovery(new URL(options.metadataUrl), options.clientId, options.clientSecret, undefined, {
+    execute: [allowInsecureRequests]
+  });
+  const authorizeUrl = buildAuthorizationUrl(config, {
+    scope: options.scope ?? "openid email",
+    redirect_uri: options.callbackUrl,
+    ...options.nonce ? { nonce: options.nonce } : {},
+    ...options.pkceCodeVerifier ? {
+      code_challenge: await calculatePKCECodeChallenge(options.pkceCodeVerifier),
+      code_challenge_method: "S256"
+    } : {}
+  });
+
+  const context = await browser.createBrowserContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(authorizeUrl.toString());
+    await page.setRequestInterception(true);
+
+    const callback = new URL(options.callbackUrl);
+    const isCallback = (request: Puppeteer.HTTPRequest) => {
+      const url = new URL(request.url());
+      return request.isNavigationRequest() && request.frame() === page.mainFrame()
+        && url.origin === callback.origin && url.pathname === callback.pathname;
+    };
+    // Capture the callback without needing a server listening on localhost.
+    page.on('request', request => {
+      if (isCallback(request))
+        void request.respond(request.redirectChain().length ? { body: '' } : { status: 204 });
+      else
+        void request.continue();
+    });
+
+    const [, callbackRequest] = await Promise.all([
+      runWebHareLoginFlow(page),
+      page.waitForRequest(isCallback, { timeout: 30000 })
+    ]);
+    const tokenSet = await authorizationCodeGrant(config, new URL(callbackRequest.url()), {
+      expectedNonce: options.nonce,
+      pkceCodeVerifier: options.pkceCodeVerifier
+    });
+    return { config, tokenSet };
+  } finally {
+    await context.close();
+  }
+}
 
 export const wellKnownHashes = {
   snowbeagleJPG: "eyxJtHcJsfokhEfzB3jhYcu5Sy01ZtaJFA5_8r6i9uw",

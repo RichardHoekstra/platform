@@ -41,6 +41,7 @@ export async function wellKnownRouter(req: WebRequest): Promise<WebResponse> {
     userinfo_endpoint: oidc_baseurl + "userinfo",
     id_token_signing_alg_values_supported,
     token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic"],
+    code_challenge_methods_supported: ["S256"],
     scopes_supported: ["openid", "email", "profile"],
     response_modes_supported: ["query", "fragment", "form_post"],
     //we many need to add various id_token/token combinations too? but they may only apply to implicit flows?
