@@ -121,7 +121,7 @@ async function setupOIDC() {
       metadataurl: testsite.webRoot + ".well-known/openid-configuration", //TODO There should be an API getting this URL for us, using the identityprovider site configuration
       clientid: clientId,
       clientsecret: clientSecret,
-      additionalscopes: "testfw",
+      additionalscopes: "testfw profile",
       extraParams: [{ param: "testparam", value: "testvalue" }]
     });
 
