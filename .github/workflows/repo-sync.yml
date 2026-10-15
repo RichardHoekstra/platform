@@ -22,7 +22,7 @@ jobs:
     name: Sync branches to configured repositories
     steps:
       - name: Fetch repository source history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0 # Fetches all history and branches required for syncing
 
