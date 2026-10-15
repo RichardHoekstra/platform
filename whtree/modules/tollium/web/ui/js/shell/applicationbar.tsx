@@ -154,7 +154,8 @@ class ApplicationTab {
     const appmenu = this.app.generateAppMenu();
     this._appbar.apptabmenu.replaceChildren();
     appmenu.forEach(menuitem => {
-      const item = <li onClick={(evt: MouseEvent) => this.onTabContextMenuClick(evt, menuitem)}>{menuitem.title}</li>;
+      const item = ("isdivider" in menuitem && menuitem.isdivider) ? <li class="divider" />
+        : <li onClick={(evt: MouseEvent) => this.onTabContextMenuClick(evt, menuitem)}>{"title" in menuitem ? menuitem.title : ""}</li>;
       this._appbar.apptabmenu.appendChild(item);
     });
 
@@ -162,7 +163,7 @@ class ApplicationTab {
   }
   onTabContextMenuClick(event: Event, menuitem: AppMenuItem) {
     dompack.stop(event);
-    if (menuitem.cmd && this.app)
+    if ("cmd" in menuitem && menuitem.cmd && this.app)
       this.app.executeCommand(menuitem.cmd);
   }
 }

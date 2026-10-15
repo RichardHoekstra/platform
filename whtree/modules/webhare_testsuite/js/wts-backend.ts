@@ -41,6 +41,7 @@ export async function runWebHareLoginFlow(page: Puppeteer.Page, options?: { user
   await page.waitForSelector('.wh-wrdauth-login [name=login]');
   await page.type('[name=login]', loginName);
   await page.type('[name=password]', password);
+  await page.waitForSelector('.wh-form--allowsubmit'); //make sure form is ready, hopefully this fixes the 'Node is either not clickable or not an Element'  errors pointing to click('button[type=submit]')
 
   await Promise.all([
     page.waitForNavigation(),

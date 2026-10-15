@@ -85,4 +85,4 @@ export interface TolliumToddService {
 export type AppMenuItem = {
   title: string;
   cmd: ShellInstruction | { type: "currentapp:restart" };
-};
+} | { isdivider: true };
