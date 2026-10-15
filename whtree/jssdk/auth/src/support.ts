@@ -1,6 +1,6 @@
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import type { SchemaTypeDefinition } from "@webhare/wrd/src/types";
-import type { WRDSchema, WRDSchemaType } from "@webhare/wrd";
+import type { WRDSchema, WRDSchemaLike, WRDSchemaType } from "@webhare/wrd";
 import type { WRDAuthSettings } from "./identity";
 import { db } from "@webhare/whdb";
 import { tagToJS } from "@webhare/wrd/src/wrdsupport";
@@ -8,7 +8,6 @@ import { getApplyTesterForURL, type WRDAuthPluginSettings } from "@webhare/whfs/
 import { getIdCookieName } from "@webhare/auth/src/authfrontend";
 import type { ServersideCookieOptions } from "@webhare/dompack/src/cookiebuilder";
 import { getSchemaSettings } from "@webhare/wrd/src/settings";
-import type { System_UsermgmtSchemaType } from "@mod-platform/generated/wrd/webhare";
 import { updateURL } from "@webhare/std";
 
 //TODO Export from @webhare/auth? but camelcase first
@@ -34,6 +33,11 @@ export const defaultWRDAuthLoginSettings: WRDAuthLoginSettings = {
   roundLongLoginsTo: 4 * 3600 * 1000, // 4 am (set to -1 to disable rounding)
   roundLongLoginsTZ: "Europe/Amsterdam", // default timezone for rounding
   roundMinDuration: 3 * 3600 * 1000, // sessions last at least 3 hours
+};
+
+export type WRDDynamicRegistrationSettings = {
+  /** Is dynamic registration currently enabled */
+  enabled: boolean;
 };
 
 export type PrepAuthResult = {
@@ -88,7 +92,7 @@ export function prepAuth(settings: WRDAuthPluginSettings_Request): PrepAuthResul
     httpOnly: true, //XSS protection
     secure: settings.secureRequest, //mirror secure if the request was
     path: "/", //we don't support limiting WRD cookies to subpaths as various helper pages are at /.wh/
-    sameSite: settings.sameSite,
+    sameSite: !settings.secureRequest && settings.sameSite === "None" ? "Lax" : settings.sameSite, //Browsers reject SameSite=None cookies without Secure
   };
 
   return {
@@ -104,7 +108,7 @@ export function prepAuth(settings: WRDAuthPluginSettings_Request): PrepAuthResul
 }
 
 export async function getUserValidationSettings<T extends SchemaTypeDefinition>(wrdschema: WRDSchemaType<T>, unit: number | null): Promise<string> {
-  const s = wrdschema as unknown as WRDSchema<System_UsermgmtSchemaType>;
+  const s = wrdschema as unknown as WRDSchema<WRDSchemaLike["system:usermgmt"]>;
 
   if (unit) {
     let maxDepth = 16;

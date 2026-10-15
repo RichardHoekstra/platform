@@ -4,7 +4,7 @@ import { createFirstPartyToken, type LookupUsernameParameters, type OpenIdReques
 import { AuthenticationSettings, createSchema, describeEntity, extendSchema, getSchemaSettings, updateSchemaSettings, wrd, type WRDSchemaLike } from "@webhare/wrd";
 import { createSigningKey, createJWT, verifyJWT, IdentityProvider, compressUUID, decompressUUID, decodeJWT, createCodeVerifier, type FrontendAuthResult, type FrontendLoginRequest } from "@webhare/auth/src/identity";
 import { createCodeChallenge, retrieveTokens, returnAuthorizeFlow, startAuthorizeFlow, type CodeChallengeMethod } from "@mod-platform/js/auth/openid.ts";
-import { addDuration, convertWaitPeriodToDate, generateRandomId, isLikeRandomId, parseTyped, throwError } from "@webhare/std";
+import { addDuration, convertWaitPeriodToDate, generateRandomId, isLikeRandomId, parseTyped, throwError, updateURL } from "@webhare/std";
 import { decryptForThisServer, readLogLines, toResourcePath } from "@webhare/services";
 import type { NavigateInstruction } from "@webhare/env/src/navigation";
 import type { SchemaTypeDefinition } from "@webhare/wrd/src/types";
@@ -13,6 +13,8 @@ import { loadlib } from "@webhare/harescript";
 import { calculateWRDSessionExpiry, defaultWRDAuthLoginSettings, prepAuthForURL } from "@webhare/auth/src/support";
 import type { PublicAuthData } from "@webhare/frontend/src/auth";
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
+import { HTTPSuccessCode } from "@webhare/router";
+import { IncomingWebRequest } from "@webhare/router/src/request";
 
 const cbUrl = "https://www.example.net/cb/";
 const loginUrl = "https://www.example.net/login/";
@@ -20,7 +22,6 @@ let robotClient: ClientConfig | undefined;
 let peopleClient: ClientConfig | undefined;
 let evilClient: ClientConfig | undefined;
 
-const systemUsermgmtSchema = wrd("system:usermgmt");
 const oidcAuthSchema = wrd<WRDSchemaLike["webhare_testsuite:oidcschema"]>("webhare_testsuite:testschema");
 
 declare module "@webhare/auth" {
@@ -171,26 +172,43 @@ async function testLowLevelAuthAPIs() {
   test.eq("00000001-0002-0003-0004-000000000005", decompressUUID('AAAAAQACAAMABAAAAAAABQ'));
 }
 
-async function mockAuthorizeFlow<T extends SchemaTypeDefinition>(provider: IdentityProvider<T>, { wrdId: clientWrdId = 0, clientId = '', clientSecret = '', code_verifier = '', challenge_method = '' }, user: number, customizer?: AuthCustomizer | undefined) {
+async function mockAuthorizeFlow<T extends SchemaTypeDefinition>(provider: IdentityProvider<T>, { wrdId: clientWrdId = 0, clientId = '', clientSecret = '', code_verifier = '', challenge_method = '' }, user: number, customizer?: AuthCustomizer, scopes: string[] = ['openid']) {
   const state = generateRandomId();
   const challenge = code_verifier && challenge_method ? createCodeChallenge(code_verifier, challenge_method as CodeChallengeMethod) : "";
-  const robotClientAuthURL = `http://example.net/?client_id=${clientId}&scope=openid+invalidscope&redirect_uri=${encodeURIComponent(cbUrl)}&state=${state}${challenge ? `&code_challenge=${challenge}&code_challenge_method=${challenge_method}` : ""}`;
+  const robotClientAuthURL = updateURL("http://example.net/", {
+    client_id: clientId,
+    response_type: "code",
+    scope: scopes.join(' '),
+    redirect_uri: cbUrl,
+    state,
+    ...(challenge ? { code_challenge: challenge, code_challenge_method: challenge_method } : {})
+  });
 
-  const startflow = await startAuthorizeFlow(provider, robotClientAuthURL, loginUrl, "", customizer);
-  test.assert(startflow.error === null && startflow.type === "redirect");
+  const startflow = await startAuthorizeFlow(provider, robotClientAuthURL.toString(), loginUrl, null, customizer);
+  test.eq(HTTPSuccessCode.SeeOther, startflow.status);
+  const starturl = new URL(startflow.headers.get("location") ?? throwError("No location header in startAuthorizeFlow response"));
+  if (starturl.toString().startsWith(cbUrl)) {
+    const errobj = {
+      error: starturl.searchParams.get("error"),
+      error_description: starturl.searchParams.get("error_description")
+    };
+    console.log("mockAuthorizeFlow error response:", errobj);
+    return { ...errobj, idToken: null };
+  }
 
   //We now have an url with wrdauth_logincontrol, decrypt it:
-  const decryptLoginControl = decryptForThisServer("wrd:authplugin.logincontroltoken", new URL(startflow.url, loginUrl).searchParams.get("wrdauth_logincontrol")!);
-  const endFlow = await returnAuthorizeFlow(provider, new URL(decryptLoginControl.returnto, loginUrl).toString(), user, customizer);
+  const decryptLoginControl = decryptForThisServer("wrd:authplugin.logincontroltoken", starturl.searchParams.get("wrdauth_logincontrol")!);
+  const endFlow = await returnAuthorizeFlow(provider, new IncomingWebRequest(new URL(decryptLoginControl.returnto, loginUrl).toString()), user, (await test.getTestSiteJS()).id, customizer);
 
-  test.assert(endFlow.error === null && endFlow.type === "redirect");
-  if (!endFlow.url.startsWith(cbUrl))
-    return { blockedTo: endFlow.url };
+  test.eq(HTTPSuccessCode.SeeOther, endFlow.status);
+  const redirectedTo = endFlow.headers.get("location");
+  if (!redirectedTo?.startsWith(cbUrl))
+    return { blockedTo: redirectedTo };
 
   //Returned to callback, retrieve JWT
-  test.eq(state, new URL(endFlow.url).searchParams.get("state"));
+  test.eq(state, new URL(redirectedTo).searchParams.get("state"));
   const formparams = {
-    code: new URL(endFlow.url).searchParams.get("code")!,
+    code: new URL(redirectedTo).searchParams.get("code")!,
     client_id: clientId,
     client_secret: clientSecret,
     grant_type: "authorization_code",
@@ -221,20 +239,46 @@ async function mockAuthorizeFlow<T extends SchemaTypeDefinition>(provider: Ident
   }
   const tokens = await retrieveTokens(provider, new URLSearchParams(formparams), new Headers, { customizer });
   test.assert(tokens.error === null);
-  test.eqPartial({ id_token: /^eyJ/, access_token: /^secret-token:eyJ/ }, tokens.body);
+  if (tokens.body.id_token)
+    test.eqPartial({ id_token: scopes.includes("openid") ? /^eyJ/ : undefined, access_token: /^secret-token:eyJ/ }, tokens.body);
   test.eq({ error: /Invalid or expired/, }, await retrieveTokens(provider, new URLSearchParams(formparams), new Headers, { customizer }));
-  test.eqPartial({ error: "Token is invalid" }, await provider.verifyAccessToken("id", tokens.body.id_token!));
-  test.eqPartial({ entity: user, scopes: ["openid"], client: clientWrdId, accountStatus: { status: "active" } }, await provider.verifyAccessToken("oidc", tokens.body.access_token));
+  if (tokens.body.id_token)
+    test.eqPartial({ error: "Token is invalid" }, await provider.verifyAccessToken("id", tokens.body.id_token));
+  test.eqPartial({ entity: user, scopes: scopes, client: clientWrdId, accountStatus: { status: "active" } }, await provider.verifyAccessToken("api", tokens.body.access_token));
   // Wrong schema
-  test.eqPartial({ error: /Token owner #\d+ does not exist anymore/ }, await new IdentityProvider(systemUsermgmtSchema).verifyAccessToken("oidc", tokens.body.access_token));
+  test.eqPartial({ error: /Token owner #\d+ does not exist anymore/ }, await new IdentityProvider(wrd("system:usermgmt")).verifyAccessToken("api", tokens.body.access_token));
 
-  const verifyresult = await provider.validateToken(tokens.body.id_token!);
-  test.eqPartial({ aud: clientId, iss: "https://my.webhare.dev/testfw/issuer" }, verifyresult);
-  test.assert(tokens.body.id_token, "We did an openid login so there should be a id_token");
+  if (tokens.body.id_token) {
+    const verifyresult = await provider.validateToken(tokens.body.id_token);
+    test.eqPartial({ aud: clientId, iss: "https://my.webhare.dev/testfw/issuer" }, verifyresult);
+  }
+  if (scopes.includes("openid"))
+    test.assert(tokens.body.id_token, "We did an openid login so there should be a id_token");
   test.assert(tokens.body.access_token, "and there should be an access_token");
 
-  test.eq({ error: /Token is invalid/ }, await provider.getUserInfo(tokens.body.id_token));
-  test.eq({ sub: /@beta.webhare.net$/, name: /^.* .*$/, given_name: /.*/, family_name: /.*/ }, await provider.getUserInfo(tokens.body.access_token));
+  if (tokens.body.id_token)
+    test.eq({ error: /Token is invalid/ }, await provider.getUserInfo(tokens.body.id_token));
+
+  const userinfo = await provider.getUserInfo(tokens.body.access_token);
+  if (tokens.body.id_token) {
+    const decoded = decodeJWT(tokens.body.id_token);
+    test.eqPartial({ sub: /@beta.webhare.net$/ }, userinfo, "sub should always be there");
+    const expectKeys = ["sub", ...scopes.includes('email') ? ['email'] : [], ...scopes.includes('profile') ? ['given_name', 'family_name', 'name'] : []];
+    test.eq(expectKeys.sort(), Object.keys(userinfo).sort());
+
+    if (scopes.includes('email')) {
+      test.eqPartial({ email: /@beta.webhare.net$/ }, userinfo);
+    }
+    if (scopes.includes('profile')) {
+      test.eqPartial({ given_name: "Jon" }, userinfo);
+      test.assert("name" in userinfo);
+      test.eq(decoded.name, userinfo.name);
+    } else {
+      test.assert(!("name" in decoded), "name should not be in decoded when profile scope is not included");
+    }
+  } else {
+    test.eq({ error: "Token does not have scope 'openid'" }, userinfo);
+  }
 
   return {
     idToken: tokens.body.id_token,
@@ -390,8 +434,12 @@ async function testAuthAPI() {
 
   //TODO verify audit
 
+  //try in invalid scope
+  test.eqPartial({ error: "invalid_scope" }, await mockAuthorizeFlow(provider, robotClient!, testuser, undefined, ['openid', 'invalidscope']));
+
   //validate openid flow
   const authresult = await mockAuthorizeFlow(provider, robotClient!, testuser);
+  console.log(authresult);
   test.assert("idToken" in authresult);
 
   //Fonzie-check the token. because its json.json.sig we'll see at least "ey" twice (encoded {})
@@ -399,7 +447,7 @@ async function testAuthAPI() {
   test.eq(/^ey[^.]+\.ey[^.]+\.[^.]+$/, authresult.idToken);
   test.assert(authresult.expiresIn && authresult.expiresIn > 59 * 60 && authresult.expiresIn <= 60 * 60, `We expect ~60 minutes expiry, got ${authresult.expiresIn! / 60} minutes`);
 
-  await test.throws(/audience invalid/, provider.validateToken(authresult.idToken, { audience: peopleClient!.clientId }));
+  await test.throws(/audience invalid/, provider.validateToken(authresult.idToken!, { audience: peopleClient!.clientId }));
 
   //validate openid flow with PKCE (both plain and S256)
   test.assert("idToken" in await mockAuthorizeFlow(provider, { ...robotClient!, code_verifier: createCodeVerifier(), challenge_method: "plain" }, testuser));
@@ -438,14 +486,20 @@ async function testAuthAPI() {
       await test.sleep(20);
       userinfo.bob = "Beagle";
       userinfo.answer = 42;
-      userinfo.sub = (userinfo.name as string).toUpperCase();
+      userinfo.sub = (userinfo.name as string)?.toUpperCase();
     },
   };
 
-  const openIdResult = await mockAuthorizeFlow(provider, robotClient!, testuser, openIdCustomizer);
+  const noOpenIdResult = await mockAuthorizeFlow(provider, robotClient!, testuser, openIdCustomizer, ["profile", "email"]);
+  test.assert(!noOpenIdResult.idToken);
+  test.assert(noOpenIdResult.accessToken);
+  test.eqPartial({ client: robotClient!.wrdId }, await provider.verifyAccessToken("api", noOpenIdResult.accessToken));
+  test.eq({ error: "Token does not have scope 'openid'" }, await provider.getUserInfo(noOpenIdResult.accessToken, openIdCustomizer));
+
+  const openIdResult = await mockAuthorizeFlow(provider, robotClient!, testuser, openIdCustomizer, ["openid", "profile"]);
   test.assert(openIdResult.idToken);
   test.eqPartial({ name: "Jon Show" }, await provider.validateToken(openIdResult.idToken));
-  test.eqPartial({ client: robotClient!.wrdId }, await provider.verifyAccessToken("oidc", openIdResult.accessToken));
+  test.eqPartial({ client: robotClient!.wrdId }, await provider.verifyAccessToken("api", openIdResult.accessToken));
   test.eq({ sub: "JON SHOW", name: /^.* .*$/, given_name: /.*/, family_name: /.*/, bob: "Beagle", answer: 42 }, await provider.getUserInfo(openIdResult.accessToken, openIdCustomizer));
 
   //Test simple login tokens

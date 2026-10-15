@@ -1,6 +1,14 @@
 <schemadefinition xmlns="http://www.webhare.net/xmlns/wrd/schemadefinition">
 
-  <domain tag="wrdauth_service_provider" keephistorydays="1100">
+  <migration tag="platform:rename_service_provider"
+             at="update"
+             revision="1"
+             stage="beforeTypes"
+             updatefunction="mod::platform/lib/internal/migrations.whlib#RenameSP" />
+
+  <domain tag="wrdauth_application"
+          comment="A registered application that authenticate with us. Also known as client (OAuth2) or relying party (OpenID Connect). Formerly wrdauth_service_provider"
+          keephistorydays="1100">
     <!-- these are service providers registered to our IDP
          ie everyone who lists this server/application as a login button -->
     <attributes>

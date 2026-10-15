@@ -59,6 +59,8 @@ PUBLIC STATIC OBJECTTYPE PreviewBrowser EXTEND TolliumFragmentBase <
 
   PUBLIC PROPERTY urlbarvisible(pvt_urlbarvisible, Seturlbarvisible);
 
+  PUBLIC PROPERTY autocloseqr(^previewurl->autocloseqr, ^previewurl->autocloseqr);
+
   // ---------------------------------------------------------------------------
   //
   // Init
@@ -73,6 +75,7 @@ PUBLIC STATIC OBJECTTYPE PreviewBrowser EXTEND TolliumFragmentBase <
     TolliumFragmentBase::StaticInit(data);
     this->onpreviewedobjectchange := data.onpreviewedobjectchange;
     this->urlbarvisible := data.urlbarvisible;
+    this->autocloseqr := data.autocloseqr;
   }
 
   UPDATE MACRO PostInitComponent()

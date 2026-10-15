@@ -1,12 +1,11 @@
-import { testschemaSchema, type JsschemaSchemaType } from "wh:wrd/webhare_testsuite";
 import type { JWTPayload, OpenIdRequestParameters, ReportedUserInfo, AuthCustomizer, FrontendRequestParameters } from "@webhare/auth";
-import { WRDSchema } from "@webhare/wrd";
+import { wrd, type WRDSchemaLike } from "@webhare/wrd";
 
 export class TestAuthCustomizer implements AuthCustomizer {
   async onOpenIdToken(params: OpenIdRequestParameters, payload: JWTPayload): Promise<void> {
     //FIXME our IDP needs to fill email/profile fields itself if email & profile are requested AND permitted for that provider
     if (params.scopes.includes("testfw")) {
-      const jsAuthSchema = new WRDSchema<JsschemaSchemaType>("webhare_testsuite:testschema");
+      const jsAuthSchema = wrd<WRDSchemaLike["webhare_testsuite:jsschema"]>("webhare_testsuite:testschema");
       const userinfo = await jsAuthSchema.getFields("wrdPerson", params.user, ["wrdFirstName", "wrdLastName", "wrdContactEmail"]);
       if (userinfo) {
         payload.testfw_firstname = userinfo.wrdFirstName;
@@ -24,9 +23,9 @@ export class TestAuthCustomizer implements AuthCustomizer {
   }
 
   async onFrontendUserInfo(params: FrontendRequestParameters) {
-    if (params.wrdSchema.tag !== testschemaSchema.tag)
-      throw new Error(`Invalid schema - invoked for ${params.wrdSchema.tag} instead of ${testschemaSchema.tag}`);
-    const userinfo = await testschemaSchema.getFields("wrdPerson", params.user, ["wrdFirstName"]);
+    if (params.wrdSchema.tag !== "webhare_testsuite:testschema")
+      throw new Error(`Invalid schema - invoked for ${params.wrdSchema.tag} instead of webhare_testsuite:testschema`);
+    const userinfo = await params.wrdSchema.getFields("wrdPerson", params.user, ["wrdFirstName"]);
     return { firstName: userinfo.wrdFirstName, aDate: new Date("2025-03-18") };
   }
 }

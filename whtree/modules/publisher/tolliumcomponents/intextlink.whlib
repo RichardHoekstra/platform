@@ -41,6 +41,7 @@ PUBLIC OBJECTTYPE IntExtLink EXTEND TolliumFragmentBase <
   RECORD __linktypeshandlers;
 
   RECORD ARRAY originaloptions;
+  OBJECT ARRAY handlercomponents;
 
   BOOLEAN __internallinks;
 
@@ -125,9 +126,15 @@ PUBLIC OBJECTTYPE IntExtLink EXTEND TolliumFragmentBase <
       INSERT GetCell(this->__linktypeshandlers, linktype) INTO linktypehandlers AT END;
     }
 
+    //FIXME: When deleting and recreating handler subcomponents, their current value is lost
+    FOREVERY (OBJECT subcomp FROM this->handlercomponents)
+      subcomp->DeleteComponent();
+    this->handlercomponents := OBJECT[];
+
     FOREVERY(OBJECT handler FROM linktypehandlers CONCAT this->linkhandlers)
     {
       OBJECT ARRAY components := handler->CreateComponents(this->owner);
+      this->handlercomponents := this->handlercomponents CONCAT components;
 
       INSERT [ rowkey := #handler + 100
              , title := handler->title

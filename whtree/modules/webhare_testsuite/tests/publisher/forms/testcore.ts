@@ -374,7 +374,7 @@ test.runTests(
 
       //Test checkbox field
       test.eq(true, data.showradioy, "type=checkbox");
-      await test.waitToggled({
+      await test.waitForTransitionToTrue({
         test: () => test.qR("#coretest-requiredradio-y").disabled,
         run: () => data.showradioy = false,
       }, "Unsetting showradioy should block the 'y' option");
@@ -390,11 +390,11 @@ test.runTests(
       test.eq(3, data.radiotest, "RadioFormField");
       //@ts-expect-error Typescript also disapproves
       await test.throws(/Invalid type string/, () => data.radiotest = "5");
-      await test.waitToggled({
+      await test.waitForTransitionToTrue({
         test: () => !test.qR("[name=opt5_select]").disabled,
         run: () => data.radiotest = 5
       }, "Setting radiotest to 5 should enable the opt5_select field");
-      await test.waitToggled({
+      await test.waitForTransitionToTrue({
         test: () => test.qR("[name=opt5_select]").disabled,
         run: () => data.radiotest = null
       }, "Clearing the radio should disable the opt5_select field again");

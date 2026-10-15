@@ -41,9 +41,6 @@ while [[ ${1:-} =~ ^-.* ]]; do
   elif [ "$1" == "--dockerfile" ]; then
     shift
     DOCKERFILE="$1"
-  elif [ "$1" == "--devcontainer" ]; then
-    TARGETSTAGE="devcontainer"      # FIXME shouldn't build-devcontainer & run-devcontainer suffice?
-    FINALTAGARGS+=(--devcontainer)
   else
     echo "Illegal option $1"
     exit 1

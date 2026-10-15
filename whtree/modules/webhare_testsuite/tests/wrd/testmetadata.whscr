@@ -779,7 +779,7 @@ MACRO TestMerge()
 
   OBJECT wrdschema := CreateWRDSchema("webhare_testsuite:testmerge");
   wrdschema->ApplySchemaDefinition([ __schemadefinition := StringToBlob(mergeschema) ]);
-  TestEq(TRUE, ObjectExists(wrdschema->GetType("wrdauth_service_provider")));
+  TestEq(TRUE, ObjectExists(wrdschema->GetType("wrdauth_application")));
 
   testfw->RollbackWork();
 }

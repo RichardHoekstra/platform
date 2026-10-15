@@ -8,10 +8,9 @@ import { spawnSync } from "node:child_process";
 import type { RTDExport } from "@webhare/services/src/richdocument";
 import { omit } from "@webhare/std";
 
-type WRD_TestschemaSchemaType = WRDSchemaLike["wrd:testschema"];
 
 async function testWRDCli() { //  tests
-  type TestSchemaType = Combine<[WRD_TestschemaSchemaType, CustomExtensions]>;
+  type TestSchemaType = Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensions]>;
   const wrdschema = wrd<TestSchemaType>(testSchemaTag);
   await createWRDTestSchema();
 

@@ -9,6 +9,7 @@ eval "$(addons/docker-build/get-build-vars.sh)"
 [ -n "${WHBUILD_ASSETROOT:-}" ] || WHBUILD_ASSETROOT="https://build.webhare.dev/whbuild/"
 
 podman build \
+  --security-opt label=disable \
   -t localhost/webhare/platform:devcontainer \
   --build-arg WEBHARE_NODE_MAJOR="$WEBHARE_NODE_MAJOR" \
   --build-arg WHBUILD_EMSCRIPTEN_VERSION="$WHBUILD_EMSCRIPTEN_VERSION"  \

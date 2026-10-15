@@ -1,9 +1,7 @@
-import type { JsschemaSchemaType } from "wh:wrd/webhare_testsuite";
 import { type LookupUsernameParameters, type AuthCustomizer, type OpenIdAuthenticationParameters, type LoginDeniedInfo, fetchUserInfo } from "@webhare/auth";
-import { WRDSchema } from "@webhare/wrd";
+import { wrd, type WRDSchemaLike } from "@webhare/wrd";
 import { runInWork } from "@webhare/whdb";
 import type { NavigateInstruction } from "@webhare/env";
-import type { WRD_TestschemaSchemaType } from "@mod-platform/generated/wrd/webhare";
 import { backendConfig } from "@webhare/services";
 
 export class MultisiteCustomizer implements AuthCustomizer {
@@ -11,7 +9,7 @@ export class MultisiteCustomizer implements AuthCustomizer {
     if (!params.site)
       return null;
 
-    const jsAuthSchema = new WRDSchema<JsschemaSchemaType>("webhare_testsuite:testschema");
+    const jsAuthSchema = wrd<WRDSchemaLike["webhare_testsuite:jsschema"]>("webhare_testsuite:testschema");
     const match = await jsAuthSchema.query("wrdPerson").where("multisite", "=", `site${params.site || ""}`).select("wrdId").execute();
     return match[0] || null;
   }
@@ -30,7 +28,7 @@ export class OIDCTestCustomizer implements AuthCustomizer {
     if (params.jwtPayload.testfw_lastname === "REDIRECTME")
       return { type: "redirect", url: backendConfig.backendURL + "/redirected-away" };
 
-    const schemaSP = new WRDSchema<WRD_TestschemaSchemaType>("webhare_testsuite:oidc-sp");
+    const schemaSP = wrd<WRDSchemaLike["wrd:testschema"]>("webhare_testsuite:oidc-sp");
     const matchUser = await schemaSP.search("wrdPerson", "wrdContactEmail", params.jwtPayload.testfw_email);
     if (matchUser) {
       return matchUser;

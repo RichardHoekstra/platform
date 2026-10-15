@@ -6,7 +6,7 @@ import { loadlib, makeObject } from "@webhare/harescript";
 import * as test from "@mod-webhare_testsuite/js/wts-backend";
 
 import { beginWork, commitWork, runInWork } from "@webhare/whdb";
-import { allowInsecureRequests, authorizationCodeGrant, buildAuthorizationUrl, discovery, fetchUserInfo, randomNonce } from 'openid-client';
+import { fetchUserInfo, randomNonce, randomPKCECodeVerifier } from 'openid-client';
 import type { Puppeteer } from "@webhare/deps";
 import { registerRelyingParty, initializeIssuer, type WRDAuthLoginSettings } from "@webhare/auth";
 import { createCodeVerifier, IdentityProvider } from "@webhare/auth/src/identity";
@@ -16,62 +16,13 @@ import { defaultWRDAuthLoginSettings } from "@webhare/auth/src/support";
 import { handleOAuth2AuthorizeLanding, OAuth2Client } from "@webhare/auth/src/oauth2-client";
 import { generateRandomId } from "@webhare/std";
 import { joinURL } from "@mod-platform/js/auth/openid";
-import { openTestPuppeteer } from "@mod-webhare_testsuite/js/wts-backend";
+import { openTestPuppeteer, RequestRecorder, runWebHareLoginFlow } from "@mod-webhare_testsuite/js/wts-backend";
 
 const callbackUrl = "http://localhost:3000/cb";
 let clientWrdId = 0, clientId = '', clientSecret = '';
 let puppeteer: Puppeteer.Browser | undefined;
 const oidcAuthSchema = wrd<WRDSchemaLike["webhare_testsuite:oidcschema"]>("webhare_testsuite:testschema");
 const newPassword = "pass$" + Math.random().toString(36).substring(2, 16);
-
-class RequestRecorder implements Disposable {
-  public urls: URL[] = [];
-  private page: Puppeteer.Page;
-
-  constructor(page: Puppeteer.Page) {
-    this.page = page;
-    page.on('request', this.logUrl);
-  }
-
-  private logUrl = (req: Puppeteer.HTTPRequest) => {
-    this.urls.push(new URL(req.url()));
-  };
-
-  [Symbol.dispose]() {
-    this.page.off('request', this.logUrl);
-  }
-}
-
-async function runWebHareLoginFlow(page: Puppeteer.Page, options?: { user?: string; password?: string; changePasswordTo?: string }) {
-  const password = options?.password || test.getUser("sysop").password;
-  const user = test.getUser(options?.user || "sysop");
-  using recorder = new RequestRecorder(page);
-
-  console.log("Login with ", user.login, "and password", password);
-  await page.waitForSelector('.wh-wrdauth-login [name=login]');
-  await page.type('[name=login]', user.login);
-  await page.type('[name=password]', password);
-
-  await Promise.all([
-    page.waitForNavigation(),
-    page.click('button[type=submit]')
-  ]);
-  if (options?.changePasswordTo) {
-    await page.waitForSelector('.wh-form--allowsubmit #completeaccountpassword-passwordnew'); //wh-form--allowsubmit ensures the form is ready for to submit (and JS code is loaded)
-    await page.type('#completeaccountpassword-passwordnew', options.changePasswordTo);
-    await page.type('#completeaccountpassword-passwordrepeat', options.changePasswordTo);
-    await page.click('button[type=submit]');
-
-    await page.waitForSelector('[data-wh-form-action="exit"]');
-    await Promise.all([
-      page.waitForNavigation(),
-      page.click('[data-wh-form-action="exit"]')
-    ]);
-  }
-
-  //we must wait for the last navigation to complete or we might actually return to our caller before the login redirects have completed
-  return recorder.urls;
-}
 
 async function runAuthorizeFlowInContext(context: Puppeteer.BrowserContext, authorizeURL: string | URL) {
   const page = await context.newPage();
@@ -163,13 +114,14 @@ async function setupOIDC() {
     const testsite = await test.getTestSiteJS();
 
     const schemaSP = wrd<WRDSchemaLike["wrd:testschema"]>("webhare_testsuite:oidc-sp");
-    await schemaSP.insert("wrdauthOidcClient", {
+    await schemaSP.insert("wrdauthServer", {
+      isIdp: true,
       wrdTag: "TESTFW_OIDC_SP",
       wrdTitle: "OIDC self sp",
       metadataurl: testsite.webRoot + ".well-known/openid-configuration", //TODO There should be an API getting this URL for us, using the identityprovider site configuration
       clientid: clientId,
       clientsecret: clientSecret,
-      additionalscopes: "testfw",
+      additionalscopes: "testfw profile",
       extraParams: [{ param: "testparam", value: "testvalue" }]
     });
 
@@ -319,34 +271,28 @@ async function verifyOpenIDClient() {
 
   //update client to use firstname as subject
   await beginWork();
-  await oidcAuthSchema.update("wrdauthServiceProvider", clientWrdId, { subjectField: "wrdFirstName" });
+  await oidcAuthSchema.update("wrdauthApplication", clientWrdId, { subjectField: "wrdFirstName" });
   await commitWork();
 
-  //verify using openid-client
-  const config = await discovery(new URL(testsite.webRoot + '.well-known/openid-configuration'), clientId, clientSecret, undefined, {
-    execute: [allowInsecureRequests],
+  test.eqPartial({ error: "invalid_scope" }, await test.runOpenIDLoginFlow(puppeteer!, {
+    metadataUrl: testsite.webRoot + '.well-known/openid-configuration',
+    clientId,
+    clientSecret,
+    callbackUrl,
+    scope: 'openid email invalidscope'
+  }));
+
+  const { config, tokenSet } = await test.runOpenIDLoginFlow(puppeteer!, {
+    metadataUrl: testsite.webRoot + '.well-known/openid-configuration',
+    clientId,
+    clientSecret,
+    callbackUrl,
+    scope: 'openid email'
   });
 
-  test.assert('https://beta.webhare.net/', config.serverMetadata().issuer);
+  test.eq('https://my.webhare.dev/testfw/issuer', config?.serverMetadata().issuer);
+  test.assert(tokenSet);
 
-  //FIXME code_verifier (PKCS?) support
-  // const code_verifier = generators.codeVerifier();
-  // store the code_verifier in your framework's session mechanism, if it is a cookie based solution
-  // it should be httpOnly (not readable by javascript) and encrypted.
-  // const code_challenge = generators.codeChallenge(code_verifier);
-
-  const authorizeurl = buildAuthorizationUrl(config, {
-    scope: 'openid email invalidscope',
-    redirect_uri: callbackUrl,
-    // response_mode
-
-    // TODO make code work
-    // code_challenge,
-    // code_challenge_method: 'S256',
-  });
-
-  const { finalurl } = await runAuthorizeFlow(authorizeurl);
-  const tokenSet = await authorizationCodeGrant(config, new URL(finalurl)); // , { code_verifier });
   test.eq("bearer", tokenSet.token_type);
   const accesTokenClaims = JSON.parse(Buffer.from(tokenSet.access_token!.split(".")[1], "base64url").toString());
   test.eq("openid email", accesTokenClaims.scope);
@@ -357,19 +303,34 @@ async function verifyOpenIDClient() {
   await test.throws(/unexpected HTTP response status code/, fetchUserInfo(config, tokenSet.id_token, tokenSet.claims()!.sub!), "Shouldn't accept id_token");
   const userinfo = await fetchUserInfo(config, tokenSet.access_token!, tokenSet.claims()!.sub!);
 
-  test.eqPartial({ "sub": "Sysop", "name": "Sysop McTestsuite", "given_name": "Sysop", "family_name": "McTestsuite", answer: 43 }, userinfo);
+  test.eqPartial({ "sub": "Sysop", email: "sysop@beta.webhare.net", answer: 43 }, userinfo);
 
   //Now with a nonce
   const nonce = randomNonce();
-  const authorizeurl2 = buildAuthorizationUrl(config, {
-    scope: 'openid email',
-    redirect_uri: callbackUrl,
+  const { tokenSet: tokenSet2 } = await test.runOpenIDLoginFlow(puppeteer!, {
+    metadataUrl: testsite.webRoot + '.well-known/openid-configuration',
+    clientId,
+    clientSecret,
+    callbackUrl,
     nonce
   });
 
-  const { finalurl: finalurl2 } = await runAuthorizeFlow(authorizeurl2);
-  const tokenSet2 = await authorizationCodeGrant(config, new URL(finalurl2), { expectedNonce: nonce });
+  test.assert(tokenSet2);
   test.eq("Sysop", tokenSet2.claims()?.sub);
+
+  // Verify discovery advertises S256 and complete a login using its verifier.
+  test.eq(true, config.serverMetadata().supportsPKCE("S256"));
+  const { tokenSet: pkceTokenSet } = await test.runOpenIDLoginFlow(puppeteer!, {
+    metadataUrl: testsite.webRoot + '.well-known/openid-configuration',
+    clientId,
+    clientSecret,
+    callbackUrl,
+    pkceCodeVerifier: randomPKCECodeVerifier()
+  });
+  test.assert(pkceTokenSet);
+  test.eq("bearer", pkceTokenSet.token_type);
+  test.assert(pkceTokenSet.id_token);
+  test.eq("Sysop", pkceTokenSet.claims()?.sub);
 }
 
 //delete the cookeies associated with /portal1-oidc/ but not our parent portal
@@ -383,6 +344,16 @@ async function logoutAtIDP(context: Puppeteer.BrowserContext) {
   for (const cookie of await context.cookies())
     if (cookie.name.endsWith("webharelogin-wrdauthjs"))
       await context.deleteCookie(cookie);
+}
+
+async function consentToTestfwScope(page: Puppeteer.Page) {
+  //Handle consent question triggered by asking for 'testfw'
+  await page.waitForSelector('button[name="approve"][value="no"]');
+  test.eq([/testfw/], await page.$$eval("form ul li", items => items.map(item => item.textContent?.trim())));
+  await Promise.all([
+    page.waitForNavigation(),
+    page.click('button[name="approve"][value="yes"]')
+  ]);
 }
 
 async function verifyAsOpenIDSP() {
@@ -414,7 +385,7 @@ async function verifyAsOpenIDSP() {
   test.eq("testvalue", authrequest.searchParams.get("testparam"), "Extra param must be passed to authorize URL: " + authrequest);
 
   await runWebHareLoginFlow(page, { password: "pass$", changePasswordTo: newPassword });
-
+  await consentToTestfwScope(page);
   console.log("Password changed to: " + newPassword);
 
   { //wait for WebHare username
@@ -516,6 +487,7 @@ async function verifyCustomOpenIDFlow() {
   await page.goto(portal1LoginRequest);
 
   await runWebHareLoginFlow(page, { user: "marge", password: "marge$", changePasswordTo: newPassword });
+  await consentToTestfwScope(page);
 
   //We're blocked so this should show Login failed page
   const heading = await page.waitForSelector("h2");
@@ -542,6 +514,7 @@ async function testUserAutoCreation() {
   await page.goto(loginRequest);
 
   await runWebHareLoginFlow(page, { user: "bart", password: "bart$", changePasswordTo: newPassword });
+  await consentToTestfwScope(page);
   const newUser = await schemaSP.query("wrdPerson").where("wrdContactEmail", "=", test.getUser("bart").login).select(["wrdId", "wrdLastName", "whuserComment"]).executeRequireExactlyOne();
   test.eq(testsite.webRoot + "portal1-oidc/wrdauthtest/", newUser.whuserComment, "Autocreated user should have final URL in whuserComment");
 
@@ -598,6 +571,7 @@ async function verifySSOAPI() {
       }
     });
 
+    //TODO improve these 'prompt=none with scopes' tests/scenarios. eg automatic rejection if you try to add scopes with prompt=none. Or have test_wrd_auth do those
     console.log("Doing second passive SSO login on ", startUrl);
     await page.goto(startUrl);
     await page.click("#ssopassivebutton");

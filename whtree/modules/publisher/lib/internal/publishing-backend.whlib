@@ -215,6 +215,35 @@ STATIC OBJECTTYPE PublicationRun
     RETURN ToLowercase(text);
   }
 
+  /// Preserve buffered output when the template exits before closing its output pipes.
+  MACRO FlushRemainingOutputs()
+  {
+    // Flush all data of all unclosed outputs
+    DEBUGPRINT("Template has finished, flushing all remaining outputs");
+    FOREVERY (INTEGER handle FROM this->outputfilepipestack)
+    {
+      IF (handle = 0)
+        CONTINUE;
+
+      DEBUGPRINT("Flushing: "||handle);
+
+      INTEGER pos := #handle;
+
+      DEBUGPRINT("READING DATA (to: "||this->outstack[pos].filehandle||")");
+      WHILE (WaitForMultiple([ handle ], DEFAULT INTEGER ARRAY, 0) = handle)
+      {
+        STRING data := ReadFrom(handle, 4096); // Wait for output until end of stream
+        IF (data = "")
+          BREAK;
+
+        DEBUGPRINT("Read "||LENGTH(data)||" bytes");
+        this->totalsize := this->totalsize + LENGTH(data);
+        PrintTo(this->outstack[pos].filehandle, data);
+      }
+      DEBUGPRINT("/READING DATA");
+    }
+  }
+
   PUBLIC INTEGER FUNCTION Run()
   {
     IF (NOT this->OpenOutput())
@@ -298,30 +327,7 @@ STATIC OBJECTTYPE PublicationRun
       }
     }
 
-    // Flush all data of all unclosed outputs
-    DEBUGPRINT("Template has finished, flushing all remaining outputs");
-    FOREVERY (INTEGER handle FROM this->outputfilepipestack)
-    {
-      IF (handle = 0)
-        CONTINUE;
-
-      DEBUGPRINT("Flushing: "||handle);
-
-      INTEGER pos := #handle;
-
-      DEBUGPRINT("READING DATA (to: "||this->outstack[pos].handle||")");
-      WHILE (WaitForMultiple([ handle ], DEFAULT INTEGER ARRAY, 0) = handle)
-      {
-        STRING data := ReadFrom(handle, 4096); // Wait for output until end of stream
-        IF (data = "")
-          BREAK;
-
-        DEBUGPRINT("Read "||LENGTH(data)||" bytes");
-        this->totalsize := this->totalsize + LENGTH(data);
-        PrintTo(this->outstack[pos].handle, data);
-      }
-      DEBUGPRINT("/READING DATA");
-    }
+    this->FlushRemainingOutputs();
 
     this->hs_errors := this->templatejob->GetErrors();
     this->hs_groupid := this->templatejob->groupid;

@@ -10,12 +10,11 @@ import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import { generateRandomId, throwError } from "@webhare/std";
 import { UUIDToWrdGuid, maxDateTime } from "@webhare/hscompat";
 
-type WRD_TestschemaSchemaType = WRDSchemaLike["wrd:testschema"];
 
 const keepHistoryDays = 1;
 
 async function testChanges() { //  tests
-  const wrdschema = wrd<Combine<[WRD_TestschemaSchemaType, CustomExtensions]>>(testSchemaTag);
+  const wrdschema = wrd<Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensions]>>(testSchemaTag);
   test.eqPartial({ keepHistoryDays }, await wrdschema.describeType("wrdPerson"));
   test.eqPartial({ keepHistoryDays }, await wrdschema.describeType("personattachment"));
 

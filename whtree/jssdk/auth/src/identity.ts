@@ -1,7 +1,6 @@
 import * as crypto from "node:crypto";
 import jwt, { type JwtPayload, type SignOptions, type VerifyOptions } from "jsonwebtoken";
 import type { AnyWRDSchema, SchemaTypeDefinition, WRDSchemaType } from "@webhare/wrd/src/schema";
-import type { WRD_IdpSchemaType, WRD_Idp_WRDPerson } from "@mod-platform/generated/wrd/webhare";
 import { compareProperties, convertWaitPeriodToDate, generateRandomId, isPromise, parseTyped, pick, stringify, throwError, updateURL, type WaitPeriod } from "@webhare/std";
 import { generateKeyPair, type KeyObject, createPrivateKey, createPublicKey } from "node:crypto";
 import { getSchemaSettings, updateSchemaSettings } from "@webhare/wrd/src/settings";
@@ -20,7 +19,7 @@ import { tagToHS, tagToJS } from "@webhare/wrd/src/wrdsupport";
 import type { PublicAuthData } from "@webhare/frontend/src/auth";
 import { checkPasswordCompliance, verifyPasswordCompliance, type PasswordCheck, type PasswordCheckResult } from "./passwords";
 import { getCompleteAccountNavigation, type LoginTweaks, type LoginErrorCode, type LoginResult } from "./shared";
-import { AuthenticationSettings, describeEntity, wrd, type AnySchemaType } from "@webhare/wrd";
+import { AuthenticationSettings, describeEntity, wrd, type AnySchemaType, type WRDSchemaLike } from "@webhare/wrd";
 import { getGuidForEntity } from "@webhare/wrd/src/accessors";
 
 const defaultPasswordResetExpiry = 3 * 86400_000; //default 3 days epxiry
@@ -355,7 +354,7 @@ function haveValidKeys(keys: SigningKey[]) {
 }
 
 type SigningKey = {
-  availableSince: Date;
+  availableSince: Temporal.Instant;
   keyId: string;
   privateKey: JsonWebKey;
 };
@@ -365,12 +364,12 @@ type SigningKey = {
  * @param wrdschema - The schema to create the token for
 */
 export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
-  readonly wrdschema: WRDSchemaType<WRD_IdpSchemaType>;
+  readonly wrdschema: WRDSchemaType<WRDSchemaLike["wrd:idp"]>;
   private authsettings?: WRDAuthSettings | null;
 
   constructor(wrdschema: WRDSchemaType<SchemaType>) {
-    //TODO can we cast to a 'real' base type instead of abusing System_UsermgmtSchemaType for the wrdSettings type?
-    this.wrdschema = wrdschema as unknown as WRDSchemaType<WRD_IdpSchemaType>;
+    //TODO can we cast to a 'real' base type instead of abusing WRDSchemaLike["wrd:idp"] for the wrdSettings type?
+    this.wrdschema = wrd<WRDSchemaLike["wrd:idp"]>(wrdschema.tag);
   }
 
   getAuthSettings(required: true): Promise<WRDAuthSettings & { loginAttribute: string; passwordAttribute: string; passwordIsAuthSettings: true }>;
@@ -400,12 +399,12 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
         if (!validity.valid_ec) {
           //TODO keyIds aren't sensitive, we can use much smaller keyIds if we check for dupes ourselves to avoid collisions
           const primarykeyid = generateRandomId();
-          signingKeys.push({ availableSince: new Date, keyId: primarykeyid, privateKey: await createSigningKey("ec") });
+          signingKeys.push({ availableSince: Temporal.Now.instant(), keyId: primarykeyid, privateKey: await createSigningKey("ec") });
         }
         if (!validity.valid_rsa) {
           //TODO keyIds aren't sensitive, we can use much smaller keyIds if we check for dupes ourselves to avoid collisions
           const primarykeyid = generateRandomId();
-          signingKeys.push({ availableSince: new Date, keyId: primarykeyid, privateKey: await createSigningKey("rsa") });
+          signingKeys.push({ availableSince: Temporal.Now.instant(), keyId: primarykeyid, privateKey: await createSigningKey("rsa") });
         }
         await updateSchemaSettings(this.wrdschema, { signingKeys });
       }
@@ -439,7 +438,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
     /** Prefer ec over non-ec, then look for most recente key */
     keys = keys.sort((a, b) =>
       (Number(b.privateKey.kty === "EC") - Number(a.privateKey.kty === "EC"))
-      || b.availableSince.getTime() - a.availableSince.getTime()
+      || Temporal.Instant.compare(b.availableSince, a.availableSince)
     );
 
     if (!keys.length)
@@ -478,7 +477,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
     */
     let clientInfo;
     if (client !== null) {
-      clientInfo = await this.wrdschema.getFields("wrdauthServiceProvider", client, ["wrdGuid", "subjectField"]);
+      clientInfo = await this.wrdschema.getFields("wrdauthApplication", client, ["wrdGuid", "subjectField"]);
       if (!clientInfo)
         throw new Error(`Unable to find serviceProvider #${client}`);
     }
@@ -509,9 +508,9 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
     if (!config || !config.signingKeys?.length)
       throw new Error(`Schema ${this.wrdschema.tag} is not configured properly. Missing issuer or signingKeys`);
 
-    //ID tokens are only generated for 3rd party clients requesting an openid scope. They shouldn't be providing access to APIs and cannot be retracted by us
+    //ID tokens are only generated for 3rd party clients requesting an openid scope. They shouldn't be providing access to APIs and cannot be retracted by us, so they won't appear in the wrd.tokens table either
     let id_token: string | undefined;
-    const requestedScopes = options?.scopes || [];
+    const scopes = options?.scopes || []; //we expect our caller to filter unwanted scopes
     if (isOIDC) {
       if (!(client && clientInfo))
         throw new Error("Unable to create ID token without a thirdparty client");
@@ -530,7 +529,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
         await options?.customizer.onOpenIdToken({
           wrdSchema: this.wrdschema as unknown as WRDSchemaType<AnySchemaType>,
           user: subject,
-          scopes: requestedScopes,
+          scopes,
           client
         }, payload as JWTPayload);
 
@@ -543,13 +542,9 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
       id_token = this.signJWT(payload, config.signingKeys, "RSA");
     }
 
-    const scopes = type === "oidc"
-      ? requestedScopes.filter(scope => ["openid", "profile", "email"].includes(scope)) //filter out non-openid scopes to protect against misinterpretation, as these tokens were specified by the client!
-      : requestedScopes;
-
     /* We always generate access tokens for OpenID requests (skippable when client only requests an id_token)
-       For our convenience we use JWT for access tokens but we don't strictly have to. We do not set an audience as we're always the audience, and we do not really care
-       about the signature yet - our wrd.tokens table is leading (and we want to be able to show active sessions anyway) */
+     For our convenience we use JWT for access tokens but we don't strictly have to. We do not set an audience as we're always the audience, and we do not really care
+     about the signature yet - our wrd.tokens table is leading (and we want to be able to show active sessions anyway) */
     const atPayload = preparePayload(subjectValue, relativeTo, validUntil, { scopes });
     const prefix = options?.prefix ?? (type !== "id" ? "secret-token:" : ""); //if undefined/null, we fall back to the default
     if (options?.claims)
@@ -568,7 +563,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
     return await runInWork(async () => {
       const hash = hashSHA256(access_token);
       const insertres = await db<PlatformDB>().insertInto("wrd.tokens").values({
-        type: type,
+        type: type === "id" ? "id" : "api",
         creationdate: new Date(atPayload.nbf! * 1000),
         expirationdate: atPayload.exp ? new Date(atPayload.exp * 1000) : defaultDateTime,
         entity: subject,
@@ -612,13 +607,33 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
   async getUserInfo(token: string, customizer?: AuthCustomizer): Promise<ReportedUserInfo | { error: string }> {
     /* We do not verify the token's signature currently - we just look it up in our database. TODO we might not have to store access tokens if we verify its
        signature and just reuse it and save a bit of database churn unless other reasons appear to store these tokens */
-    const tokeninfo = await this.verifyAccessToken("oidc", token);
+    const tokeninfo = await this.verifyAccessToken("api", token, { requireScopes: ["openid"] });
     if ("error" in tokeninfo)
       return { error: tokeninfo.error };
     if (!tokeninfo.client)
-      return { error: "WRDAuth login tokens are not valid for OpenID /userinfo endpoints" };
+      return { error: "An API token without a client cannot be used to get userinfo" };
 
-    const userfields = await this.wrdschema.getFields("wrdPerson", tokeninfo.entity, ["wrdFullName", "wrdFirstName", "wrdLastName"/*,"wrdContactEmail"*/]);
+    const getfields: Record<string, string> = {};
+    const authsettings = await this.getAuthSettings(false);
+
+    if (tokeninfo.scopes.includes("profile")) {
+      getfields.name = "wrdFullName";
+      getfields.given_name = "wrdFirstName";
+      getfields.family_name = "wrdLastName";
+    }
+
+    if (tokeninfo.scopes.includes("email")) {
+      if (authsettings?.emailAttribute)
+        getfields.email = authsettings.emailAttribute;
+    }
+
+    const accountType = authsettings?.accountType || "wrdPerson";
+    const userfields = await (this.wrdschema as AnyWRDSchema).getFields(accountType, tokeninfo.entity, getfields) as {
+      name?: string;
+      given_name?: string;
+      family_name?: string;
+      email?: string | null;
+    } | null;
     if (!userfields)
       return { error: "No such user" };
 
@@ -628,10 +643,10 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
 
     const userinfo: Record<string, unknown> = { //TODO limit by the fields by requested scope and client access
       sub: decoded.payload.sub,
-      name: userfields.wrdFullName,
-      given_name: userfields.wrdFirstName,
-      family_name: userfields.wrdLastName,
-      // email: userinfo.wrdContactEmail
+      ...userfields.name ? { name: userfields.name } : {},
+      ...userfields.given_name ? { given_name: userfields.given_name } : {},
+      ...userfields.family_name ? { family_name: userfields.family_name } : {},
+      ...userfields.email ? { email: userfields.email } : {},
     };
 
     if (customizer?.onOpenIdUserInfo)
@@ -665,7 +680,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
    * @param token - The token to verify
    * @param options - Optional parameters for token verification
   */
-  async verifyAccessToken(type: "id" | "api" | "oidc", token: string, options?: { ignoreAccountStatus?: boolean; requireScopes?: string[] }): Promise<VerifyAccessTokenResult | { error: string }> {
+  async verifyAccessToken(type: "id" | "api", token: string, options?: { ignoreAccountStatus?: boolean; requireScopes?: string[] }): Promise<VerifyAccessTokenResult | { error: string }> {
     const hashed = hashSHA256(token);
     const matchToken = await db<PlatformDB>().
       selectFrom("wrd.tokens").
@@ -733,7 +748,7 @@ export class IdentityProvider<SchemaType extends SchemaTypeDefinition> {
         ...pick(options || {}, ["site"])
       });
 
-    const user = await (this.wrdschema as AnyWRDSchema).search(authsettings.accountType, authsettings.loginAttribute as AttrRef<WRD_Idp_WRDPerson>, loginname);
+    const user = await (this.wrdschema as AnyWRDSchema).search(authsettings.accountType, authsettings.loginAttribute as AttrRef<WRDSchemaLike["wrd:idp"]["wrdPerson"]>, loginname);
     return user || null;
   }
 

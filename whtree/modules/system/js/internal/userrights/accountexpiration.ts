@@ -1,6 +1,5 @@
 import { addDuration, parseDuration } from "@webhare/std";
-import type { System_UsermgmtSchemaType } from "@mod-platform/generated/wrd/webhare";
-import { WRDSchema } from "@webhare/wrd";
+import { wrd, type WRDSchemaLike } from "@webhare/wrd";
 import { beginWork, commitWork } from "@webhare/whdb";
 import { writeAuthAuditEvent, type WRDAuthAccountStatus } from "@webhare/auth";
 
@@ -18,7 +17,7 @@ export async function runAccountExpiration(tag: string) {
     return null;
   }
 
-  const wrdschema = new WRDSchema<System_UsermgmtSchemaType>(tag);
+  const wrdschema = wrd<WRDSchemaLike["system:usermgmt"]>(tag);
   if (!wrdschema)
     throw new Error(`No such schema '${tag}'`); //TODO shouldn't openSchema just throw?
   if (!await wrdschema.getType("whuserUnit").exists())
@@ -41,7 +40,7 @@ export async function runAccountExpiration(tag: string) {
   // Get all active users in these units
   const expirycandidates = (await wrdschema.
     query("wrdPerson").
-    select(["wrdId", "wrdCreationDate", "whuserLastlogin", "whuserUnit", "wrdauthAccountStatus"]).
+    select(["wrdId", "wrdCreated", "whuserLastlogin", "whuserUnit", "wrdauthAccountStatus"]).
     where("whuserUnit", "in", processunits.map(_ => _.wrdId)).
     execute()).filter(_ => _.wrdauthAccountStatus?.status === "active");
 
@@ -49,7 +48,7 @@ export async function runAccountExpiration(tag: string) {
   for (const unit of processunits) { //all processunits have expiration.locknologin! set.
     const cutoff = addDuration(new Date(), { ...parseDuration(unit.expiration!.locknologin!), sign: "-" });
     for (const user of expirycandidates) {
-      const lastActive = Math.max(user.whuserLastlogin?.getTime() || 0, user.wrdCreationDate?.getTime() || 0, user.wrdauthAccountStatus?.since?.epochMilliseconds || 0);
+      const lastActive = Math.max(user.whuserLastlogin?.epochMilliseconds || 0, user.wrdCreated?.epochMilliseconds || 0, user.wrdauthAccountStatus?.since?.epochMilliseconds || 0);
       if (lastActive < cutoff.getTime()) {
         lockusers.push(user);
       }

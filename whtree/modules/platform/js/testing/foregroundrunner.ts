@@ -110,20 +110,20 @@ async function reportFailure(testinfo: Test, message: string | null, log: LogEnt
 
 export async function init(options: {
   debug: boolean;
-  keepopen: boolean;
+  keepbrowser: boolean;
   alwayslog: boolean;
   showbrowser: boolean;
 }) {
 
   debug = Boolean(options.debug);
-  if (options.keepopen)
-    debugFlags["test-keepopen"] = true;
+  if (options.keepbrowser)
+    debugFlags["test-keepbrowser"] = true;
   if (options.showbrowser)
     debugFlags["test-showbrowser"] = true;
 
   alwayslog = Boolean(options.alwayslog);
   puppeteer = await launchPuppeteer({
-    headless: !debugFlags["test-keepopen"] && !debugFlags["test-showbrowser"],
+    headless: !debugFlags["test-keepbrowser"] && !debugFlags["test-showbrowser"],
     defaultViewport: { height: 1024, width: 1280, deviceScaleFactor: 1 }
   });
 }
@@ -261,14 +261,14 @@ export async function runTest(test: Test) {
     return { status: "fail" };
   } finally {
     // Cleanup
-    if (!debugFlags["test-keepopen"])
+    if (!debugFlags["test-keepbrowser"])
       await page?.close();
     await events[Symbol.dispose]();
   }
 }
 
 export async function close() {
-  if (!debugFlags["test-keepopen"])
+  if (!debugFlags["test-keepbrowser"])
     await puppeteer?.close();
   puppeteer = null;
 }

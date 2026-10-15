@@ -1,0 +1,41 @@
+<?wh
+LOADLIB "wh::files.whlib";
+LOADLIB "wh::internal/jobs.whlib";
+LOADLIB "wh::internal/interface.whlib";
+LOADLIB "mod::system/lib/database.whlib";
+LOADLIB "mod::system/lib/testframework.whlib";
+LOADLIB "mod::publisher/lib/internal/publishing-backend.whlib";
+
+MACRO TestRemainingOutput()
+{
+  OBJECT process := NEW PublicationProcess(0);
+  OBJECT run := process->CreatePublicationRun(DEFAULT OBJECT, DEFAULT RECORD, FALSE);
+  INTEGER output1 := CreateStream();
+  INTEGER output2 := CreateStream();
+  RECORD pipe1 := CreatePipeSet();
+  RECORD pipe2 := CreatePipeSet();
+  TRY
+  {
+    PrintTo(pipe1.write, "first output");
+    PrintTo(pipe2.write, "second output");
+    ClosePipe(pipe1.write);
+    ClosePipe(pipe2.write);
+    // Closed slots remain in the parallel arrays until CLOSEOUTPUT removes them.
+    run->outstack := [[filehandle := output1], [filehandle := 0], [filehandle := output2]];
+    run->outputfilepipestack := INTEGER [pipe1.read, 0, pipe2.read];
+    __HS_INTERNAL_MakeObjectReferencePrivileged(run)->FlushRemainingOutputs();
+    TestEq("first output", BlobToString(MakeBlobFromStream(output1)));
+    TestEq("second output", BlobToString(MakeBlobFromStream(output2)));
+    TestEq(25, run->totalsize);
+    Print("✅ Both buffered outputs preserved; total size is 25 bytes\n");
+  }
+  FINALLY
+  {
+    ClosePipe(pipe1.read);
+    ClosePipe(pipe2.read);
+    CloseBlobFile(output1);
+    CloseBlobFile(output2);
+  }
+}
+
+RunTestframework([PTR TestRemainingOutput]);

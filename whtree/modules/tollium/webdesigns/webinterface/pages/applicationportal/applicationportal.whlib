@@ -170,11 +170,14 @@ PUBLIC RECORD FUNCTION GetCacheableApplicationPortalConfigForApplyTester(OBJECT 
   IF(wrdschema != "")
   {
     OBJECT targetschema := OpenWRDSchema(wrdschema);
-    OBJECT oidcclient := targetschema->GetType("WRDAUTH_OIDC_CLIENT");
+    OBJECT oidcclient := targetschema->GetType("wrdauth_server");
     IF(ObjectExists(oidcclient))
     {
       eventmasks := eventmasks CONCAT oidcclient->GetEventMasks();
-      RECORD ARRAY clients := oidcclient->RunQuery(CELL[ outputcolumns := [ "wrd_id", "wrd_title", "wrd_tag", "wrd_ordering", "icon", "metadataurl", "visibility" ]]);
+      RECORD ARRAY clients := oidcclient->RunQuery(CELL[
+        outputcolumns := [ "wrd_id", "wrd_title", "wrd_tag", "wrd_ordering", "icon", "metadataurl", "visibility" ],
+        filters := [[ field := "is_idp", value := TRUE ]]
+      ]);
       config.loginmethods := config.loginmethods CONCAT
                              (SELECT type := "oidc"
                                    , tag := wrd_tag ?? "#" || wrd_id

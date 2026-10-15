@@ -126,7 +126,7 @@
                description="Log the runpermission handling of HareScript code called from JavaScript in WASM mode" />
     <debugflag name="calljs" description="Log the calljs calls to the debug log" />
     <debugflag name="test-showbrowser" description="Show browser when running tests" />
-    <debugflag name="test-keepopen" description="Keep browser open when running tests" />
+    <debugflag name="test-keepbrowser" description="Keep browser open when running tests" />
     <debugflag name="calljs-alt" description="Use alternative CallJS service" />
   </development>
 

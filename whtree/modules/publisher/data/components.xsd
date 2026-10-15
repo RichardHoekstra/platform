@@ -80,6 +80,11 @@
           </xs:documentation>
         </xs:annotation>
       </xs:attribute>
+      <xs:attribute name="autocloseqr" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Whether to automatically close the QR code dialog after the URL is opened. This will generate a QR code that doesn't directly encode the shown preview URL.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
     </xs:complexType>
   </xs:element>
 

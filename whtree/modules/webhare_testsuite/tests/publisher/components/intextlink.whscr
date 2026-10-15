@@ -1,7 +1,5 @@
 <?wh
 
-LOADLIB "wh::xml/dom.whlib";
-
 LOADLIB "mod::system/lib/testframework.whlib";
 LOADLIB "mod::system/lib/whfs.whlib";
 
@@ -140,6 +138,9 @@ ASYNC MACRO TestIntExtLink_WithLinkHandlers()
 
   AWAIT ExpectScreenChange(+1, PTR GetTestController()->RunScreen(`inline::${intextlink_withlinkhandlers}`));
 
+  OBJECT ARRAY textedits := SELECT AS OBJECT ARRAY obj FROM ToRecordArray(TT("frame")->GetTopDownAllComponents(), "obj") WHERE obj->componenttype = "textedit" AND obj->placeholder = "customlinkhandler2";
+  TestEq(1, Length(textedits));
+
   TestEq(["External link","custom link handler","custom link handler2"], SELECT AS STRING ARRAY title FROM TT("link")->^linktype->options);
   TT("link")->value := MakeIntExtExternalLink("x-webharetestsuite-customlink:15");
   TestEq("custom link handler", TT("link")->^linktype->selection.title);
@@ -149,6 +150,11 @@ ASYNC MACRO TestIntExtLink_WithLinkHandlers()
   TT("link")->value := MakeIntExtinternalLink(1,"#test");
   TestEq("custom link handler2", TT("link")->^linktype->selection.title);
   TestEQ(MakeIntExtinternalLink(1,"#test"), TT("link")->value);
+
+  // Regression: toggling the required state of the intextlink caused the custom link handler fields to be duplicated
+  TT("link")->required := NOT TT("link")->required;
+  textedits := SELECT AS OBJECT ARRAY obj FROM ToRecordArray(TT("frame")->GetTopDownAllComponents(), "obj") WHERE obj->componenttype = "textedit" AND obj->placeholder = "customlinkhandler2";
+  TestEq(1, Length(textedits));
 
   AWAIT ExpectScreenChange(-1, PTR TTEscape);
 

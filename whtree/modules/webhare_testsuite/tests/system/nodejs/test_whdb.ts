@@ -1,4 +1,4 @@
-import { WebHareBlob, ResourceDescriptor, lockMutex, subscribeToEventStream, writeRegistryKey } from "@webhare/services";
+import { WebHareBlob, ResourceDescriptor, lockMutex, hasMutex, subscribeToEventStream, writeRegistryKey } from "@webhare/services";
 import * as test from "@webhare/test";
 import { sleep } from "@webhare/std";
 import { defaultDateTime, maxDateTime } from "@webhare/hscompat";
@@ -690,6 +690,58 @@ async function testHSRunInSeparatePrimary() {
   test.assert(await db<WebHareTestsuiteDB>().selectFrom("webhare_testsuite.exporttest").select("text").where("id", "=", id2).executeTakeFirst());
 }
 
+async function testPreparedStatementsAcrossVMs() {
+  const invoketargetlib = "mod::webhare_testsuite/tests/system/nodejs/data/invoketarget.whlib";
+  await beginWork();
+  await db<WebHareTestsuiteDB>().deleteFrom("webhare_testsuite.exporttest").execute();
+  const first = await nextVal("webhare_testsuite.exporttest.id"), second = await nextVal("webhare_testsuite.exporttest.id");
+  await db<WebHareTestsuiteDB>().insertInto("webhare_testsuite.exporttest").values([{ id: first, text: "first" }, { id: second, text: "second" }]).execute();
+  await commitWork();
+
+  // The wasm driver prepares a query on its 16th use, so 20 uses run it as a prepared statement too
+  const repeat = async (call: () => Promise<unknown>) => {
+    let result;
+    for (let i = 0; i < 20; ++i)
+      result = await call();
+    return result;
+  };
+  const countPrepared = async () => (await query<{ count: number }>("SELECT count(*)::integer AS count FROM pg_prepared_statements WHERE name LIKE 'prep\\_%'")).rows[0].count; //the HareScript driver's statements
+
+  // A fresh code context has a fresh context VM, which prepares its statements on the primary connection
+  const context = new CodeContext("testPreparedStatementsAcrossVMs");
+  try {
+    await context.run(async () => {
+      const contextvm = loadlib(invoketargetlib);
+      test.eq("first", await repeat(() => contextvm.GetExportText(first)));
+      await beginWork();
+      await repeat(() => contextvm.AddExportRow("second")); //every other row says 'second', so GetOtherExportText stays predictable
+      await commitWork();
+      const preparedOnPrimary = await countPrepared();
+
+      await runInSeparateWork(async () => {
+        // Another VM in this code context prepares its statements on the separate connection
+        await using othervm = await createVM();
+        await othervm.loadlib("mod::system/lib/database.whlib").openPrimary();
+        const other = othervm.loadlib(invoketargetlib);
+        test.eq("second", await repeat(() => other.GetOtherExportText(first)));
+
+        // The context VM now runs on the separate connection too: it may not reuse statements it prepared elsewhere
+        test.eq("first", await repeat(() => contextvm.GetExportText(first)));
+        await repeat(() => contextvm.AddExportRow("second"));
+        // Both VMs can prepare more statements on the connection they share
+        test.eq("first", await repeat(() => other.GetExportText(first)));
+        test.eq("second", await repeat(() => contextvm.GetOtherExportText(first)));
+      });
+
+      // Back on the primary connection, the context VM reuses what it prepared there
+      test.eq("first", await repeat(() => contextvm.GetExportText(first)));
+      test.eq(preparedOnPrimary, await countPrepared());
+    });
+  } finally {
+    await context.close();
+  }
+}
+
 async function testClosedConnectionHandling() {
   const worker = new AsyncWorker;
   await worker.callRemote("@mod-webhare_testsuite/tests/system/nodejs/data/context-tests.ts#runShortLivedContext", 0);
@@ -719,6 +771,44 @@ async function testSeparatePrimaryLeak() {
   test.assert((endConns - startConns) < 40, `${endConns - startConns} connections were added during the test!`);
 
   await rollbackWork();
+}
+
+async function testFailingCommitHandler() {
+  // An onCommit handler that fails runs after the database acknowledged the commit, so it must not undo anything
+  await beginWork();
+  const id = await nextVal("webhare_testsuite.exporttest.id");
+  await db<WebHareTestsuiteDB>().insertInto("webhare_testsuite.exporttest").values({ id, text: "committed despite a failing handler" }).execute();
+  let rolledBack = false, laterHandlerCommitted = false;
+  onFinishWork({
+    onCommit: () => { throw new Error("onCommit handler failed"); },
+    onRollback: () => { rolledBack = true; }
+  });
+  onFinishWork({ onCommit: () => { laterHandlerCommitted = true; } });
+  await test.throws(/onCommit handler failed/, commitWork());
+  test.eq(false, rolledBack, "an acknowledged commit must not be reported as a rollback");
+  test.eq(true, laterHandlerCommitted, "a failing handler doesn't keep the others from learning about the commit");
+  test.eq([{ id }], await db<WebHareTestsuiteDB>().selectFrom("webhare_testsuite.exporttest").select("id").where("id", "=", id).execute());
+
+  // The failing handler opened new work under the same mutex before failing. That work must stay attached, and
+  // still own the mutex, when the commit cleans up after the failure.
+  const mutex = "webhare_testsuite:failingcommithandler";
+  await beginWork({ mutex });
+  onFinishWork({
+    onCommit: async () => {
+      await beginWork({ mutex });
+      throw new Error("handler failed after opening work");
+    }
+  });
+  try {
+    await test.throws(/handler failed after opening work/, commitWork());
+    test.eq(true, isWorkOpen(), "the work opened by the handler must stay attached");
+    test.eq(true, hasMutex(mutex), "the mutex taken by the new work must still be known to be held");
+  } finally {
+    if (isWorkOpen())
+      await rollbackWork();
+  }
+
+  await runInWork(() => db<WebHareTestsuiteDB>().deleteFrom("webhare_testsuite.exporttest").where("id", "=", id).execute());
 }
 
 async function testDeadlockDetection() {
@@ -914,9 +1004,11 @@ test.runTests([
   testIsolation,
   testSeparatePrimary,
   testHSRunInSeparatePrimary,
+  testPreparedStatementsAcrossVMs,
   testHSCommitHandlers, //moving this higher triggers races around commit handlers and VM shutdowns
   testClosedConnectionHandling,
   testSeparatePrimaryLeak,
+  testFailingCommitHandler,
   testDeadlockDetection,
   testOtherTypes,
 ]);

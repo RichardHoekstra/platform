@@ -55,7 +55,7 @@ test.runTests(
       await testwrd.runPasswordSetForm("pietje@allow2fa.test.webhare.net", "xecret");
       test.eq(null, (await rpc("webhare_testsuite:authtestsupport").getUserInfo("pietje@allow2fa.test.webhare.net"))?.whuserLastlogin, "Password reset is not a login!");
       await testwrd.runLogin("pietje@allow2fa.test.webhare.net", "xecret");
-      test.eqPartial({ whuserLastlogin: (d: Date | null) => Boolean(d && d.getTime() <= Date.now() && d.getTime() >= Date.now() - 5000) }, (await rpc("webhare_testsuite:authtestsupport").getUserInfo("pietje@allow2fa.test.webhare.net")));
+      test.eqPartial({ whuserLastlogin: (d: Temporal.Instant | null) => Boolean(d && d.epochMilliseconds <= Date.now() && d.epochMilliseconds >= Date.now() - 5000) }, (await rpc("webhare_testsuite:authtestsupport").getUserInfo("pietje@allow2fa.test.webhare.net")));
     },
 
     "enable TOTP",
@@ -154,7 +154,7 @@ test.runTests(
 
       // verify lastlogin is updated
       const userinfo = await rpc("webhare_testsuite:authtestsupport").getUserInfo("pietje@allow2fa.test.webhare.net");
-      test.eqPartial({ whuserLastlogin: (d: Date | null) => Boolean(d && d.getTime() > whuserLastlogin.getTime()) }, userinfo);
+      test.eqPartial({ whuserLastlogin: (d: Temporal.Instant | null) => Boolean(d && d.epochMilliseconds > whuserLastlogin.epochMilliseconds) }, userinfo);
 
       // logout
       await test.runTolliumLogout();

@@ -23,7 +23,7 @@ export {
   eqProps,
   assert,
   throws,
-  waitToggled,
+  waitForTransitionToTrue,
   waitForEvent,
 } from '@webhare/test';
 

@@ -1,5 +1,8 @@
 #!/bin/bash
-export WEBHARE_DIR="${BASH_SOURCE%/*/*}"
+
+WEBHARE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. && pwd)"
+export WEBHARE_DIR
+
 # shellcheck source=../lib/wh-functions.sh
 source "${WEBHARE_DIR}/lib/wh-functions.sh"
 

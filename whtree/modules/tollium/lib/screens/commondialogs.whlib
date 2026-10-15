@@ -567,7 +567,7 @@ PUBLIC OBJECTTYPE QRCallback EXTEND TolliumScreenBase <
 
   PUBLIC MACRO Init(RECORD data) {
     this->data := data;
-    STRING qrurl := this->callbacklistener->GetCallbackURL(data.options);
+    STRING qrurl := data.options.autoclose ? this->callbacklistener->GetCallbackURL(data.options.data) : data.url;
     OBJECT qrcode := CreateQRCode(qrurl, [ size := 500, correctlevel := "L" ]);
     BLOB qrpng := qrcode->ExportAsPalettedPNG(TRUE);
     RECORD qrdata := ScanBlob(qrpng, "qr.png");
@@ -577,6 +577,10 @@ PUBLIC OBJECTTYPE QRCallback EXTEND TolliumScreenBase <
     this->qrcode->width := qrdata.width || "px";
     this->qrcode->height := qrdata.height || "px";
     this->qrcode->SetImage(qrpng, "qr.png");
+
+    this->frame->title := data.options.title ?? this->frame->title;
+    this->description->value := data.options.description ?? this->description->value;
+    this->description->visible := this->description->value != "";
   }
 
   // ---------------------------------------------------------------------------
