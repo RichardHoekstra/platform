@@ -40,7 +40,7 @@ function generatebuildinfo() {
 
   ORIGIN="$(git -C "$WEBHARE_CHECKEDOUT_TO" config --get remote.origin.url | sed -E 's#(https://[^:/]+):[^@]+@#\1@#')"
 
-  BRANCH="${CI_COMMIT_BRANCH}"
+  BRANCH="${CI_COMMIT_REF_NAME}"
   [ -n "$BRANCH" ] || BRANCH="$(git -C "$WEBHARE_CHECKEDOUT_TO" rev-parse --abbrev-ref HEAD)"
 
   if [ -n "$WEBHARE_IN_DOCKER" ]; then

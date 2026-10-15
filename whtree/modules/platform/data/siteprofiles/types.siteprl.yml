@@ -356,7 +356,8 @@ types:
   ## SEO and other extended metadata used when publishing to the web
   web.metadata:
     clone: onDraft
-    comment: Extended metadata for web publishing. eg. seotitle, schema.org, ..
+    comment: Extended metadata for web publishing. eg. seotitle. Can be set for contentlinks
+    contentLink: true
     # TODO we still need to design and add schema.org support but it would appear here. likewise og:data things could appear here
     members:
       seoTitle:

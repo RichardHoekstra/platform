@@ -26,20 +26,30 @@ async function asyncRun(tests: TestList, options?: object) {
   let idx = 0;
 
   try {
+    let nextTestTitle = '';
     for (; idx < tests.length; ++idx) {
       const test = tests[idx];
       if (typeof test === "string") {
-        console.log(`Test: ${test}`);
+        nextTestTitle = test;
         continue;
       }
+
+      const testTitle = nextTestTitle || test.name;
+      const testName = `test ${idx + 1}/${tests.length}${testTitle ? `: ${testTitle}` : ""}`;
+      // console.log(`⏳ ${new Date().toISOString()} ${testName}`);
+      console.log(`---- ${new Date().toISOString()} --- ${testName} -------------`.padEnd(78, '-'));
+      const testStart = performance.now();
+
       try {
         const result = await test();
         if (typeof result !== "undefined") {
           // this may be accidentally passing a non test-function eg testing `() => myTest` instead of `() => myTest()`
           throw new Error(`Unexpected return value from test #${idx} (function ${test.name}). Make sure tests never return anything`);
         }
+        console.log(`✅ Success: ${testName} (${(performance.now() - testStart).toFixed(3)} ms)\n`);
       } catch (e) {
-        console.error(`Unexpected exception from test #${idx} (function ${test.name}):`, e);
+        console.log(`❌ Failed: ${testName} (${(performance.now() - testStart).toFixed(3)} ms)\n`);
+        console.error(e);
         await Promise.all(finalizers.map(finalizer => finalizer.onCatch?.())).catch(err => {
           console.error("Ignoring exception from finalizer onCatch:", err);
         });

@@ -49,6 +49,7 @@ BOOLEAN reduceverboseness;
 OBJECT jstestrunner;
 STRING ARRAY testtypes;
 STRING profiling; // "", "cov", "apr"
+INTEGER set_timeout;
 BOOLEAN jscoverage;
 RECORD parsedargs;
 BOOLEAN keepbrowser;
@@ -199,8 +200,8 @@ RECORD FUNCTION RunTest(RECORD testinfo, STRING testmask, BOOLEAN toplevel, STRI
         IF (tries != 0)
           MyPrint(FormatDateTime("[%H:%M:%S.%Q]", GetCurrentDateTime()) || " Retry failed flaky test " || testinfo.testname  || " (try " || tries + 1 || ")\n");
 
-        success := run_in_job ? WaitForPromise(RunTestJob(testinfo.testname, runner, testinfo.arguments, script, testinfo.xfail, testinfo.timeout, debugflags))
-                              : RunTestProcess(testinfo.testname, runner, arguments, script, testinfo.xfail, testinfo.env, testinfo.timeout, debugflags);
+        success := run_in_job ? WaitForPromise(RunTestJob(testinfo.testname, runner, testinfo.arguments, script, testinfo.xfail, set_timeout ?? testinfo.timeout, debugflags))
+                              : RunTestProcess(testinfo.testname, runner, arguments, script, testinfo.xfail, testinfo.env, set_timeout ?? testinfo.timeout, debugflags);
         IF (success OR NOT testinfo.flaky)
           BREAK;
       }
@@ -666,6 +667,7 @@ parsedargs := ParseArguments(GetConsoleArguments(),
                                     , [name := "alwayslog", type := "switch"]
                                     , [name := "terse", type := "switch"]
                                     , [name := "wasm", type := "switch"]
+                                    , [name := "timeout", type := "stringopt" ]
                                     , [name := "testlist", type := "paramlist" ]
                                     ]);
 
@@ -688,6 +690,8 @@ alwayslog := parsedargs.alwayslog;
 profiling := parsedargs.coverage ? "cov" : "";
 jscoverage := parsedargs.jscoverage;
 BOOLEAN looptests := parsedargs.loop OR parsedargs.untilfail;
+
+set_timeout := ToInteger(parsedargs.timeout, 0);
 
 STRING ARRAY requiretags, excludetags;
 FOREVERY(STRING tag FROM Tokenize(parsedargs.tag,','))

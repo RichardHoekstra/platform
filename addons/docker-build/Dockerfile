@@ -1,10 +1,8 @@
 ################# STAGE 0 - base image. shared between builder and runner
 FROM almalinux:10 AS base
-LABEL maintainer="WebHare bv <info@webhare.com>"
 
 # Depend on this setting to let builder.sh download the proper node
-ARG WEBHARE_NODE_MAJOR
-ARG WHBUILD_NODE_URL
+ARG WEBHARE_NODE_MAJOR WHBUILD_NODE_URL
 
 # Environment variables
 ENV LC_ALL=C \
@@ -191,16 +189,12 @@ ENTRYPOINT [ "/opt/container/entrypoint.sh" ]
 CMD [ "/opt/container/launch.sh" ]
 
 # Add a label with the commit SHA
-ARG CI_COMMIT_SHA
-ARG CI_COMMIT_REF_NAME
-ARG CI_PIPELINE_ID
-ARG CI_COMMIT_TIMESTAMP
-ARG WEBHARE_VERSION
-ARG WHBUILD_RUNNER
+ARG CI_COMMIT_SHA CI_COMMIT_REF_NAME CI_PIPELINE_ID CI_COMMIT_TIMESTAMP WEBHARE_VERSION WHBUILD_RUNNER
 
 LABEL com.webhare.webhare.git-commit-sha="$CI_COMMIT_SHA" \
       com.webhare.webhare.git-commit-ref="$CI_COMMIT_REF_NAME" \
       com.webhare.webhare.git-commit-time="$CI_COMMIT_TIMESTAMP" \
       com.webhare.webhare.pipelineid="$CI_PIPELINE_ID" \
       com.webhare.webhare.runner="$WHBUILD_RUNNER" \
-      com.webhare.webhare.version="$WEBHARE_VERSION"
+      com.webhare.webhare.version="$WEBHARE_VERSION" \
+      maintainer="WebHare bv <info@webhare.nl>"

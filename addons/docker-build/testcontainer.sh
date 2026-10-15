@@ -698,8 +698,8 @@ elif [ -n "$ISMODULETEST" ]; then
   # Get the current branch name of the module
   TESTINGMODULEBRANCH="$(git -C "$TESTINGMODULEDIR" rev-parse --abbrev-ref HEAD || true)"
   # For 'normal' ci builds, use the branch name from the CI environment
-  if [ -n "$CI_COMMIT_BRANCH" ]; then
-    TESTINGMODULEBRANCH="$CI_COMMIT_BRANCH"
+  if [ -n "$CI_COMMIT_REF_NAME" ]; then
+    TESTINGMODULEBRANCH="$CI_COMMIT_REF_NAME"
   fi
   # For automerge requests, use the target branch name
   if [[ "$TESTINGMODULEBRANCH" =~ ^automerge/[^/]+/(.+)$ ]]; then
