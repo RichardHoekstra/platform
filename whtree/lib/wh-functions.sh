@@ -258,6 +258,10 @@ trim()
     echo -n "$var"
 }
 
+function exists_origin_branch() {
+  git -C "$WEBHARE_CHECKEDOUT_TO" ls-remote  --exit-code --heads origin "$1"   # >/dev/null 2>&1
+}
+
 # Calculate the image tags for the build/test/deploy process
 # return
 #   BUILD_IMAGE name of the Webhare image
@@ -265,21 +269,13 @@ trim()
 #   PUBLIC_IMAGES image tags that will be deployed
 #   PUSH_BUILD_IMAGES if 1, push build and branch images
 # shellcheck disable=SC2120 # all parameters are optional
-get_finaltag()
+function get_finaltag()
 {
   BUILD_IMAGE=
   BRANCH_IMAGES=
   PUBLIC_IMAGES=
   PUSH_BUILD_IMAGES=
   LOCALTAG=devbuild
-
-  # loop while number of arguments isn't zero
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --devcontainer) LOCALTAG=developcontainer; shift;;
-      *) echo "Unknown argument $1" 1>&2; exit 1;;
-    esac
-  done
 
   local ADDTAGS
   getwebhareversion
@@ -315,12 +311,21 @@ get_finaltag()
     fi
 
     # When building 'main', also build the corresponding release-x-y tag
+    SUPPRESS_RELEASE_TAG=
     if [ "$CI_COMMIT_REF_NAME" == "main" ]; then
-      ADDTAGS="release-$(echo "$WEBHARE_VERSION" | cut -d. -f1)-$(echo "$WEBHARE_VERSION" | cut -d. -f2)"
+      RELEASEBRANCH="release/$(echo "$WEBHARE_VERSION" | cut -d. -f1,2)"
+      # Check if this branch exists at the origin
+      if ! exists_origin_branch "$RELEASEBRANCH" ; then # If the corresponding release branch doesn't exist, we act as release branch and push versioned images
+        RELEASEBRANCH="${RELEASEBRANCH//\//-}" # replace / with -
+        RELEASEBRANCH="${RELEASEBRANCH//./-}" # replace . with -
+        ADDTAGS="${RELEASEBRANCH}"
+      else
+        SUPPRESS_RELEASE_TAG=1 #Don't create a x.y.z tag either!
+      fi
     fi
 
     # When building 'main' or a 'release/', also tag by WebHare version# (eg 4.35.2)
-    if [ "$CI_COMMIT_REF_NAME" == "main" ] || [[ $CI_COMMIT_REF_NAME =~ ^release/ ]]; then #not a custom/feature build
+    if  { [ "$CI_COMMIT_REF_NAME" == "main" ] && [ -z "$SUPPRESS_RELEASE_TAG" ]; } || [[ $CI_COMMIT_REF_NAME =~ ^release/ ]]; then #not a custom/feature build
       ADDTAGS="$ADDTAGS ${VERSIONMAJOR}.${VERSIONMINOR}.${VERSIONPATCH}"
     fi
 

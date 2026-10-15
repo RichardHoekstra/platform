@@ -8,7 +8,6 @@ USEPODMAN=""
 NOPULL=""
 DEBUG=""
 ARCH=""
-FINALTAGARGS=()
 TARGETSTAGE="appimage"
 
 # shellcheck source=../../whtree/lib/wh-functions.sh
@@ -79,7 +78,7 @@ fi
 # Get WH and emscripten versions
 eval "$(addons/docker-build/get-build-vars.sh)"
 
-get_finaltag "${FINALTAGARGS[@]}"
+get_finaltag
 list_finaltag
 
 if [ -n "$USEPODMAN" ]; then
