@@ -18,7 +18,6 @@ export { importIntoWRDSchema } from "./import";
 export { WRDLegacySchema as WRDSchema, type WRDAttributeType, type WRDMetaType, type AnyWRDSchema };
 export type { WRDInsertable, WRDUpdatable, WRDSchemaTypeOf, WRDSchemaType };
 
-import type * as customizer from "@webhare/auth/src/customizer";
 import { parseModuleQualifiedName } from "@webhare/services/src/naming";
 import { getExtractedConfig } from "@mod-system/js/internal/configuration";
 import { parseSchema, wrd_baseschemaresource } from "./schemaparser";
@@ -35,17 +34,6 @@ import type { } from "wh:ts/wrd.ts";
 export interface WRDSchemaLike {
   "*": AnySchemaType;
 }
-
-/** @deprecated WH5.7 splits the WRDAuthCustomizer off to \@webhare/auth and renames it to AuthCustomizer - please use that library instead */
-export type WRDAuthCustomizer = customizer.AuthCustomizer;
-/** @deprecated WH5.7 splits the WRDAuthCustomizer & friends off to \@webhare/auth - please use that library instead */
-export type LookupUsernameParameters = customizer.LookupUsernameParameters;
-/** @deprecated WH5.7 splits the WRDAuthCustomizer & friends off to \@webhare/auth - please use that library instead */
-export type OpenIdRequestParameters = customizer.OpenIdRequestParameters;
-/** @deprecated WH5.7 splits the WRDAuthCustomizer & friends off to \@webhare/auth - please use that library instead */
-export type JWTPayload = customizer.JWTPayload;
-/** @deprecated WH5.7 splits the WRDAuthCustomizer & friends off to \@webhare/auth - please use that library instead */
-export type ReportedUserInfo = customizer.ReportedUserInfo;
 
 export interface DescribedEntity {
   /** Entity's tag */

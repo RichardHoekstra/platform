@@ -1548,16 +1548,7 @@ PUBLIC RECORD FUNCTION TestInvoke_SetupForTestSetup(RECORD options DEFAULTSTO DE
   options := ValidateOptions([ createsysop := FALSE
                              , preprtd := FALSE
                              , prepmodule := FALSE
-                             , onpeerserver := FALSE
                              ], options);
-
-  IF(options.onpeerserver)
-  {
-    OpenPrimary();
-    STRING peerserver := ReadRegistryKey("webhare_testsuite.tests.secondhareinterface");
-    STRING testtoken := ReadRegistryKey("webhare_testsuite.tests.secondharetesttoken");
-    RETURN CallJSONRPC(ResolveToAbsoluteURL(peerserver,"/wh_services/system/jstests"), "invoke", testtoken, Resolve("#SetupForTestSetup"), VARIANT[CELL[ ...options, DELETE onpeerserver ]]);
-  }
 
   RECORD testfwoptions := [ testusers := RECORD[]
                           , wrdauth := TRUE
@@ -1573,7 +1564,6 @@ PUBLIC RECORD FUNCTION TestInvoke_SetupForTestSetup(RECORD options DEFAULTSTO DE
                    , testportalurl := GetTestTolliumPortalURL()
                    , rtdid         := 0
                    , alternatesite := ""
-                   , peerserver    := ReadRegistryKey("webhare_testsuite.tests.secondhareinterface")
                    , links := CELL[]
                    ];
 

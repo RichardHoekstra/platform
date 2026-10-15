@@ -5,6 +5,7 @@ import { WebHareBlob } from "@webhare/services";
 import type { TransferListItem } from "worker_threads";
 import { encodeString, generateRandomId, stringify } from "@webhare/std";
 import type { RPCResponse } from "@webhare/rpc/src/rpc";
+import { isLitty, littyToString, type Litty } from "@webhare/litty";
 
 export const HTTPErrorCode = {
   BadRequest: 400,
@@ -169,7 +170,17 @@ export function createWebResponseFromTransferData(data: WebResponseForTransfer):
  * @param body - The body to return.
  * @param options - Optional statuscode and headers
  */
-export function createWebResponse(body: string | ArrayBuffer | Blob | ReadableStream<Uint8Array> | undefined, options?: { status?: number; headers?: Record<string, string> | Array<[string, string]> | Headers }): WebResponse {
+export function createWebResponse(body: string | ArrayBuffer | Blob | ReadableStream<Uint8Array> | undefined | Litty, options?: { status?: number; headers?: Record<string, string> | Array<[string, string]> | Headers }): WebResponse {
+  if (isLitty(body)) {
+    const littyBody = body;
+    body = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(new TextEncoder().encode(await littyToString(littyBody)));
+        controller.close();
+      }
+    });
+  }
+
   const headers = new Headers(options?.headers);
   if (!headers.get("content-type") && body !== undefined)
     headers.set("content-type", body instanceof ArrayBuffer ? "application/octet-stream" : "text/html;charset=utf-8");

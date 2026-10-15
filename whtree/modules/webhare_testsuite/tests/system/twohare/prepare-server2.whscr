@@ -37,6 +37,5 @@ IF(beta_sysop = 0)
   sysopobj->UpdateGrant("grant", "system:sysop", 0, sysopobj, [ allowselfassignment := TRUE, withgrantoption := TRUE, comment := "Granted by WebHare during initial setup" ]);
 }
 
-OpenSiteByName("WebHare backend")->UpdateSiteMetadata([webfeatures := ["webhare_testsuite:insecure_interface"] ]);
 
 GetPrimary()->CommitWork();

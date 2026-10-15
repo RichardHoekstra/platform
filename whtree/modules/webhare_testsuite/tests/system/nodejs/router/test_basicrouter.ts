@@ -1,12 +1,13 @@
 import * as test from "@mod-webhare_testsuite/js/wts-backend.ts";
 import * as services from "@webhare/services";
-import { createRedirectResponse, getAssetPackIntegrationCode } from "@webhare/router";
+import { createRedirectResponse, createWebResponse, getAssetPackIntegrationCode } from "@webhare/router";
 import { coreWebHareRouter } from "@webhare/router/src/corerouter";
 import { decodeHSON } from "@webhare/hscompat/src/hscompat";
 import { IncomingWebRequest, newForwardedWebRequest, newWebRequestFromInfo } from "@webhare/router/src/request";
 import type { WebRequestInfo } from "@mod-system/js/internal/types";
 import { listLocks } from "@mod-platform/js/bridge/tools";
 import { generateRandomId } from "@webhare/std";
+import { litty } from "@webhare/litty";
 
 interface GetRequestDataResponse {
   method: string;
@@ -75,6 +76,11 @@ function testWebRequest() {
   test.eq("Spicy", searchParams3.get("hungry4"));
   test.eq(services.backendConfig.backendURL + "sub%20URL/dir/", req3.baseURL);
   test.eq("f", req3.localPath);
+}
+
+async function testWebResponse() {
+  const littyResponse = createWebResponse(litty`<html><p>Hello ${"<b>world</b>"}</p></html>`);
+  test.eq(`<html><p>Hello &lt;b&gt;world&lt;/b&gt;</p></html>`, await littyResponse.text());
 }
 
 async function testHSWebserver() {
@@ -233,6 +239,7 @@ async function testRequestSeparation() {
 test.runTests([
   testRouterAPIs,
   testWebRequest,
+  testWebResponse,
   testHSWebserver,
   testJSBackedURLs,
   testRequestSeparation
