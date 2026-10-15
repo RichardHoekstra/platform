@@ -150,7 +150,7 @@ async function testPageMetadata() {
 
      doc1-clink3 - points to doc1
      - seoTitle: Doc1 Clink3 Seo
-     - pageHeaeding: Doc1 Clink3 PH
+     - pageHeading: Doc1 Clink3 PH
 
      doc2:
      - title: (empty, falls back to folder title)

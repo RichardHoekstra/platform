@@ -44,7 +44,7 @@ async function asyncRun(tests: TestList, options?: object) {
         const result = await test();
         if (typeof result !== "undefined") {
           // this may be accidentally passing a non test-function eg testing `() => myTest` instead of `() => myTest()`
-          throw new Error(`Unexpected return value from test #${idx} (function ${test.name}).Make sure tests never return anything`);
+          throw new Error(`Unexpected return value from test #${idx} (function ${test.name}). Make sure tests never return anything`);
         }
         console.log(`✅ Success: ${testName} (${(performance.now() - testStart).toFixed(3)} ms)\n`);
       } catch (e) {

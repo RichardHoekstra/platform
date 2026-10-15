@@ -217,7 +217,7 @@ export class CPageRequest {
     const seoSettings = {
       //We always use the target's web.config, no need to look that up
       ...await this.getInstance("platform:web.config", { source: "target" }),
-      //Metadata is workflowed. but contentlinks take it from the target object
+      //Metadata is workflowed, but contentlinks take it from the target object
       ...await this.getInstance("platform:web.metadata"),
     };
 
