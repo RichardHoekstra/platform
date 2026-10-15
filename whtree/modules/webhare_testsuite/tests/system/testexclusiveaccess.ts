@@ -215,7 +215,7 @@ test.runTests(
 
       await test.invoke("mod::webhare_testsuite/webdesigns/basetest/pages/exclusiveaccesstest/exclusiveaccesstest.whlib#Resume");
       await test.wait(() => test.qR("#status").textContent === "Got lock");
-      test.assert(!test.qS('html.dompack--busymodal'));
+      await test.waitForUI();
       test.click("#releaselock");
       test.assert(test.qR("#status").textContent !== "Lock not taken");
     }
