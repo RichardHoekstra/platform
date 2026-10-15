@@ -217,13 +217,9 @@ export class CPageRequest {
     const seoSettings = {
       //We always use the target's web.config, no need to look that up
       ...await this.getInstance("platform:web.config", { source: "target" }),
-      //Metadata is workflowed. But for a contentlink some properties have to come from the target object
+      //Metadata is workflowed. but contentlinks take it from the target object
       ...await this.getInstance("platform:web.metadata"),
     };
-    if (this.isLinkedContent) {
-      const targetMetadata = await this.getInstance("platform:web.metadata", { source: "target" });
-      seoSettings.seoTitle = targetMetadata.seoTitle;
-    }
 
     //base title for meta-title and pageHeading. folder title is a reasonable fallback for indexdocs but not for other files to prevent dupe titles
     const isIndex = this.targetFolder.indexDoc === this.targetObject.id;
