@@ -378,6 +378,7 @@ async function testUnique() {
   test.eq(null, await wrdschema.search("testUniques", "testFree", "A8E64800-9854-4cf1-a7be-49ac3f6d380a", { matchCase: true }));
   test.eq(pietje, await wrdschema.search("testUniques", "testFree", "A8E64800-9854-4cf1-a7be-49ac3f6d380a", { matchCase: false }));
   test.eq({ wrdId: pietje }, await wrdschema.query("testUniques").select(["wrdId"]).where("testFree", "=", "A8E64800-9854-4cf1-a7be-49ac3f6d380a", { matchCase: false }).executeRequireExactlyOne());
+  test.eq({ wrdId: pietje }, await wrdschema.getFields("testUniques", { testFree: "a8e64800-9854-4cf1-a7be-49ac3f6d380a" }, ["wrdId"]));
 
   await whdb.commitWork();
 
