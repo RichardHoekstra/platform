@@ -1,9 +1,7 @@
 ﻿<?wh
 
-LOADLIB "mod::system/lib/configure.whlib";
 LOADLIB "mod::system/lib/database.whlib";
 LOADLIB "mod::system/lib/virtualfs/base.whlib";
-LOADLIB "mod::system/lib/virtualfs/diskfolder.whlib";
 LOADLIB "mod::system/lib/virtualfs/modular.whlib";
 LOADLIB "mod::system/lib/internal/virtualfs/modules.whlib";
 LOADLIB "mod::system/lib/internal/virtualfs/logs.whlib";
@@ -28,12 +26,6 @@ PUBLIC OBJECTTYPE SystemFS EXTEND VirtualModularFSBase
           THROW NEW VirtualFSException("BADPATH", "No such data path");
         RETURN NEW LogsFS();
       }
-    CASE "installedfonts"
-      {
-        IF (NOT GetEffectiveUser()->HasRight("system:sysop"))
-          THROW NEW VirtualFSException("BADPATH", "No such data path");
-        RETURN NEW DiskFolderFS(GetWebHareConfiguration().varroot || "fonts", TRUE, FALSE);
-      }
     }
 
     THROW NEW VirtualFSException("BADPATH", "No such data path");
@@ -49,10 +41,6 @@ PUBLIC OBJECTTYPE SystemFS EXTEND VirtualModularFSBase
           , write :=  has_sysop
           ]
         , [ name :=   "logs"
-          , read :=   has_sysop
-          , write :=  has_sysop
-          ]
-        , [ name :=   "installedfonts"
           , read :=   has_sysop
           , write :=  has_sysop
           ]

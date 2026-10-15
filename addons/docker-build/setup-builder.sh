@@ -12,7 +12,6 @@
 # Packages not needed for building: curl strace wget
 # TODO - createrepo can go if we don't need WH1 to build repositories anymore
 # stunnel: some modules use it for connectivity. must be a stunnel version with PSK support
-# liberation-fonts: fonts that look like Arial, Times New Roman, Courier New
 
 # Fail on any error
 set -eo pipefail
@@ -38,7 +37,6 @@ PACKAGES=(
   automake
   autoconf
   ccache
-  freetype-devel
   gcc-c++
   giflib-devel
   git

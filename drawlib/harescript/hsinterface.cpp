@@ -12,10 +12,7 @@ namespace DrawLibInterface_v2
 {
 using namespace DrawLib;
 
-typedef std::shared_ptr<FontInfo>   FontInfoPtr;
-
 typedef uint32_t DrawID;
-typedef int32_t FontID;
 
 const unsigned DrawlibContextId = 7; //reserved number for drawlib. DO NOT CHANGE!!!
 
@@ -51,8 +48,6 @@ public:
         int32_t ResizeDrawObject                   (DrawID id, uint32_t newwidth, uint32_t newheight, bool fast);
         CountResult CountDrawObjectColors       (DrawID id, unsigned minimum_alpha);
 
-        void ClearDrawObject                    (DrawID id, DrawLib::Pixel32 color);
-
         //set options
         void SetAlphaMode              (DrawID id, uint32_t mode);
         void SetBinaryMode             (DrawID id, uint32_t mode);
@@ -71,8 +66,6 @@ public:
         //get options
         uint32_t  GetWidth (DrawID id);
         uint32_t  GetHeight(DrawID id);
-        uint32_t  GetTextWidth (FontID fid, std::string &text);
-        uint32_t  GetTextHeight(FontID fid, std::string &text);
         uint32_t  GetAlphaMode(DrawID id);
         uint32_t  GetBinaryMode(DrawID id);
         uint32_t  GetPixel(DrawID id, double x, double y);
@@ -90,28 +83,12 @@ public:
         void DrawRectangle     (DrawID id, double sx, double sy, double ex, double ey, bool outline);
         void StrokeFillPath          (DrawID id, DrawLib::Path const &path, bool stroke, bool fill);
 
-        void DrawText          (DrawID id, FontID fid, double basex, double basey, std::string const & text);
-
-        //TEXT STUFF HERE.....
-
-        ///Create a new font. If the font doesn't exist.. tough.. no errors (yet)
-        FontID CreateFont        (const std::string &fontname, const std::string &fontstyle, uint32_t pointsize);
-
-
-        void   SetFontColor      (FontID fid, DrawLib::Pixel32 color);
-        void   SetFontSize       (FontID fid, uint32_t size);
-        void   SetFontLetterSpacing(FontID id, double spacing);
-        void   SetFontAlignment  (FontID fid, uint32_t horizontal, uint32_t vertical);
-        void   SetFontOrientation(FontID fid, signed base      , signed glyph);
-        void   SetFontRenderMode (FontID fid, uint32_t rendertype); ///1 -> antialiased, ==0 -> no antialiasing!
-
         ///Comparing bitmaps for testing purposes
         double CompareCanvases(DrawID id1, DrawID id2);
         DrawID CreateDifferenceCanvas(DrawID id1, DrawID id2);
 
         ///Destroy an object... for powerusers only :)
         void DestroyDrawObject (DrawID id);
-        void DestroyFont       (FontID id);
 
         // Bitmap filters...
         void BlurCanvas        (DrawID id, int xsize, int ysize);
@@ -122,11 +99,7 @@ public:
         void MultiplyCanvas    (DrawID id1, DrawID id2);
         void ApplyColorMapping (DrawID id, DrawLib::ColorMapping &colormap);
 
-        //FIXME: Unnecessary copying of getdrawinfo etc.. Unsafe reference passing..
-        FontInfoPtr& GetFontInfo(FontID fid);
-
         int32_t ValidateDrawId(DrawID id) const;
-        int32_t ValidateFontId(FontID id) const;
 
         void CalculateKMeansQuantizedPalette(DrawID id, uint32_t clustercount, uint8_t minimum_alpha, int32_t max_iters, float initialpoint, std::vector< Pixel32 > *result);
 
@@ -136,8 +109,6 @@ public:
 
         ///1-based drawinfo list
         std::vector<DrawInfo const *> drawinfos;
-        private:
-        std::vector<FontInfoPtr> fontinfolist;
 };
 
 DrawlibInterfaceState::DrawlibInterfaceState()
@@ -182,13 +153,6 @@ int32_t DrawlibInterfaceState::ValidateDrawId(DrawID id) const
         return 0; //ok
 }
 
-int32_t DrawlibInterfaceState::ValidateFontId(FontID id) const
-{
-        if (id <= 0x00010000L || unsigned(id - 0x00010000L) > fontinfolist.size() )
-            return -1;
-
-        return 0; //ok
-}
 DrawInfo const& DrawlibInterfaceState::GetDrawInfoForRead(DrawID id) const
 {
         if (id<=0 || id > drawinfos.size() || !drawinfos[id-1])
@@ -345,15 +309,6 @@ DrawID  DrawlibInterfaceState::CreateResizedDrawObjectFromFile (Blex::RandomStre
         }
 }
 
-
-void   DrawlibInterfaceState::ClearDrawObject(DrawID id, DrawLib::Pixel32 color)
-{
-        DrawInfo& drawinfo = GetDrawInfoForWrite(id);
-
-        DrawLib::Scanline32 filler(drawinfo.GetBitmap().GetWidth(), true, color);
-        for (unsigned i=0;i < drawinfo.GetBitmap().GetHeight(); ++i)
-            drawinfo.GetBitmap().SetScanline32(i, filler);
-}
 
 int32_t   DrawlibInterfaceState::RotateDrawObject(DrawID id, bool rotate_right)
 {
@@ -577,20 +532,6 @@ uint32_t DrawlibInterfaceState::GetHeight(DrawID id)
         return drawinfo.GetDrawObject().GetCanvas()->GetHeight();
 }
 
-FontInfoPtr& DrawlibInterfaceState::GetFontInfo(FontID id)
-{
-        // font handles start at 0x00010000 HEX!  (maak daar dan een constante van!)
-        uint32_t index = id - 0x00010000;
-
-        if (index<=0 || index>fontinfolist.size())
-            throw std::runtime_error("Drawlib: Font handle out of legal range");
-
-        if (fontinfolist[index-1]==NULL)
-            throw std::runtime_error("Drawlib: Canvas already closed");
-
-        return fontinfolist[index-1];
-}
-
 DrawID DrawlibInterfaceState::CreateDuplicateDrawObject(DrawID id)
 {
         DrawInfo const& drawinfo = GetDrawInfoForRead(id);
@@ -708,163 +649,11 @@ void DrawlibInterfaceState::DrawRectangle (DrawID id, double sx, double sy, doub
                 GetDrawInfoForWrite(id).GetDrawObject().DrawRectangle(upper_left,lower_right);
 }
 
-void DrawlibInterfaceState::DrawText  (DrawID id, FontID fid, double basex, double basey, std::string const & text)
-{
-        FontInfoPtr fontptr = GetFontInfo(fid);
-        DrawInfo& drawinfo = GetDrawInfoForWrite(id);
-
-        DrawLib::FPPoint basepoint(basex,basey);
-
-
-        Blex::UnicodeString unicode_text;
-        Blex::UTF8Decode(reinterpret_cast<const uint8_t*>(&text[0]),reinterpret_cast<const uint8_t*>(&text[text.size()]), std::back_inserter(unicode_text));
-        std::vector<double> deltas; // dummy var!
-        drawinfo.GetDrawObject().DrawTextExtended(
-                basepoint,
-                unicode_text ,
-                *(fontptr->font.get()),
-                deltas,
-                (fontptr->rendermode==1),
-                fontptr->horizontal_alignment,
-                fontptr->vertical_alignment,
-                fontptr->baseline_angle,
-                fontptr->glyph_angle,
-                fontptr->letterspacing
-                );
-
-        //FIXME: NOT IMPLEMENTED YET
-//        GetDrawInfoForWrite(id).GetDrawObject().DrawString(basex, basey, text.c_str());
-}
-
-FontID DrawlibInterfaceState::CreateFont(const std::string &fontname, const std::string &fontstyle, uint32_t pointsize)
-{
-        //ADDME Why print the old ID?
-        DEBUGPRINT(fontinfolist.size() + 0x00010000L+1);
-
-        //FIXME: check for NULL font somewhere! maybe in FontInfo()??
-        FontInfoPtr newfontinfo(new FontInfo(fontname,fontstyle)); //create a new fontinfo-object and a pointer to it.
-
-        if (newfontinfo.get()->font.get()==NULL)
-                return -1;
-
-        fontinfolist.push_back(newfontinfo);
-
-        DrawLib::FPSize size(pointsize, pointsize);
-        newfontinfo->font->SetSize(size);
-
-        return (fontinfolist.size()+ 0x00010000L); //fontlist is 1+offset - based, so this is correct
-}
-
-void DrawlibInterfaceState::DestroyFont(FontID id)
-{
-        uint32_t index = id -0x00010000L;
-        if ((index>0) && (index<=fontinfolist.size()))
-                fontinfolist[(index-1)].reset();
-        DEBUGPRINT("DestroyFont called");
-}
-
-
 void DrawlibInterfaceState::DestroyDrawObject(DrawID id)
 {
         GetDrawInfoForRead(id).DelRef();
         drawinfos[id-1] = NULL;
         DEBUGPRINT("DestroyDrawObject called");
-}
-
-/********************************************************************************
-* Font functions
-*
-********************************************************************************/
-void   DrawlibInterfaceState::SetFontColor(FontID id, DrawLib::Pixel32 color)
-{
-        FontInfoPtr fip = GetFontInfo (  id );
-        fip->font->SetColor(color);
-}
-
-void   DrawlibInterfaceState::SetFontSize(FontID id, uint32_t size)
-{
-        FontInfoPtr fip = GetFontInfo (  id );
-        fip->font->SetISize(DrawLib::ISize(size,size));
-}
-
-void   DrawlibInterfaceState::SetFontLetterSpacing(FontID id, double spacing)
-{
-        FontInfoPtr fip = GetFontInfo (  id );
-        fip->letterspacing = spacing;
-}
-
-void   DrawlibInterfaceState::SetFontAlignment(FontID id, uint32_t hor, uint32_t ver)
-{
-        FontInfoPtr fip = GetFontInfo (  id );
-        fip->horizontal_alignment = DrawLib::TextRenderer::HorizontalAlignment(hor);
-        fip->vertical_alignment   = DrawLib::TextRenderer::VerticalAlignment(ver);
-}
-
-void   DrawlibInterfaceState::SetFontOrientation(FontID id, signed base, signed glyph)
-{
-        FontInfoPtr fip = GetFontInfo (  id );
-        fip->baseline_angle = base;
-        fip->glyph_angle    = glyph;
-}
-
-void   DrawlibInterfaceState::SetFontRenderMode(FontID id, uint32_t mode)
-{ //mode is guaranteed 0 or 1.
-        FontInfoPtr fip = GetFontInfo (  id );
-        fip->rendermode = mode;
-}
-
-uint32_t   DrawlibInterfaceState::GetTextWidth(FontID fid, std::string &text)
-{
-        FontInfoPtr fptr = GetFontInfo(fid);
-
-        if (fptr->font.get()==NULL)
-                throw(std::runtime_error("GetTextWidth tried to reference NULL font."));
-
-        DrawLib::TextRenderer renderer;
-
-        Blex::UnicodeString unicode_text;
-        Blex::UTF8Decode(reinterpret_cast<const uint8_t*>(&text[0]),reinterpret_cast<const uint8_t*>(&text[text.size()]), std::back_inserter(unicode_text));
-        std::vector<double> deltas;      // dummy
-        DrawLib::FPBoundingBox bbox = renderer.CalculateBoundingBox(unicode_text,
-                DrawLib::FPPoint(0,0),
-                *(fptr->font.get()),
-                deltas,
-                (fptr->rendermode==1),
-                fptr->baseline_angle,
-                fptr->glyph_angle,
-                (DrawLib::TextRenderer::HorizontalAlignment)fptr->horizontal_alignment,
-                (DrawLib::TextRenderer::VerticalAlignment)fptr->vertical_alignment,
-                fptr->letterspacing);
-
-        return static_cast<uint32_t>(bbox.lower_right.x - bbox.upper_left.x);
-}
-
-
-
-uint32_t   DrawlibInterfaceState::GetTextHeight(FontID fid, std::string &text)
-{
-        FontInfoPtr fptr = GetFontInfo(fid);
-
-        if (fptr->font.get()==NULL)
-                throw(std::runtime_error("GetTextHeight tried to reference NULL font."));
-
-        DrawLib::TextRenderer renderer;
-
-        Blex::UnicodeString unicode_text;
-        Blex::UTF8Decode(reinterpret_cast<const uint8_t*>(&text[0]),reinterpret_cast<const uint8_t*>(&text[text.size()]), std::back_inserter(unicode_text));
-        std::vector<double> deltas;      // dummy
-        DrawLib::FPBoundingBox bbox = renderer.CalculateBoundingBox(unicode_text,
-                DrawLib::FPPoint(0,0),
-                *(fptr->font.get()),
-                deltas,
-                (fptr->rendermode==1),
-                fptr->baseline_angle,
-                fptr->glyph_angle,
-                (DrawLib::TextRenderer::HorizontalAlignment)fptr->horizontal_alignment,
-                (DrawLib::TextRenderer::VerticalAlignment)fptr->vertical_alignment,
-                fptr->letterspacing);
-
-        return static_cast<uint32_t>(bbox.lower_right.y - bbox.upper_left.y);
 }
 
 void    DrawlibInterfaceState::BlurCanvas(DrawID cid, int xsize, int ysize)
@@ -939,16 +728,6 @@ void  DLv2_ValidateDrawId(HSVM *vm, HSVM_VariableId id_set)
         OPEN_WRAPPER
 
         int32_t returncode = context->ValidateDrawId(HSVM_IntegerGet(vm,HSVM_Arg(0)));
-        HSVM_IntegerSet(vm,id_set,returncode);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_ValidateFontId(HSVM *vm, HSVM_VariableId id_set)
-{
-        OPEN_WRAPPER
-
-        int32_t returncode = context->ValidateFontId(HSVM_IntegerGet(vm,HSVM_Arg(0)));
         HSVM_IntegerSet(vm,id_set,returncode);
 
         CLOSE_WRAPPER
@@ -1371,187 +1150,6 @@ void  DLv2_DrawCanvas(HSVM *vm)
         CLOSE_WRAPPER
 }
 
-void  DLv2_ClearCanvas(HSVM *vm)
-{
-        OPEN_WRAPPER
-
-        DrawID id                       =  HSVM_IntegerGet(vm,HSVM_Arg(0));
-        DrawLib::Pixel32 packedcolor = HStoDrawlibPixel(HSVM_IntegerGet(vm,HSVM_Arg(1)));
-
-        context->ClearDrawObject(id, packedcolor);
-
-        CLOSE_WRAPPER
-}
-
-
-void  DLv2_CreateFont(HSVM *vm, HSVM_VariableId id_set)
-{
-        OPEN_WRAPPER
-
-        std::string fontname    = HSVM_StringGetSTD(vm,HSVM_Arg(0));
-        std::string fontstyle   = HSVM_StringGetSTD(vm,HSVM_Arg(1));
-
-        uint32_t fontsize            = HSVM_IntegerGet(vm,HSVM_Arg(2));
-
-        FontID fid = context->CreateFont(fontname,fontstyle, fontsize);
-
-        HSVM_IntegerSet(vm,id_set,fid);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_GetAvailableFonts(HSVM *vm, HSVM_VariableId id_set)
-{
-        OPEN_WRAPPER
-        (void)context;// no unused variable warning
-
-        std::vector<DrawLib::FontManager::FontItem> fonts;
-        DrawLib::GetGlobalFontManager().GetFontList(&fonts);
-
-        HSVM_SetDefault(vm, id_set, HSVM_VAR_RecordArray);
-
-        HSVM_ColumnId col_family = HSVM_GetColumnId(vm, "FAMILY");
-        HSVM_ColumnId col_style = HSVM_GetColumnId(vm, "STYLE");
-        HSVM_ColumnId col_filename = HSVM_GetColumnId(vm, "FILENAME");
-        HSVM_ColumnId col_istruetype = HSVM_GetColumnId(vm, "ISTRUETYPE");
-        HSVM_ColumnId col_isbold = HSVM_GetColumnId(vm, "ISBOLD");
-        HSVM_ColumnId col_isitalic = HSVM_GetColumnId(vm, "ISITALIC");
-
-        for (unsigned i=0;i<fonts.size();++i)
-        {
-                DrawLib::FontManager::FontItem &font = fonts[i];
-                HSVM_VariableId newrec = HSVM_ArrayAppend(vm, id_set);
-
-                HSVM_StringSetSTD(vm, HSVM_RecordCreate(vm, newrec, col_family), font.fontfamily);
-                HSVM_StringSetSTD(vm, HSVM_RecordCreate(vm, newrec, col_style), font.fontstyle);
-                HSVM_StringSetSTD(vm, HSVM_RecordCreate(vm, newrec, col_filename), font.fullpath);
-                HSVM_BooleanSet(vm, HSVM_RecordCreate(vm, newrec, col_istruetype), font.isTrueType);
-                HSVM_BooleanSet(vm, HSVM_RecordCreate(vm, newrec, col_isbold), font.bold);
-                HSVM_BooleanSet(vm, HSVM_RecordCreate(vm, newrec, col_isitalic), font.italic);
-        }
-
-        CLOSE_WRAPPER
-}
-
-
-void  DLv2_DrawText(HSVM *vm)
-{
-        OPEN_WRAPPER
-
-        int32_t canvashandle = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        int32_t fonthandle   = HSVM_IntegerGet(vm,HSVM_Arg(1));
-        int32_t xpos = HSVM_IntegerGet(vm,HSVM_Arg(2));
-        int32_t ypos = HSVM_IntegerGet(vm,HSVM_Arg(3));
-        std::string text = HSVM_StringGetSTD(vm,HSVM_Arg(4));
-        context->DrawText(canvashandle, fonthandle, xpos, ypos, text);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_GetTextWidth(HSVM *vm, HSVM_VariableId id_set)
-{
-        OPEN_WRAPPER
-
-        FontID fid = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        std::string text = HSVM_StringGetSTD(vm,HSVM_Arg(1));
-
-        uint32_t width = context->GetTextWidth(fid, text);
-        HSVM_IntegerSet(vm,id_set,width);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_GetTextHeight(HSVM *vm, HSVM_VariableId id_set)
-{
-        OPEN_WRAPPER
-
-        FontID fid = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        std::string text = HSVM_StringGetSTD(vm,HSVM_Arg(1));
-
-        uint32_t height = context->GetTextHeight(fid, text);
-        HSVM_IntegerSet(vm,id_set,height);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_SetFontAntiAliasMode(HSVM *vm)
-{
-        OPEN_WRAPPER
-
-        FontID  fid    = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        int32_t rendertype = HSVM_IntegerGet(vm,HSVM_Arg(1));
-
-        if ((rendertype<0) || (rendertype>1))
-            throw std::runtime_error("Drawlib: Invalid font render mode");
-
-        context->SetFontRenderMode(fid, rendertype);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_SetFontSize(HSVM *vm)
-{
-        OPEN_WRAPPER
-
-        FontID fid = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        uint32_t size   = HSVM_IntegerGet(vm,HSVM_Arg(1));
-
-        context->SetFontSize(fid, size);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_SetFontLetterSpacing(HSVM *vm)
-{
-        OPEN_WRAPPER
-
-        FontID fid = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        float size   = HSVM_FloatGet(vm,HSVM_Arg(1));
-
-        context->SetFontLetterSpacing(fid, size);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_SetFontColor(HSVM *vm)
-{
-        OPEN_WRAPPER
-
-        FontID fid = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        DrawLib::Pixel32 packedcolor = HStoDrawlibPixel(HSVM_IntegerGet(vm,HSVM_Arg(1)));
-
-        context->SetFontColor(fid, packedcolor);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_SetFontAlignment(HSVM *vm)
-{
-        OPEN_WRAPPER
-
-        FontID fid = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        uint32_t hor    = HSVM_IntegerGet(vm,HSVM_Arg(1));
-        uint32_t ver    = HSVM_IntegerGet(vm,HSVM_Arg(2));
-
-        context->SetFontAlignment(fid, hor, ver);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_SetFontOrientation(HSVM *vm)
-{
-        OPEN_WRAPPER
-
-        FontID fid   = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        uint32_t baseline = HSVM_IntegerGet(vm,HSVM_Arg(1));
-        uint32_t glyph    = HSVM_IntegerGet(vm,HSVM_Arg(2));
-
-        context->SetFontOrientation(fid, baseline, glyph);
-
-        CLOSE_WRAPPER
-}
-
-
 ///\todo Do all the loading functions really need bufferedstreams?
 ///\bug Properly handle 0-byte files and I/O errors
 ///\bug Handle file data errors (what happens now? exceptions?)
@@ -1810,15 +1408,6 @@ void  DLv2_DestroyCanvas(HSVM *vm)
         OPEN_WRAPPER
         DrawID id  = HSVM_IntegerGet(vm,HSVM_Arg(0));
         context->DestroyDrawObject(id);
-
-        CLOSE_WRAPPER
-}
-
-void  DLv2_DestroyFont(HSVM *vm)
-{
-        OPEN_WRAPPER
-        FontID id  = HSVM_IntegerGet(vm,HSVM_Arg(0));
-        context->DestroyFont(id);
 
         CLOSE_WRAPPER
 }
@@ -2185,11 +1774,6 @@ BLEXLIB_PUBLIC void HSDRAWLIBINTERFACE_DestroyDrawObject(HSVM *vm, DrawID drawid
 }
 
 
-BLEXLIB_PUBLIC void HSDRAWLIBINTERFACE_AddFontDir(const char *fontdirname)
-{
-        DrawLib::GetGlobalFontManager().AddFontDirectory(fontdirname);
-}
-
 static void* CreateContext(void *)
 {
         return new DrawlibInterfaceState;
@@ -2199,21 +1783,12 @@ static void DestroyContext(void*, void *context_ptr)
         delete static_cast<DrawlibInterfaceState*>(context_ptr);
 }
 
-static void DrawlibSoftResetHandler()
-{
-        DEBUGPRINT("*** DrawlibSoftResetHandler invoked");
-        DrawLib::GetGlobalFontManager().ForceRescan();
-}
-
 } //end extern "C"
 
 extern "C" BLEXLIB_PUBLIC int HSVM_ModuleEntryPoint(HSVM_RegData *regdata, void*)
 {
-        HSVM_RegisterSoftResetCallback(regdata, &DrawlibSoftResetHandler);
-
         HSVM_RegisterContext (regdata, DrawlibContextId, NULL, &CreateContext, &DestroyContext);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_VALIDATEDRAWID:WHMOD_GRAPHICS:I:I",DLv2_ValidateDrawId);
-        HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_VALIDATEFONTID:WHMOD_GRAPHICS:I:I",DLv2_ValidateFontId);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_MAKECANVAS:WHMOD_GRAPHICS:I:III",DLv2_MakeCanvas);
         HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_EASTEREGG:WHMOD_GRAPHICS::I", DLv2_EasterEgg);
 
@@ -2229,17 +1804,6 @@ extern "C" BLEXLIB_PUBLIC int HSVM_ModuleEntryPoint(HSVM_RegData *regdata, void*
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_GETPIXEL:WHMOD_GRAPHICS:I:III",DLv2_GetPixel);
         HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_DRAWPATH:WHMOD_GRAPHICS::IRABBFA",DLv2_DrawPath);
         HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_DRAWCANVAS:WHMOD_GRAPHICS::IIII", DLv2_DrawCanvas);
-        HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_DRAWTEXT:WHMOD_GRAPHICS::IIIIS",DLv2_DrawText);
-
-        HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_MAKEFONT:WHMOD_GRAPHICS:I:SSI",DLv2_CreateFont);
-        HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_GETAVAILABLEFONTS:WHMOD_GRAPHICS:RA:",DLv2_GetAvailableFonts);
-        HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_SETFONTCOLOR:WHMOD_GRAPHICS::II",DLv2_SetFontColor);
-        HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_SETFONTSIZE:WHMOD_GRAPHICS::II",DLv2_SetFontSize);
-        HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_SETFONTLETTERSPACING:WHMOD_GRAPHICS::IF",DLv2_SetFontLetterSpacing);
-        HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_SETFONTANTIALIASMODE:WHMOD_GRAPHICS::II",DLv2_SetFontAntiAliasMode);
-        HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_SETFONTALIGNMENT:WHMOD_GRAPHICS::III", DLv2_SetFontAlignment);
-        HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_SETFONTORIENTATION:WHMOD_GRAPHICS::III", DLv2_SetFontOrientation);
-        HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_CLEAR:WHMOD_GRAPHICS::II",DLv2_ClearCanvas);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_CREATECANVASFROMFILE:WHMOD_GRAPHICS:I:X", DLv2_CreateCanvasFromFile);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_CREATERESIZEDCANVASFROMFILE:WHMOD_GRAPHICS:I:XII", DLv2_CreateResizedCanvasFromFile);
 
@@ -2260,7 +1824,6 @@ extern "C" BLEXLIB_PUBLIC int HSVM_ModuleEntryPoint(HSVM_RegData *regdata, void*
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_DUPLICATECANVAS:WHMOD_GRAPHICS:I:I", DLv2_DuplicateCanvas);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_MAKECANVASFROMCANVAS:WHMOD_GRAPHICS:I:IIIII", DLv2_MakeCanvasFromCanvas);
         HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_DESTROYCANVAS:WHMOD_GRAPHICS::I", DLv2_DestroyCanvas);
-        HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_DESTROYFONT:WHMOD_GRAPHICS::I", DLv2_DestroyFont);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_CREATEPNGBLOBFROMCANVAS:WHMOD_GRAPHICS:X:IBB", DLv2_CreatePNGBlobFromCanvas);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_CREATEJPGBLOBFROMCANVAS:WHMOD_GRAPHICS:X:II", DLv2_CreateJPGBlobFromCanvas);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_CREATEGIFBLOBFROMCANVAS:WHMOD_GRAPHICS:X:I", DLv2_CreateGIFBlobFromCanvas);
@@ -2272,9 +1835,6 @@ extern "C" BLEXLIB_PUBLIC int HSVM_ModuleEntryPoint(HSVM_RegData *regdata, void*
         HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_SETPIXELMODE:WHMOD_GRAPHICS::II", DLv2_SetBinaryMode);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_GETALPHAMODE:WHMOD_GRAPHICS:I:I", DLv2_GetAlphaMode);
         HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_GETPIXELMODE:WHMOD_GRAPHICS:I:I", DLv2_GetBinaryMode);
-
-        HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_GETTEXTWIDTH:WHMOD_GRAPHICS:I:IS", DLv2_GetTextWidth);
-        HSVM_RegisterFunction(regdata, "__DRAWLIB_V2_GETTEXTHEIGHT:WHMOD_GRAPHICS:I:IS", DLv2_GetTextHeight);
 
         HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_BLURCANVAS:WHMOD_GRAPHICS::III", DLv2_BlurCanvas);
         HSVM_RegisterMacro(regdata, "__DRAWLIB_V2_GRAYSCALECANVAS:WHMOD_GRAPHICS::I", DLv2_GrayscaleCanvas);

@@ -80,7 +80,7 @@ function fixPackages() {
 
   elif [ "$WEBHARE_PLATFORM" == "linux" ] && [ -f /etc/redhat-release ] && ! grep CentOS /etc/redhat-release ; then
     # FIXME get this list fro setup-builder.sh!
-    REQUIREPACKAGES="openssl-devel pixman-devel git freetype-devel libtiff-devel giflib-devel libjpeg-turbo-devel libpng-devel libtiff-devel pixman-devel openssl-devel libicu-devel libxml2-devel valgrind-devel libmaxminddb-devel postgresql17"
+    REQUIREPACKAGES="openssl-devel pixman-devel git libtiff-devel giflib-devel libjpeg-turbo-devel libpng-devel libtiff-devel pixman-devel openssl-devel libicu-devel libxml2-devel valgrind-devel libmaxminddb-devel postgresql17"
     if ! which ccache > /dev/null 2>&1 ; then
       REQUIREPACKAGES="$REQUIREPACKAGES ccache"
     fi

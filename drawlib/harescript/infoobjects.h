@@ -4,7 +4,6 @@
 #include <drawlib/drawlibv2/bitmap.h>
 #include <drawlib/drawlibv2/canvas.h>
 #include <drawlib/drawlibv2/drawobject.h>
-#include <drawlib/drawlibv2/textrenderer.h>
 
 namespace DrawLibInterface_v2
 {
@@ -46,25 +45,6 @@ public:
 
         void AddRef() const;
         void DelRef() const;
-};
-
-///fontinfo is a wrapper for font-handling
-class FontInfo
-{
-public:
-        FontInfo(std::string const &fontname, std::string const &fontstyle);
-
-        ~FontInfo();
-
-        std::unique_ptr<DrawLib::Font>  font;
-
-        DrawLib::TextRenderer::HorizontalAlignment horizontal_alignment;
-        DrawLib::TextRenderer::VerticalAlignment vertical_alignment;
-        uint32_t rendermode           ;
-        DrawLib::Pixel32 color            ;
-        double baseline_angle     ;
-        double glyph_angle        ;
-        double letterspacing;
 };
 
 } //namespace ender

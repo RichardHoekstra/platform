@@ -90,7 +90,7 @@ export DLL_SUFFIX
 # Compiler/linker configuration
 #
 
-PKGCONFIG_PACKAGES = openssl freetype2 pixman-1 icu-i18n libpq
+PKGCONFIG_PACKAGES = openssl pixman-1 icu-i18n libpq
 PKGCONFIGCFLAGS := $(shell $(PKGCONFIG) --cflags $(PKGCONFIG_PACKAGES))
 PKGCONFIGLDFLAGS := $(shell $(PKGCONFIG) --libs $(PKGCONFIG_PACKAGES))
 
@@ -206,7 +206,7 @@ endif
 BLEX_SSL_LIBS=ssl crypto
 
 ICU_LIBS = icui18n icudata icuuc
-DRAWLIB_BASE_LIBS=freetype png tiff gif pixman-1
+DRAWLIB_BASE_LIBS=png tiff gif pixman-1
 DRAWLIB_STATIC_LIBS=
 
 DRAWLIB_BASE_LIBS+=jpeg
@@ -739,7 +739,7 @@ build.drawlib: $(drawlib_DEPLOYABLES)
 	>build.drawlib
 
 success.drawlib drawlib-test: bin/$(RUNDRAWLIBTEST)
-	$(TESTRUNNER) bin/$(RUNDRAWLIBTEST) $(SRCDIR)/drawlib/drawlibv2_test/data $(SRCDIR)/whtree/fonts
+	$(TESTRUNNER) bin/$(RUNDRAWLIBTEST) $(SRCDIR)/drawlib/drawlibv2_test/data
 ifeq ($(DRAWLIBTEST),)
 	> success.drawlib
 endif

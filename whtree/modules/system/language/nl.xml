@@ -153,9 +153,6 @@
       <text tid="other">Overig</text>
       <text tid="tasks">Taken en wachtrijen</text>
     </textgroup>
-    <textgroup gid="installedfonts">   <!-- monitor.installedfonts -->
-      <text tid="title">Geïnstalleerde lettertypes</text>
-    </textgroup>
     <textgroup gid="locks">   <!-- monitor.locks -->
       <text tid="clientname">Clientnaam</text>
       <text tid="col">Kolom</text>
@@ -1267,17 +1264,6 @@
         <textgroup gid="statistics">   <!-- tolliumapps.dashboard.dashboard.statistics -->
           <text tid="webserverusagestats">Webserver gebruiksstatistieken exporteren</text>
         </textgroup>
-      </textgroup>
-      <textgroup gid="fonts">   <!-- tolliumapps.dashboard.fonts -->
-        <text tid="css">CSS</text>
-        <text tid="family">Familie</text>
-        <text tid="filename">Bestandsnaam</text>
-        <text tid="fontinfo">Fontinformatie</text>
-        <text tid="installedfonts">Lettertypes</text>
-        <text tid="isboldicon">Vetgedrukt</text>
-        <text tid="isitalicicon">Cursief</text>
-        <text tid="istruetypeicon">Truetype</text>
-        <text tid="style">Stijl</text>
       </textgroup>
       <textgroup gid="mailqueue">   <!-- tolliumapps.dashboard.mailqueue -->
         <text tid="mailqueuepanel">Uitgaande e-mail</text>

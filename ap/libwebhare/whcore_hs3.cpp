@@ -460,22 +460,6 @@ void ScriptEnvironment::Init()
         //ADDME: Restore pimpl of HareScript stuff?
         environment.InvokeModuleRegistration(WHCore_ModuleEntryPoint, this);
 
-        //Try to load the drawlib interface
-        void *graphicsmodule = environment.LoadHarescriptModule("whmod_graphics");
-        if (graphicsmodule)
-        {
-                Blex::DynamicFunction func = Blex::FindDynamicFunction(graphicsmodule,"HSDRAWLIBINTERFACE_AddFontDir");
-                if (func)
-                {
-                        typedef void (*AddFontDirFunc)(const char *);
-                        AddFontDirFunc addfontdir = (AddFontDirFunc)func;
-                        addfontdir( (whconn.GetWebHareRoot() + "fonts").c_str() );
-                        addfontdir( (whconn.GetBaseDataRoot() + "fonts").c_str() );
-                }
-
-                DEBUGPRINT("Got a handle to the graphics library");
-        }
-
         environment.RegisterVMCreationHandler(std::bind(&ScriptEnvironment::OnNewVM, this, std::placeholders::_1));
 //        cache_vm.reset(ConstructWHVM(&cache_errorhandler));
 
