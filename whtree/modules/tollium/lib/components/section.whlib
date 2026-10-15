@@ -16,6 +16,7 @@ PUBLIC OBJECTTYPE TolliumSection EXTEND TolliumComponentBase <
     this->componenttype := "section";
     this->pvt_panel := this->owner->CreateTolliumComponent("panel");
     this->pvt_panel->pvt_parent := this;
+    this->pvt_panel->spacers := [ top := TRUE, bottom := TRUE, left := FALSE, right := FALSE ];
   }
 
   UPDATE PUBLIC STRING FUNCTION GetDefaultWidth() {
@@ -26,7 +27,7 @@ PUBLIC OBJECTTYPE TolliumSection EXTEND TolliumComponentBase <
     TolliumComponentBase::StaticInit(def);
     this->open := def.open;
     this->onchange := def.onchange;
-    this->panel->StaticInit(def);
+    this->panel->StaticInit(CELL[...def, spacers := this->pvt_panel->spacers ]);
 
     //Repair children's parents
     FOREVERY(OBJECT child FROM this->panel->GetChildComponents())
