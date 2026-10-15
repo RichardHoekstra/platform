@@ -1,16 +1,15 @@
 # Building WebHare from source
 
 ## Getting started
-Clone the repository (the examples assume we're extracting to `$HOME/projects`). You will need to have setup your ssh
-keys to communicate with gitlab.com
+Clone the repository (the examples assume we're extracting to `$HOME/projects`).
 
 ```bash
 mkdir ~/projects
 cd ~/projects
-git clone git@gitlab.com:webhare/platform.git webhare
+git clone git@github.com:WebHare/platform.git webhare
 ```
 
-You can use `git clone https://gitlab.com/webhare/platform.git webhare` if you do not want to set up a SSH key.
+You can use `git clone https://github.com/WebHare/platform.git webhare` if you do not want to set up a SSH key.
 
 Now setup the `wh` tool by adding this to your `~/.profile` (or equivalent .bashrc of .bash_profile):
 and relogging in or restarting your terminal session.
@@ -23,7 +22,7 @@ setupmyshell currently requires the use of `bash` as your shell (macOS uses `zsh
 
 See [wh](wh.md) for more information about the wh tool. All other documentation
 will assume you've set this up and just refer to `wh` when they want you to
-invoke the `webhare/whree/bin/wh` tool.
+invoke the `webhare/whtree/bin/wh` tool.
 
 If you do not setup your shell as above, you will need to type the full path to the wh script in all the examples below,
 ie `~/projects/webhare/whtree/bin/wh` instead of just `wh`.
@@ -45,7 +44,7 @@ Run `wh fixmodules` once to update NPM dependencies.
 
 Run `wh runtest checkmodules` for static validation of the core WebHare modules.
 
-If you want to run the WebHare webserver on ports 80 and/or 443 (the default ports) without having to set up a [proxy](https://gitlab.com/webhare/proxy#readme)
+If you want to run the WebHare webserver on ports 80 and/or 443 (the default ports) without having to set up a [proxy](https://github.com/WebHare/proxy)
 you will need to either run WebHare as `root` (not recommended) or install the socketbinder by running `wh installsocketbinder`.
 The socket binder is a small daemon that runs as root and allows WebHare to listen on port numbers below 1024.
 

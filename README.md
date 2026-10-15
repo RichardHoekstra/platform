@@ -12,6 +12,11 @@ used by WebHare may be licensed differently. Modules you write and distribute
 yourself (ie those that aren't part of the WebHare Platform project) can be
 released under any license you wish.
 
+## Authors and (past) commits
+Contributions made before WebHare was released as open source (ie before 25 Nov 2019) are attributed
+to `WebHare bv <info@webhare.nl>` in the commit logs. See [the contributors graph](https://github.com/WebHare/platform/graphs/contributors?all=1) for develoopers we have contributed since. We would also like to acknowledge
+and thank the developers who have contributed to WebHare before 2020 even though they may not be listed in the commit logs.
+
 # Documentation
 End-user documentation aka the WebHare manuals can be found on https://docs.webhare.nl/ and https://docs.webhare.com/
 

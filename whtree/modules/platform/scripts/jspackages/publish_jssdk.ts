@@ -136,7 +136,7 @@ runCli({
       packagejson.devDependencies ||= {};
 
       //Update README.md
-      const sourcelink = `https://gitlab.com/webhare/platform/-/tree/master/whtree/jssdk/${pkgname}`;
+      const sourcelink = `https://github.com/WebHare/platform/tree/main/whtree/jssdk/${pkgname}`;
       const readme = `${(await readFile(join(pkgroot, "README.md"), "utf8")).trim()}\n\n## Publication source\nThe [source code for @webhare/${pkgname}](${sourcelink}) is part of the WebHare Platform\n`;
       await writeFile(join(pkgroot, "README.md"), readme, "utf8");
 
