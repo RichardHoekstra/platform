@@ -85,9 +85,8 @@ echo "Using Web interface for container 1 at $TH_WEBINTERFACE1"
 echo "Using Web interface for container 2 at $TH_WEBINTERFACE2"
 
 #$TH_EXEC1 run mod::webhare_testsuite/tests/system/twohare/prepare1.whscr
-# debugging may require setting WEBHARE_DEBUG=test-keepopen
+# debugging may require setting WEBHARE_DEBUG=test-keepbrowser
 if ! $TH_EXEC1 registry set webhare_testsuite.tests.secondhareinterface "$TH_WEBINTERFACE2" ||
-   ! $TH_EXEC1 registry set webhare_testsuite.tests.secondharetesttoken "$TESTTOKEN" ||
    ! $TH_EXEC2 run mod::webhare_testsuite/tests/system/twohare/prepare-server2.whscr ||
    ! $TH_EXEC1 runtest --outputdir "$OUTPUTDIR" system.twohare.test_peerserver;then
   die "tests failed"

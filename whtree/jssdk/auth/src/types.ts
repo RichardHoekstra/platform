@@ -6,6 +6,10 @@ type SupportedScopes =
   | "phone"
   | "offline_access";
 
+/** the actual allowed values in a response_type */
+export type ResponseType = "code" | "token" | "id_token" | "none";
+
+/** this is how they may appear in metadata. ordering is specified: */
 type ResponseTypesScopes =
   | "code"
   | "token"
@@ -157,6 +161,26 @@ type ClaimsSupported =
   | "nickname"
   | "email"
   | "email_verified";
+
+export type OAuth2EndpointErrorCodes =
+  | "invalid_request"
+  | "unauthorized_client"
+  | "access_denied"
+  | "unsupported_response_type"
+  | "invalid_scope"
+  | "server_error"
+  | "temporarily_unavailable";
+
+export type OIDCEndpointErrorCodes =
+  | "interaction_required"
+  | "login_required"
+  | "account_selection_required"
+  | "consent_required"
+  | "invalid_request_uri"
+  | "invalid_request_object"
+  | "request_not_supported"
+  | "request_uri_not_supported"
+  | "registration_not_supported";
 
 //See https://datatracker.ietf.org/doc/html/rfc8414 for required fields
 export type OpenIdConfiguration = {

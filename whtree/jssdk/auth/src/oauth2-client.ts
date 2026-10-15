@@ -37,7 +37,7 @@ declare module "@webhare/services" {
   }
 }
 
-export type OAuth2PromptFlag = "" | "login" | "none" | "select_account";
+export type OAuth2PromptFlag = "" | "login" | "none" | "consent" | "select_account";
 
 export interface OAuth2LoginRequestOptions {
   prompt?: OAuth2PromptFlag;

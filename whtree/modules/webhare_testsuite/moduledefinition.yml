@@ -87,10 +87,6 @@ webFeatures:
     title: "WH testsuite: Test feature"
     siteProfile: webfeatures/testfeature.siteprl.xml
     hidden: true
-  insecure_interface:
-    title: "WH testsuite: Unprotected WebHare backend"
-    siteProfile: webfeatures/insecure_interface.siteprl.xml
-    hidden: true
   siteprl_datastorage:
     title: "WH testsuite: siteprl_datastorage"
     siteProfile: webfeatures/siteprl_datastorage.siteprl.xml

@@ -274,15 +274,24 @@ async function verifyOpenIDClient() {
   await oidcAuthSchema.update("wrdauthApplication", clientWrdId, { subjectField: "wrdFirstName" });
   await commitWork();
 
-  const { config, tokenSet } = await test.runOpenIDLoginFlow(puppeteer!, {
+  test.eqPartial({ error: "invalid_scope" }, await test.runOpenIDLoginFlow(puppeteer!, {
     metadataUrl: testsite.webRoot + '.well-known/openid-configuration',
     clientId,
     clientSecret,
     callbackUrl,
     scope: 'openid email invalidscope'
+  }));
+
+  const { config, tokenSet } = await test.runOpenIDLoginFlow(puppeteer!, {
+    metadataUrl: testsite.webRoot + '.well-known/openid-configuration',
+    clientId,
+    clientSecret,
+    callbackUrl,
+    scope: 'openid email'
   });
 
-  test.assert('https://beta.webhare.net/', config.serverMetadata().issuer);
+  test.eq('https://my.webhare.dev/testfw/issuer', config?.serverMetadata().issuer);
+  test.assert(tokenSet);
 
   test.eq("bearer", tokenSet.token_type);
   const accesTokenClaims = JSON.parse(Buffer.from(tokenSet.access_token!.split(".")[1], "base64url").toString());
@@ -306,6 +315,7 @@ async function verifyOpenIDClient() {
     nonce
   });
 
+  test.assert(tokenSet2);
   test.eq("Sysop", tokenSet2.claims()?.sub);
 
   // Verify discovery advertises S256 and complete a login using its verifier.
@@ -317,6 +327,7 @@ async function verifyOpenIDClient() {
     callbackUrl,
     pkceCodeVerifier: randomPKCECodeVerifier()
   });
+  test.assert(pkceTokenSet);
   test.eq("bearer", pkceTokenSet.token_type);
   test.assert(pkceTokenSet.id_token);
   test.eq("Sysop", pkceTokenSet.claims()?.sub);
@@ -333,6 +344,16 @@ async function logoutAtIDP(context: Puppeteer.BrowserContext) {
   for (const cookie of await context.cookies())
     if (cookie.name.endsWith("webharelogin-wrdauthjs"))
       await context.deleteCookie(cookie);
+}
+
+async function consentToTestfwScope(page: Puppeteer.Page) {
+  //Handle consent question triggered by asking for 'testfw'
+  await page.waitForSelector('button[name="approve"][value="no"]');
+  test.eq([/testfw/], await page.$$eval("form ul li", items => items.map(item => item.textContent?.trim())));
+  await Promise.all([
+    page.waitForNavigation(),
+    page.click('button[name="approve"][value="yes"]')
+  ]);
 }
 
 async function verifyAsOpenIDSP() {
@@ -364,7 +385,7 @@ async function verifyAsOpenIDSP() {
   test.eq("testvalue", authrequest.searchParams.get("testparam"), "Extra param must be passed to authorize URL: " + authrequest);
 
   await runWebHareLoginFlow(page, { password: "pass$", changePasswordTo: newPassword });
-
+  await consentToTestfwScope(page);
   console.log("Password changed to: " + newPassword);
 
   { //wait for WebHare username
@@ -466,6 +487,7 @@ async function verifyCustomOpenIDFlow() {
   await page.goto(portal1LoginRequest);
 
   await runWebHareLoginFlow(page, { user: "marge", password: "marge$", changePasswordTo: newPassword });
+  await consentToTestfwScope(page);
 
   //We're blocked so this should show Login failed page
   const heading = await page.waitForSelector("h2");
@@ -492,6 +514,7 @@ async function testUserAutoCreation() {
   await page.goto(loginRequest);
 
   await runWebHareLoginFlow(page, { user: "bart", password: "bart$", changePasswordTo: newPassword });
+  await consentToTestfwScope(page);
   const newUser = await schemaSP.query("wrdPerson").where("wrdContactEmail", "=", test.getUser("bart").login).select(["wrdId", "wrdLastName", "whuserComment"]).executeRequireExactlyOne();
   test.eq(testsite.webRoot + "portal1-oidc/wrdauthtest/", newUser.whuserComment, "Autocreated user should have final URL in whuserComment");
 
@@ -548,6 +571,7 @@ async function verifySSOAPI() {
       }
     });
 
+    //TODO improve these 'prompt=none with scopes' tests/scenarios. eg automatic rejection if you try to add scopes with prompt=none. Or have test_wrd_auth do those
     console.log("Doing second passive SSO login on ", startUrl);
     await page.goto(startUrl);
     await page.click("#ssopassivebutton");

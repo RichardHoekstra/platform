@@ -6,7 +6,7 @@ export type DeferredPromise<T> = PromiseWithResolvers<T>;
 
 /** A promise that sleeps for the specified number of milliseconds
  *  @param duration - Relative (milliseconds, but not Infinity) or absolute (Date) wait duration. May not be Infinity
- *  @param options - Options - `signal` to set an AbortSignal which will canel this sleep
+ *  @param options - Options - `signal` to set an AbortSignal which will cancel this sleep
 */
 export function sleep(duration: WaitPeriod, options?: { signal?: AbortSignal }): Promise<void> {
   if (duration === Infinity)
