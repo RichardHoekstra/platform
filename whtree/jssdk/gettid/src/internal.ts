@@ -31,14 +31,19 @@ export function setTidLanguage(newLanguage: string): void {
 
 const langFileCache: Record<string, CompiledLanguageFile> = {};
 
-function getLanguageFile(module: string, langCode: string): CompiledLanguageFile | undefined {
-  const langkey = `${module}:${langCode}`;
+function getLanguageFile(moduleName: string, langCode: string): CompiledLanguageFile | undefined {
+  const langkey = `${moduleName}:${langCode}`;
   let compiled = langFileCache[langkey];
   if (!compiled || !compiled.resource) {
-    const loader = ensureHooks().loader;
+    const { loader, addResourceChangeListener } = ensureHooks();
     if (loader) {
       try {
-        compiled = loader(module, langCode, compiled?.registered ?? new Map);
+        const loaded = compiled = loader(moduleName, langCode, compiled?.registered ?? new Map);
+        // Reload the language file on the next lookup when it has been modified
+        addResourceChangeListener?.(module, loaded.resource, () => {
+          loaded.resource = "";
+          loaded.texts.clear();
+        });
       } catch (e) {
         // loading failed, erase the loaded texts (keep the registered texts, though)
         if (dtapStage !== "production" || debugFlags.gtd) {
@@ -51,7 +56,7 @@ function getLanguageFile(module: string, langCode: string): CompiledLanguageFile
     }
   }
   if (!compiled && (dtapStage !== "production" || debugFlags.gtd)) {
-    console.warn(`No language texts found for module '${module}' and language '${langCode}'`);
+    console.warn(`No language texts found for module '${moduleName}' and language '${langCode}'`);
   }
   return compiled;
 }
