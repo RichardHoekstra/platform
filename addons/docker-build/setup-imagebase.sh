@@ -12,7 +12,8 @@
 # Packages not needed for building: curl strace wget
 # TODO - createrepo can go if we don't need WH1 to build repositories anymore
 # stunnel: some modules use it for connectivity. must be a stunnel version with PSK support
-# liberation-fonts: fonts that look like Arial, Times New Roman, Courier New
+# liberation-fonts: fonts that look like Arial, Times New Roman, Courier New.
+# Our CI tests use Arial and some depend on the exact layout. Might be worth fixing, but for now easiest to keep the liberation-fonts
 
 # Fail on any error
 set -eo pipefail

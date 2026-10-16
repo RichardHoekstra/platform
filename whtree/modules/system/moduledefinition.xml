@@ -169,10 +169,6 @@
         <requireright right="system:sysop" />
       </accesscheck>
     </dashboardpanel>
-    <dashboardpanel name="installedfonts"
-                    group="ap"
-                    screen="tolliumapps/dashboard/fonts.xml#installedfonts"
-                    tid="tolliumapps.dashboard.fonts.installedfonts" />
     <dashboardpanel name="precalculatedcache"
                     group="dev"
                     screen="tolliumapps/dashboard/caches.xml#precalculatedcache"

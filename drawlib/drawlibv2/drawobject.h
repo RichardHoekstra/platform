@@ -5,7 +5,6 @@
 #include "canvas.h"
 #include "polyrenderer.h"
 #include "outlinerenderer.h"
-#include "textrenderer.h"
 #include "drawpath.h"
 
 namespace DrawLib
@@ -24,7 +23,7 @@ namespace DrawLib
 #define TEXT_VALIGN_BOTTOM 2
 #define TEXT_VALIGN_CENTER 3*/
 
-/** DrawObject is able to draw polygons, line, polylines, bezier curves. It also draws text using the FreeType library.*/
+/** DrawObject is able to draw polygons, line, polylines, and bezier curves. */
 class BLEXLIB_PUBLIC DrawObject
 {
 public:
@@ -163,43 +162,6 @@ public:
 
         /** DrawBitmap - copy a bitmap onto the canvas */
         void DrawBitmap(const Bitmap32  &mybitmap, DrawLib::XForm2D const &transform);
-
-        /*-------------------------------------------
-                Text methods...
-        ---------------------------------------------*/
-        /** DrawTextExt - draw a text string (extended)
-            @param plotpoint - position of the text.
-            @param textstring - text string in Unicode format
-            @param myFont - pointer to the font to be used
-            @param antialiasing - if true text is rendered in antialiased mode
-            @param h_alignment  - 0 = LEFT, 1 = CENTER, 2 = RIGHT
-            @param v_alignment  - 0 = BASELINE, 1 = TOP, 2 = BOTTOM, 3 = CENTER, 4 = ASCENDER, 5 = DESCENDER
-            @param baselineangle  Angle of the baseline. The basepoint of glyphs changes location.
-            @param glyphangle     Angle of the glyphs. The rotation of the glyphs changes
-            */
-        void DrawTextExtended(const FPPoint &baseline, const Blex::UnicodeString &textstring,
-                const Font &myFont, const std::vector<double> &deltas,
-                bool Antialiasing,
-                TextRenderer::HorizontalAlignment horizontal_alignment,
-                TextRenderer::VerticalAlignment vertical_alignment,
-                double baselineangle,
-                double glyphangle,
-                double letterspacing
-        );
-
-        /** GetTextWidth - get the width in pixels of a text string
-            @param textstring - text string in Unicode format
-            @param myFont - pointer to the font to be used
-            @param antialiasing - if true text is rendered in antialiased mode
-                */
-        uint32_t GetTextWidth(const Blex::UnicodeString &textstring, const Font &myFont, const std::vector<double> &deltas, bool antialiasing, double letterspacing);
-
-        /** GetTextHeight - get the height in pixels of a text string
-            @param textstring - text string in Unicode format
-            @param myFont - pointer to the font to be used
-            @param antialiasing - if true text is rendered in antialiased mode
-                */
-        uint32_t GetTextHeight(const Blex::UnicodeString &textstring, const Font &myFont, const std::vector<double> &deltas, bool antialiasing, double letterspacing);
 
         /** SetFillColor - sets the fill color used by the polygonfiller (FillMode = SOLID) */
         void SetFillColor(const Pixel32 &color);
@@ -356,9 +318,6 @@ private:
         SolidPolyCallback       outline_solidpolycallback;
         TexturedPolyCallback    outline_texturedpolycallback;
         ThreeDTexturedPolyCallback outline_threedtexturedpolycallback;
-
-        // textrenderer
-        TextRenderer            renderer;
 
         // Currently active polyfiller callback
         PolyScanlineCallbackBase *current_fillcallback;

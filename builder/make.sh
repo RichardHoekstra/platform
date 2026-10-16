@@ -78,12 +78,8 @@ function fixPackages() {
       exit 1
     fi
 
-  elif [ "$WEBHARE_PLATFORM" == "linux" ] && [ -f /etc/redhat-release ] && ! grep CentOS /etc/redhat-release ; then
-    # FIXME get this list fro setup-builder.sh!
-    REQUIREPACKAGES="openssl-devel pixman-devel git freetype-devel libtiff-devel giflib-devel libjpeg-turbo-devel libpng-devel libtiff-devel pixman-devel openssl-devel libicu-devel libxml2-devel valgrind-devel libmaxminddb-devel postgresql17"
-    if ! which ccache > /dev/null 2>&1 ; then
-      REQUIREPACKAGES="$REQUIREPACKAGES ccache"
-    fi
+  elif [ "$WEBHARE_PLATFORM" == "linux" ] && [ -f /etc/redhat-release ] && ! grep CentOS /etc/redhat-release && [ -z "$WEBHARE_IN_DOCKER" ]; then
+    REQUIREPACKAGES="$(WHBUILD_PRINTPACKAGES=1 bash "$WEBHARE_CHECKEDOUT_TO/addons/docker-build/setup-builder.sh")"
     MISSINGPACKAGES=
     for P in $REQUIREPACKAGES; do
       ASSUME=0

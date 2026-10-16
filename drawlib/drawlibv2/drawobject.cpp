@@ -748,48 +748,6 @@ void DrawObject::DrawRectangleOutline(const FPPoint &upperleft, const FPPoint &l
         StrokePath(CreateRectanglePath(upperleft, lowerright));
 }
 
-void DrawObject::DrawTextExtended(
-        const FPPoint &baseline,
-        const Blex::UnicodeString &textstring,
-        const Font &myFont,
-        const std::vector<double> &deltas,
-        bool Antialiasing,
-        TextRenderer::HorizontalAlignment halign,
-        TextRenderer::VerticalAlignment valign,
-        double baselineangle,
-        double glyphangle,
-        double letterspacing
-        )
-{
-        renderer.DrawText(*mycanvas, textstring, baseline, myFont, deltas, Antialiasing, baselineangle, glyphangle, halign, valign, letterspacing);
-}
-
-uint32_t DrawObject::GetTextHeight(const Blex::UnicodeString &textstring, const Font &myFont, const std::vector<double> &deltas, bool antialiasing, double letterspacing)
-{
-        DrawLib::FPBoundingBox bbox = renderer.CalculateBoundingBox(
-                textstring,
-                DrawLib::FPPoint(0.0, 0.0),
-                myFont,
-                deltas,
-                antialiasing,
-                0.0, 0.0, DrawLib::TextRenderer::LEFT,DrawLib::TextRenderer::BASELINE, letterspacing);
-
-        return static_cast<uint32_t>(bbox.lower_right.y - bbox.upper_left.y + 0.5);
-}
-
-uint32_t DrawObject::GetTextWidth(const Blex::UnicodeString &textstring, const Font &myFont, const std::vector<double> &deltas, bool antialiasing, double letterspacing)
-{
-        DrawLib::FPBoundingBox bbox = renderer.CalculateBoundingBox(
-                textstring,
-                DrawLib::FPPoint(0.0, 0.0),
-                myFont,
-                deltas,
-                antialiasing,
-                0.0, 0.0, DrawLib::TextRenderer::LEFT,DrawLib::TextRenderer::BASELINE, letterspacing);
-
-        return static_cast<uint32_t>(bbox.lower_right.x - bbox.upper_left.x + 0.5);
-}
-
 DrawLib::PolyLine DrawObject::GenerateArc(const FPPoint &centerpoint, const FPSize &radius, double startradial, double endradial)
 {
         DrawLib::PolyLine polyline;

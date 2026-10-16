@@ -102,27 +102,4 @@ DrawInfo::~DrawInfo()
 #endif
 }
 
-/*******************************************************************************
-*
-*  FONTINFO
-*
-*******************************************************************************/
-
-
-FontInfo::FontInfo(std::string const &fontname, std::string const &fontstyle)
-{
-        DrawLib::Font *tempf = DrawLib::GetGlobalFontManager().CreateFontFromFile(fontname, fontstyle);
-        font.reset(tempf);
-        baseline_angle = 0.0;
-        glyph_angle    = 0.0;
-        horizontal_alignment = DrawLib::TextRenderer::LEFT;
-        vertical_alignment   = DrawLib::TextRenderer::BASELINE;
-        rendermode           = 1;
-        letterspacing = 0.0;
-}
-
-FontInfo::~FontInfo()
-{
-}
-
 } //namespace end

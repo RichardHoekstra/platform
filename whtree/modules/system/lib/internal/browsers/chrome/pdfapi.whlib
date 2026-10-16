@@ -2,9 +2,7 @@
 
 LOADLIB "wh::files.whlib";
 LOADLIB "wh::ipc.whlib";
-LOADLIB "wh::javascript.whlib";
 LOADLIB "wh::filetypes/html.whlib";
-LOADLIB "wh::graphics/core.whlib";
 LOADLIB "wh::xml/dom.whlib";
 
 LOADLIB "mod::system/lib/networking/adhocserver.whlib";
@@ -52,7 +50,6 @@ PUBLIC STATIC OBJECTTYPE ChromePDFAPI EXTEND ComposerBase
   OBJECT connector;
   OBJECT conn;
   OBJECT page;
-  RECORD ARRAY embedded_fonts;
   RECORD ARRAY logevents;
 
   PUBLIC BLOB htmlversion;
@@ -79,27 +76,6 @@ PUBLIC STATIC OBJECTTYPE ChromePDFAPI EXTEND ComposerBase
     BLOB htmlversion := this->GenerateHTML().htmlversion; //ADDME can't we combine fontfaces generation for when we actulaly have access to the HTML source
 
     OBJECT htmldoc := MakeXMLDocumentFromHTML(htmlversion);
-    OBJECT head := htmldoc->GetElement("head,body");
-    OBJECT stylenode := htmldoc->CreateElement("style");
-    head->InsertBefore(stylenode, head->firstchild);
-
-    STRING styleinfo;
-    this->embedded_fonts := RECORD[];
-
-    IF(NOT IsWasm()) {
-      FOREVERY(RECORD font FROM (SELECT * FROM GfxGetAvailableFonts() ORDER BY family,style))  {
-        RECORD css := GfxGetFontCSSCode(font);
-        IF(NOT RecordExists(css))
-          CONTINUE;
-
-        styleinfo := styleinfo || css.csstext;
-        INSERT font INTO this->embedded_fonts AT END;
-      }
-    } ELSE {
-      styleinfo := '/* Font listing not available in wasm */\n';
-    }
-    stylenode->AppendChild(htmldoc->CreateCDATASection(styleinfo));
-
     htmldoc->documentelement->SetAttribute("class", htmldoc->documentelement->GetAttribute("class") || " wk-chromepdf--pdfbody");
     htmlversion := NEW HTMLRewriterContext->GenerateHTML(htmldoc);
 
@@ -140,12 +116,7 @@ PUBLIC STATIC OBJECTTYPE ChromePDFAPI EXTEND ComposerBase
                     [ [ field := "Content-Type", value := contenttype ] ]
                 , COLUMN data
              FROM this->embedded_files)
-          CONCAT
-          (SELECT path := "/" || GetNameFromPath(filename)
-                , headers :=
-                    [ [ field := "Content-Type", value := "application/octet-stream" ] ]
-                , data := GetDiskResource(filename)
-             FROM this->embedded_fonts);
+            ;
     RETURN filelist;
   }
 

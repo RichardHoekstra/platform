@@ -1,7 +1,6 @@
 brew "autoconf"
 brew "automake"
 brew "ccache"
-brew "freetype"
 brew "fswatch"
 brew "giflib"
 brew "icu4c"

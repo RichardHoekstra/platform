@@ -343,9 +343,6 @@
       <text tid="other">Other</text>
       <text tid="tasks">Tasks and queues</text>
     </textgroup>
-    <textgroup gid="installedfonts">   <!-- monitor.installedfonts -->
-      <text tid="title">Installed fonts</text>
-    </textgroup>
     <textgroup gid="locks">   <!-- monitor.locks -->
       <text tid="clientname">Client name</text>
       <text tid="col">Column</text>
@@ -1457,17 +1454,6 @@
         <textgroup gid="statistics">   <!-- tolliumapps.dashboard.dashboard.statistics -->
           <text tid="webserverusagestats">Export webserver usage stats</text>
         </textgroup>
-      </textgroup>
-      <textgroup gid="fonts">   <!-- tolliumapps.dashboard.fonts -->
-        <text tid="css">CSS</text>
-        <text tid="family">Family</text>
-        <text tid="filename">File name</text>
-        <text tid="fontinfo">Font information</text>
-        <text tid="installedfonts">Fonts</text>
-        <text tid="isboldicon">Bold</text>
-        <text tid="isitalicicon">Italic</text>
-        <text tid="istruetypeicon">Truetype</text>
-        <text tid="style">Style</text>
       </textgroup>
       <textgroup gid="mailqueue">   <!-- tolliumapps.dashboard.mailqueue -->
         <text tid="mailqueuepanel">Outgoing e-mail</text>
