@@ -16,19 +16,6 @@
 # Fail on any error
 set -eo pipefail
 
-if [ -z "$WHBUILD_DOWNLOADCACHE" ]; then
-  echo WHBUILD_DOWNLOADCACHE not set
-  exit 1
-fi
-
-# Keep dnf downloads
-grep -q '^keepcache' /etc/dnf/dnf.conf && \
-  ( sed -i 's/^keepcache=.*/keepcache=1/' /etc/dnf/dnf.conf || \
-    sed -i '/^\[main\]/a keepcache=1' /etc/dnf/dnf.conf )
-
-
-dnf config-manager --set-enabled crb # Needed for giflib-devel and libmaxminddb-devel
-
 # 2025-03-16: Conversion to RL10
 # 2023-05-30: Removed libxml2 but adding automake,autoconf,libtool to build it from source
 
@@ -59,6 +46,24 @@ PACKAGES=(
   rapidjson-devel
   valgrind-devel
 )
+
+if [ -n "$WHBUILD_PRINTPACKAGES" ]; then
+  echo "${PACKAGES[@]}"
+  exit 0
+fi
+
+if [ -z "$WHBUILD_DOWNLOADCACHE" ]; then
+  echo WHBUILD_DOWNLOADCACHE not set
+  exit 1
+fi
+
+# Keep dnf downloads
+grep -q '^keepcache' /etc/dnf/dnf.conf && \
+  ( sed -i 's/^keepcache=.*/keepcache=1/' /etc/dnf/dnf.conf || \
+    sed -i '/^\[main\]/a keepcache=1' /etc/dnf/dnf.conf )
+
+
+dnf config-manager --set-enabled crb # Needed for giflib-devel and libmaxminddb-devel
 
 dnf install -y "${PACKAGES[@]}"
 
