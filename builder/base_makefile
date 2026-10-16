@@ -592,6 +592,41 @@ $(LIBXML2_WASM_GENERATEDFILE): $(SRCDIR)/vendor/setup-libxml2.sh $(SRCDIR)/vendo
 
 #################################################
 ##
+## Setup nginx njs module
+##
+NGINX_MODULE=$(WHBUILD_BUILDDIR)/vendor-nginx/ngx_http_js_module.so
+NGINX_CONFIG_STAMP=$(WHBUILD_BUILDDIR)/vendor-nginx/nginx-config.stamp
+
+setup-nginx: $(NGINX_MODULE)
+
+# Check the installed nginx version and build options whenever the module is considered.
+.PHONY: check-nginx-config
+# Preserve the stamp's timestamp when unchanged, so the module is not rebuilt every time.
+# Compare content rather than executable timestamps, which package updates may preserve.
+$(NGINX_CONFIG_STAMP): check-nginx-config
+	$(HIDE)config=$$(nginx -V 2>&1) || { printf '%s\n' "$$config" >&2; exit 1; }; \
+		mkdir -p "$(dir $@)" && \
+		tmp=$$(mktemp "$@.XXXXXX") && \
+		trap 'rm -f "$$tmp"' EXIT HUP INT TERM; \
+		printf '%s\n' "$$config" > "$$tmp" && \
+		{ cmp -s "$$tmp" "$@" || mv -f "$$tmp" "$@"; }
+
+$(SRCDIR)/vendor/njs/nginx/config:
+	git -C "$(SRCDIR)" submodule update --init --recursive vendor/njs
+
+$(NGINX_MODULE): $(SRCDIR)/vendor/setup-nginx.sh $(SRCDIR)/vendor/njs/nginx/config $(NGINX_CONFIG_STAMP)
+	bash $(SRCDIR)/vendor/setup-nginx.sh "$(dir $@)"
+
+ifeq ($(WEBHARE_WEBSERVER),nginxjs)
+install-binaries: $(PREFIX)/lib/ngx_http_js_module.so
+all: $(NGINX_MODULE)
+
+$(PREFIX)/lib/ngx_http_js_module.so: $(NGINX_MODULE)
+	$(HIDE)echo "- Installing $< -> $@" && mkdir -p $(dir $@) && cp -af $< $(dir $@)
+endif
+
+#################################################
+##
 ## Build instructions
 ##
 

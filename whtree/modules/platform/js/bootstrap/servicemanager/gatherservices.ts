@@ -49,6 +49,18 @@ const defaultServices: Record<string, ServiceDefinition> = {
       startIn: Stage.Bootup,
       run: "always"
     }
+  } : process.env.WEBHARE_WEBSERVER === "nginxjs" ? {
+    "platform:webserver-nginx": {
+      cmd: ["launch_nginx.sh"],
+      startIn: Stage.Bootup,
+      run: "always"
+    },
+    "platform:webserver": {
+      cmd: ["webserver", "--secondary", "--dispatchers", "25"], //50 seems excessive for a secondary?
+      //Our startIn should match the platform:webserver
+      startIn: Stage.Bootup,
+      run: "always"
+    }
   } : {
     "platform:webserver": {
       cmd: ["webserver", "--dispatchers", "50"], //50 was the default but we might make it tunable ?
