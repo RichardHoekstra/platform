@@ -112,6 +112,15 @@ test.runTests(
 
       //to the 3rdmenu
       await test.sendMouseGesture([{ el: X04 }]);
+      const X04submenu = test.qR<HTMLUListElement>(X04, "ul");
+      test.assert(X04submenu.matches(":popover-open"));
+      test.eq(X04, X04submenu.parentElement);
+      const openSubmenu = test.getOpenMenu();
+      X07 = test.qSA(openSubmenu, "li").filter(item => item.textContent.includes('X07'))[0];
+      const X08 = test.qSA(openSubmenu, "li").filter(item => item.textContent.includes('X08'))[0];
+      test.assert(X01.getBoundingClientRect().top === X04.getBoundingClientRect().top, "menubar items should stay on one row");
+      test.assert(X08.getBoundingClientRect().top > X07.getBoundingClientRect().top, "submenu items should be vertically stacked");
+      test.assert(getComputedStyle(X07).paddingTop === "0px", "submenu text should not inherit menubar padding");
 
       //verify that only X07, X08, and the divider between them are visible
       test.assert(!test.qSA(test.getOpenMenu(), "li").filter(li => li.textContent.includes('X05'))[0]);
@@ -135,7 +144,7 @@ test.runTests(
       menu = test.qR('.wh-menubar');
       X04 = test.qR<HTMLLIElement>(menu, "li[data-menuitem$=':x04menu']");
       test.click(X04);
-      X07 = test.qSA("li").filter(item => item.textContent.includes('X07'))[0];
+      X07 = test.qSA(test.getOpenMenu(), "li").filter(item => item.textContent.includes('X07'))[0];
       test.click(X07);
       await test.waitForUI();
     },

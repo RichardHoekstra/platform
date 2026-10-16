@@ -396,14 +396,14 @@ function openSubMenu(parentmenu: MenuBase, horizontalsubs: boolean, li: HTMLLIEl
     @param minwidth - Minimum menu width
     @param options - options.forcenooverlap Whether to disallow overlap of the reference element
 */
-function openAsList(submenu: MenuList, coords: dompack.Rect, preferreddirection: PreferredDirection, preferredalign: PreferredDirection, exitdirection: ExitDirection, minwidth: number, options: MenuOptions) {
+function openAsList(submenu: MenuList, coords: dompack.Rect, preferreddirection: PreferredDirection, preferredalign: PreferredDirection, exitdirection: ExitDirection, minwidth: number, options: MenuOptions, owner?: HTMLLIElement) {
   if (dompack.debugflags.men)
     console.log("[men] openAsList called");
   if (!submenu._fireOpenCloseEvent(true))
     return;
 
   closingmenus = []; //if we're back to opening menus, forget about the close list
-  submenu._openMenu(coords, preferreddirection, null, preferredalign, exitdirection, minwidth, options);
+  submenu._openMenu(coords, preferreddirection, null, preferredalign, exitdirection, minwidth, options, owner);
   recomputeSubSelection();
   takeSemiFocus();
 }
@@ -608,7 +608,7 @@ class MenuBase {
 
   _onMouseDownOnItem(event: Event) {
     const li = (event.target as HTMLElement).closest("li");
-    if (!li)
+    if (!li || li.parentElement !== this.el)
       return;
 
     event.preventDefault(); //avoid focus theft
@@ -636,7 +636,7 @@ class MenuBase {
 
   _onMouseMove(event: Event) {
     const li = (event.target as HTMLElement).closest("li");
-    if (!li)
+    if (!li || li.parentElement !== this.el)
       return;
 
     // Need to select item if hovering above non-selected item, or have item selected in submenu
@@ -808,6 +808,7 @@ export class MenuBar extends MenuBase {
 class MenuList extends MenuBase {
   substitutionnode: HTMLElement | null;
   position: { x: number; y: number } | null;
+  removeOnClose: boolean;
   preferreddirection: PreferredDirection;
 
   constructor(el: HTMLElement) {
@@ -815,6 +816,7 @@ class MenuList extends MenuBase {
 
     this.position = null;
     this.substitutionnode = null;
+    this.removeOnClose = false;
     this.currentalign = '';
     this.preferreddirection = '';
     if (dompack.debugflags.men)
@@ -860,8 +862,8 @@ class MenuList extends MenuBase {
     @param coords Coordinates to place the menu around (left/right/top/bottom)
     @param size Size of the menu (x/y)
     @param bounds Soft bounds to place the menu in (left/right/top/bottom)
-    @param viewport Position of the viewport relative to the body (left/right/top/bottom)
-    @param bodybounds Size of the body (x/y)
+    @param viewport The viewport bounds
+    @param containingblock The positioning containing block bounds
     @param sizeattr Name of attribute in which size is kepy ('x' or 'y')
     @param minattr Name of attribute with lowest coordinates ('left' or 'top')
     @param maxattr Name of attribute with lowest coordinates ('left' or 'top')
@@ -870,7 +872,7 @@ class MenuList extends MenuBase {
     @param forcenooverlap Whether to disallow overlap if menu doesn't fit at all (only when overlapcoords is false)
   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- we shouldn't even be returning data through a oty parameter
-  _calculatePosition(styles: any, coords: dompack.Rect, size: { x: number; y: number }, bounds: dompack.Rect, viewport: dompack.Rect, bodybounds: dompack.Rect, horizontal: boolean, preferfirst: boolean, overlapcoords: boolean) {
+  _calculatePosition(styles: any, coords: dompack.Rect, size: { x: number; y: number }, bounds: dompack.Rect, viewport: dompack.Rect, containingblock: dompack.Rect, horizontal: boolean, preferfirst: boolean, overlapcoords: boolean) {
     // Calc the style attrs that
     const sizeattr = horizontal ? "x" : "y";
     const minattr = horizontal ? "left" : "top";
@@ -909,9 +911,9 @@ class MenuList extends MenuBase {
     for (let i = 0; i < 2; ++i) {
       if (preferfirst && bounded_space_before >= size[sizeattr]) {
         if (dompack.debugflags.men)
-          console.log(`[men] setting maxattr '${maxattr}' sizeattr '${csssizeattr}' to ${(bodybounds[csssizeattr] - before_coords)}`);
+          console.log(`[men] setting maxattr '${maxattr}' sizeattr '${csssizeattr}' to ${(containingblock[csssizeattr] - before_coords)}`);
 
-        styles[maxattr] = (bodybounds[csssizeattr] - before_coords) + "px";
+        styles[maxattr] = (containingblock[csssizeattr] - before_coords) + "px";
         return false;
       } else if (!preferfirst && bounded_space_after >= size[sizeattr]) {
         if (dompack.debugflags.men)
@@ -934,9 +936,9 @@ class MenuList extends MenuBase {
     for (let i = 0; i < 2; ++i) {
       if (preferfirst && space_before >= size[sizeattr]) {
         if (dompack.debugflags.men)
-          console.log("[men] setting maxattr", maxattr, 'sizeattr', sizeattr, bodybounds, before_coords);
+          console.log("[men] setting maxattr", maxattr, 'sizeattr', sizeattr, containingblock, before_coords);
 
-        styles[maxattr] = (bodybounds[csssizeattr] - before_coords) + "px";
+        styles[maxattr] = (containingblock[csssizeattr] - before_coords) + "px";
         return false;
       } else if (!preferfirst && space_after >= size[sizeattr]) {
         if (dompack.debugflags.men)
@@ -962,7 +964,7 @@ class MenuList extends MenuBase {
       if (preferfirst)
         styles[minattr] = bounds[minattr] + "px";
       else
-        styles[maxattr] = (bodybounds[csssizeattr] - bounds[maxattr]) + "px";
+        styles[maxattr] = (containingblock[csssizeattr] - bounds[maxattr]) + "px";
     } else if ((viewport[maxattr] - viewport[minattr]) >= size[sizeattr]) {
       if (dompack.debugflags.men)
         console.log("[men] Fits within view - honour direction, stick to view border");
@@ -970,7 +972,7 @@ class MenuList extends MenuBase {
       if (preferfirst)
         styles[minattr] = viewport[minattr] + "px";
       else
-        styles[maxattr] = (bodybounds[csssizeattr] - viewport[maxattr]) + "px";
+        styles[maxattr] = (containingblock[csssizeattr] - viewport[maxattr]) + "px";
     } else {
       if (dompack.debugflags.men)
         console.log("[men] Doesn't fit at all - stick to top. Force the max size to force scroll");
@@ -1004,7 +1006,7 @@ class MenuList extends MenuBase {
 -       @param preferredalign - left/right (only used when preferreddirection is 'up' or 'down')
       @param exitdirection - '', 'top', 'left' - cursor directio in nwhich the selection can be removed
   */
-  _openMenu(coords: dompack.Rect, preferreddirection: PreferredDirection, parentmenu: MenuBase | null, preferredalign: PreferredDirection | null, exitdirection: ExitDirection, minwidth: number, options?: MenuOptions) {
+  _openMenu(coords: dompack.Rect, preferreddirection: PreferredDirection, parentmenu: MenuBase | null, preferredalign: PreferredDirection | null, exitdirection: ExitDirection, minwidth: number, options?: MenuOptions, owner?: HTMLLIElement) {
     if (dompack.debugflags.men)
       console.log("[men] openMenu called, prefdir:", preferreddirection, "prefalign:", preferreddirection, "exitdir", exitdirection);
 
@@ -1012,9 +1014,17 @@ class MenuList extends MenuBase {
 
     this._fixupDividers();
 
-    if (document.body.contains(this.el)) {
-      this.substitutionnode = this.el.cloneNode(false) as HTMLElement; //create a copy with the same style/class, to avoid the ul snapping to block mode
-      this.el.replaceWith(this.substitutionnode!);
+    const wasConnected = this.el.isConnected;
+    this.removeOnClose = !wasConnected && !parentmenu;
+    const destination = owner && this.el.parentElement !== owner && !this.el.contains(owner) ? owner : !parentmenu && !owner ? document.body : null;
+    if (destination && this.el.parentElement !== destination) {
+      if (wasConnected) {
+        this.substitutionnode = this.el.cloneNode(false) as HTMLElement;
+        this.el.replaceWith(this.substitutionnode);
+      }
+      destination.appendChild(this.el);
+    } else if (!wasConnected) {
+      document.body.appendChild(this.el);
     }
 
     this.parentmenu = parentmenu;
@@ -1025,7 +1035,6 @@ class MenuList extends MenuBase {
     this.preferreddirection = preferreddirection;
     this.exitdirection = exitdirection || 'notspecified';
 
-    document.body.appendChild(this.el);
     this.el.showPopover();
 
     // Reset sizes before measuring
@@ -1049,19 +1058,8 @@ class MenuList extends MenuBase {
     size.x = Math.ceil(Math.max(size.x, minwidth || 0)); //round up, because we need 110 pixels for a 109.007 wide menu.
     size.y = Math.ceil(size.y); //round up, because we need 110 pixels for a 109.007 wide menu.
 
-    // Calculate the viewport relative to the body
-    let bodybounds = document.body.getBoundingClientRect();
-    bodybounds = { left: bodybounds.left, top: bodybounds.top, right: bodybounds.right, bottom: bodybounds.bottom, height: bodybounds.height, width: bodybounds.width, x: bodybounds.x, y: bodybounds.y } as DOMRect;
     const viewsize = { x: window.innerWidth, y: window.innerHeight };
-    const viewport =
-    {
-      left: -bodybounds.left,
-      top: -bodybounds.top,
-      right: -bodybounds.left + viewsize.x,
-      bottom: -bodybounds.top + viewsize.y,
-      width: 0,
-      height: 0
-    };
+    const viewport: dompack.Rect = { left: 0, top: 0, right: viewsize.x, bottom: viewsize.y, width: viewsize.x, height: viewsize.y };
 
     const bounds = { ...viewport };
 
@@ -1082,21 +1080,21 @@ class MenuList extends MenuBase {
       console.log("[men]  menu size", size);
       console.log("[men]  bounds", bounds);
       console.log("[men]  viewport ", viewport, viewsize);
-      console.log("[men]  body bounds", { ...bodybounds });
+      console.log("[men]  viewport bounds", { ...viewport });
     }
 
     // ADDME: maybe save the resulting direction and alignment in this.currentdirection and this.currentalign
     if (preferreddirection === "left" || preferreddirection === "right" || !preferreddirection) {
       // Right is preferred direction
-      this._calculatePosition(styles, coords, size, bounds, viewport, bodybounds, true, preferreddirection === "left", false);
+      this._calculatePosition(styles, coords, size, bounds, viewport, viewport, true, preferreddirection === "left", false);
 
       // Down is preferred alignment
-      this._calculatePosition(styles, coords, size, bounds, viewport, bodybounds, false, preferredalign === "up", true);
+      this._calculatePosition(styles, coords, size, bounds, viewport, viewport, false, preferredalign === "up", true);
     } else {
-      this._calculatePosition(styles, coords, size, bounds, viewport, bodybounds, false, preferreddirection === "up", false);
+      this._calculatePosition(styles, coords, size, bounds, viewport, viewport, false, preferreddirection === "up", false);
 
       // Left is preferred alignment
-      this._calculatePosition(styles, coords, size, bounds, viewport, bodybounds, true, preferredalign === "right", true);
+      this._calculatePosition(styles, coords, size, bounds, viewport, viewport, true, preferredalign === "right", true);
     }
 
     if (dompack.debugflags.men)
@@ -1124,11 +1122,12 @@ class MenuList extends MenuBase {
 
     if (this.substitutionnode) {
       this.substitutionnode.replaceWith(this.el);
-    } else {
+    } else if (this.removeOnClose) {
       this.el.remove();
     }
 
     this.substitutionnode = null;
+    this.removeOnClose = false;
   }
 }
 
@@ -1145,21 +1144,25 @@ export function openAt(el: HTMLElement, at: Pick<MouseEvent, "pageX" | "pageY" |
     throw new Error("openAt requires an object, not an #id");
 
   let coords: dompack.Rect;
+  const opener = 'target' in at ? at.target : at;
+  const owner = opener instanceof Element ? opener.closest("li") || undefined : undefined;
   if ('pageX' in at && 'pageY' in at) {
     options!.direction = "right";
-    coords = { left: at.pageX || 0, right: at.pageX || 0, top: at.pageY || 0, bottom: at.pageY || 0, width: 0, height: 0 };
+    const x = (at.pageX || 0) - window.scrollX;
+    const y = (at.pageY || 0) - window.scrollY;
+    coords = { left: x, right: x, top: y, bottom: y, width: 0, height: 0 };
     if (!options!.eventnode)
       options!.eventnode = at.target as HTMLElement; //make sure events are injected at the click location
   } else {
-    //@ts-expect-error FIXME cleanup calling synatx
-    coords = dompack.getRelativeBounds(at.target || at);
+    if (!(opener instanceof Element))
+      throw new Error("openAt requires an element or an event with an element target");
+    coords = dompack.getRelativeBounds(opener);
     if (!options!.direction) {
       options!.direction = "right";
       coords = { left: coords.left, right: coords.left, top: coords.top, bottom: coords.bottom, width: 0, height: 0 };
     }
     if (!options!.eventnode)
-      //@ts-expect-error FIXME cleanup calling synatx
-      options!.eventnode = at.target || at;
+      options!.eventnode = opener as HTMLElement;
   }
 
   const openoptions =
@@ -1180,7 +1183,7 @@ export function openAt(el: HTMLElement, at: Pick<MouseEvent, "pageX" | "pageY" |
     openaslistoptions.forcenooverlap = options!.forcenooverlap;
 
   eventnode = cureventnode || null;
-  openAsList(ml, coords, openoptions.direction, openoptions.align || '', openoptions.exitdirection as ExitDirection, 0, openaslistoptions);
+  openAsList(ml, coords, openoptions.direction, openoptions.align || '', openoptions.exitdirection as ExitDirection, 0, openaslistoptions, owner);
 
   return ml;
 }

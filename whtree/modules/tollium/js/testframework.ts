@@ -84,7 +84,7 @@ class ScreenProxy {
             test.click(curitem);
 
           // Get the relevant detached menu
-          curitem = this.win.node.ownerDocument.querySelectorAll<HTMLElement>('.wh-menulist:popover-open')[i - 1];
+          curitem = curitem.querySelector<HTMLElement>(":scope > ul.wh-menulist:popover-open");
           if (!curitem)
             throw new Error('Could not find detached menu');
         }
