@@ -1,0 +1,46 @@
+# Uses https://github.com/maxlapides/cherry-picker
+# Responds to issue comments: `cherry-pick to release/88.0 release/87.0`
+name: Cherry-Pick PR
+
+on:
+  issue_comment:
+    types:
+      - created
+      - edited
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  cherry-pick:
+    name: Cherry-Pick PR
+    if: ${{ (github.event.issue.pull_request && (startsWith(github.event.comment.body, 'cherry-pick to') || startsWith(github.event.comment.body, 'cherry pick to'))) || github.event.pull_request.merged }}
+    # Scope concurrency to eligible jobs, so bot replies and unrelated comments
+    # cannot replace pending work. Every run reconciles all current requests.
+    concurrency:
+      group: cherry-pick-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
+      queue: max
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get token
+        id: get_token
+        uses: actions/create-github-app-token@v1
+        with:
+          private-key: ${{ secrets.WEBHARE_BOT_PRIVATEKEY }}
+          app-id: ${{ secrets.WEBHARE_BOT_APPID }}
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ steps.get_token.outputs.token }}
+
+      - name: Run Cherry-Pick Action
+        uses: maxlapides/cherry-picker@96e6113000ba1c01e0d34effb5b94a58b4b3f85a
+        with:
+          token: ${{ steps.get_token.outputs.token }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+          pr_number: ${{ github.event.issue.number || github.event.number }}
+          # cherry-pick PRs should be reviewed and merged manually.
+          auto_approve_and_merge: false
