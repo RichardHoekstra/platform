@@ -64,8 +64,8 @@ testContainerTagCalculation()
   CI_COMMIT_REF_NAME=main
   CI_COMMIT_REF_SLUG=main
 
-  # building 'main' when our release/x-y branch exist should just buikld 'main'
-  echo ---- CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME CI_COMMIT_REF_SLUG=$CI_COMMIT_REF_SLUG with WEBHARE_VERSION-5.6.7
+  # building 'main' when our release/x-y branch exists should just build 'main'
+  echo ---- CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME CI_COMMIT_REF_SLUG=$CI_COMMIT_REF_SLUG with WEBHARE_VERSION=5.6.7
   get_finaltag
   list_finaltag
   testEq "ghcr.io/webhare/platform:main" "$BRANCH_IMAGES"

@@ -11,10 +11,13 @@ on:
     types:
       - closed
 
+permissions:
+  contents: read
+
 jobs:
   cherry-pick:
     name: Cherry-Pick PR
-    if: ${{ (github.event.issue.pull_request && (startsWith(github.event.comment.body, 'cherry-pick to') || startsWith(github.event.comment.body, 'cherry pick to'))) || github.event.pull_request.merged }}
+    if: ${{ (github.event.issue.pull_request && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association) && (startsWith(github.event.comment.body, 'cherry-pick to') || startsWith(github.event.comment.body, 'cherry pick to'))) || github.event.pull_request.merged }}
     # Scope concurrency to eligible jobs, so bot replies and unrelated comments
     # cannot replace pending work. Every run reconciles all current requests.
     concurrency:
