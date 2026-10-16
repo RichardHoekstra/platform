@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ref: [main] #FIXME add release/6.1 etc as soon as feasible
+        ref: [main, release/6.1]
     steps:
       - uses: actions/github-script@v7
         env:
