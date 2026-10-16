@@ -259,7 +259,21 @@ trim()
 }
 
 function exists_origin_branch() {
-  git -C "$WEBHARE_CHECKEDOUT_TO" ls-remote  --exit-code --heads origin "$1"   # >/dev/null 2>&1
+  local RC OUTPUT
+  if OUTPUT=$(git -C "$WEBHARE_CHECKEDOUT_TO" ls-remote --exit-code --heads origin "refs/heads/$1" 2>&1); then
+    return 0  # The branch exists
+  else
+    RC=$?
+  fi
+
+  if [[ "$RC" -eq 2 ]]; then
+    return 1  # The branch does not exist
+  fi
+
+  # Network errors? We can't safely continue
+  printf 'Unexpected return code %s from git ls-remote\n' "$RC" >&2
+  printf '%s\n' "$OUTPUT" >&2
+  exit 1
 }
 
 # Calculate the image tags for the build/test/deploy process
