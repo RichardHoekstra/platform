@@ -1,5 +1,5 @@
 /* This files lives in whtree/nginx-router as it requires libraries incompatible with node
-   (eg. readFileSync in nodejs doesn't accept 'utf-8' buffer directly, only 'utf8')
+   (eg. readFileSync in nodejs doesn't accept 'utf-8' as the encoding parameter, only 'utf8')
 
    TODO: still need to tsc-validate this during WebHare builds
 */

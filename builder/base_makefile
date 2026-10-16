@@ -601,7 +601,7 @@ setup-nginx: $(NGINX_MODULE)
 $(SRCDIR)/vendor/njs/nginx/config:
 	git -C "$(SRCDIR)" submodule update --init --recursive vendor/njs
 
-$(NGINX_MODULE): $(SRCDIR)/vendor/setup-nginx.sh $(SRCDIR)/vendor/njs/nginx/config $(SRCDIR)/vendor/setup-nginx.sh
+$(NGINX_MODULE): $(SRCDIR)/vendor/setup-nginx.sh $(SRCDIR)/vendor/njs/nginx/config
 	bash $(SRCDIR)/vendor/setup-nginx.sh "$(dir $@)"
 
 ifeq ($(WEBHARE_WEBSERVER),nginxjs)
