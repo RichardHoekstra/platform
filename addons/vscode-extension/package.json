@@ -9,7 +9,7 @@
 	"version": "1.2.0",
 	"repository": {
 		"type": "git",
-		"url": "https://gitlab.com/webhare/platform"
+		"url": "https://github.com/WebHare/platform"
 	},
 	"engines": {
 		"vscode": "^1.134.0"

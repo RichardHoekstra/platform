@@ -164,9 +164,6 @@ Keep in mind that the buildscripts will list all the set variables and their con
 You need to make sure you fully control and trust whatever the URL points to as any shell code in the script it
 points to may be executed by the test runner as well.
 
-This variable can be setup as eg a [GitLab CI/CD environment variable](https://gitlab.com/help/ci/variables/README).
-Please make sure you protect it !
-
 ### TESTFW_TWOHARES
 If set the CI framework will launch a second WebHare (used for test_peerserver)
 

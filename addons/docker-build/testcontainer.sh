@@ -151,7 +151,7 @@ create_container()
   if [ -n "$WEBHARE_CI_ACCESS_DOCKERHOST" ]; then # Running on our infra, so predictable paths
     echo ""
     echo "To access the runner:    ${WEBHARE_CI_ACCESS_DOCKERHOST}"
-    echo "To access the container: ${WEBHARE_CI_ACCESS_RUNNER} docker exec -ti ${TESTENV_CONTAINER1} /bin/bash"
+    echo "To access the container: ${WEBHARE_CI_ACCESS_RUNNER} ${CONTAINERENGINE[*]} exec -ti ${TESTENV_CONTAINER1} /bin/bash"
     echo ""
   fi
 

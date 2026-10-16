@@ -4,11 +4,11 @@
   "license": "MIT",
   "homepage": "https://www.webhare.dev/",
   "bugs": {
-    "url": "https://gitlab.com/webhare/platform/-/issues"
+    "url": "https://github.com/WebHare/platform/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://gitlab.com/webhare/platform.git"
+    "url": "git+https://github.com/WebHare/platform.git"
   },
   "version": "",
   "workspaces": [

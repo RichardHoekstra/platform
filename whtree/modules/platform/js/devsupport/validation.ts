@@ -213,6 +213,9 @@ function pointerToYamlPath(ptr: string): string[] {
 }
 
 export async function runYAMLBasedValidator(result: ValidationState, content: WebHareBlob, resource: string, options?: ValidationOptions): Promise<void> {
+  if (resource.startsWith("direct::")) //lives outside a module
+    return;
+
   const data = await content.text();
   const tracked = new TrackedYAML<object>(data);
 

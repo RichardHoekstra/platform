@@ -85,7 +85,7 @@ jobs:
       CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
       PUBLIC_REGISTRY_IMAGE: ${{ needs.prepare.outputs.PUBLIC_REGISTRY_IMAGE }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository }}
           ref: ${{ inputs.ref || github.sha }}
@@ -114,7 +114,7 @@ jobs:
     name: VS Code extension tests
     runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - run: addons/vscode-extension/scripts/run-extension-tests.sh
@@ -161,7 +161,7 @@ jobs:
           - { name: two-hares, command: 'addons/docker-build/testcontainer.sh --podman --nocheckmodule --twohares --testscript $PWD/whtree/modules/webhare_testsuite/scripts/whcommands/twoharetests.sh', allow_failure: false }
           - { name: backup-restore, command: 'TESTFW_SKIP_FINALIZE_CI=1 addons/docker-build/testcontainer.sh --podman --nocheckmodule --testscript $PWD/whtree/modules/webhare_testsuite/scripts/whcommands/backup-restore-test.sh', allow_failure: false }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository }}
           ref: ${{ inputs.ref || github.sha }}
@@ -207,12 +207,12 @@ jobs:
       DOCKERHUB_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_REGISTRY_PASSWORD }}
       PUBLIC_REGISTRY_IMAGE: ${{ needs.prepare.outputs.PUBLIC_REGISTRY_IMAGE }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository }}
           ref: ${{ inputs.ref || github.sha }}
           allow-unsafe-pr-checkout: true # Needed to be able to pull for Fork PRs
-          submodules: recursive
+          submodules: false
       - uses: ./.github/actions/checkout-and-login
         with:
           ref: ${{ inputs.ref || github.sha }}
