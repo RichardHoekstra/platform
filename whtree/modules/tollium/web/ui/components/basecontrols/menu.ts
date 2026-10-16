@@ -216,15 +216,15 @@ function _gotGlobalMouseDown(htmlevent: Event) {
 function _gotGlobalKeyPressed(htmlevent: KeyboardEvent) {
   // INV: this.activemenus.length > 0
 
-  const keydata = dompack.normalizeKeyboardEventData(htmlevent);
+  const key = htmlevent.key;
   //Function key or possible shortcut (ctrl/alt/meta is pressed and none of the composing or arrow keys is triggering us), then close and let it be handled
-  if (keydata.key.match(/^F.+/) || ((keydata.ctrlKey || keydata.altKey || keydata.metaKey) && !keydata.key.match(/^(Control$|Alt$|Meta$|Shift$|Arrow)/))) {
+  if (key.match(/^F.+/) || ((htmlevent.ctrlKey || htmlevent.altKey || htmlevent.metaKey) && !key.match(/^(Control$|Alt$|Meta$|Shift$|Arrow)/))) {
     closeAll();
     return;
   }
 
   // Global key handling
-  if (keydata.key === "Escape") {
+  if (key === "Escape") {
     closeAll();
     htmlevent.preventDefault();
     htmlevent.stopPropagation();
@@ -451,7 +451,7 @@ class MenuBase {
   depth = 0;
   parentmenu: MenuBase | null = null;
   exitdirection = '';
-  selecteditem: HTMLElement | null = null;
+  selecteditem: HTMLLIElement | null = null;
   currentalign: PreferredDirection | null;
 
   constructor(el: HTMLElement, openonhover: boolean) {
@@ -502,40 +502,33 @@ class MenuBase {
     return this.horizontalsubs;
   }
 
-  // _selectRelativeItem(position: Position, scroll: boolean)
-  // {
-  //   const items = this._getSelectableItems(this.el);
-  //   let pos = this.selecteditem ? items.indexOf(this.selecteditem) : -1;
-  //   if (!items.length)
-  //     return;
+  private getSelectableItems() {
+    return this._getMenuItems().filter(item => !item.matches('.divider, .disabled, .hidden'));
+  }
 
-  //   switch (position)
-  //   {
-  //   case "first":       pos = 0; break;
-  //   case "last":        pos = items.length - 1; break;
-  //   case "next":        pos = pos + 1; break;
-  //   case "previous":    pos = pos - 1; break;
-  //   }
+  private selectRelativeItem(position: "first" | "last" | "previous" | "next", scroll: boolean) {
+    const items = this.getSelectableItems();
+    if (!items.length)
+      return;
 
-  //   if (pos >= items.length)
-  //     return;
+    let pos = this.selecteditem ? items.indexOf(this.selecteditem) : -1;
+    switch (position) {
+      case "first": pos = 0; break;
+      case "last": pos = items.length - 1; break;
+      case "next": ++pos; break;
+      case "previous": --pos; break;
+    }
 
-  //   if (pos < 0)
-  //   {
-  //     if (this.exitdirection === (this._isOrientationVertical() ? "top" : "left"))
-  //       this._selectItem(null);
+    if (pos >= items.length)
+      return;
 
-  //     return;
-  //   }
+    if (pos < 0) {
+      if (this.exitdirection === (this._isOrientationVertical() ? "top" : "left"))
+        this._selectItem(null);
+      return;
+    }
 
-  //   this._selectItem(items[pos], scroll);
-  // }
-
-  _getSelectableItems() {
-    // const node = this.el;
-    //    return Array.from(node.childNodes).filter(node => dompack.matches(node,"li:not(.divider,.disabled,.hidden)"));
-    // return node.getElements('>li:not(.divider,.disabled,.hidden)');
-    throw new Error(`This code must have been unreachable? tried to Moo node.getElements...`);
+    this._selectItem(items[pos], scroll);
   }
 
   _fireOpenCloseEvent(isopen: boolean) {
@@ -663,15 +656,13 @@ class MenuBase {
       return false;
 
     switch (event.key) {
-      case 'enter': return this._handleKeyEnter(event);
-      case 'up': return this._handleKeyUp(event, topmenu);
-      case 'down': return this._handleKeyDown(event, topmenu);
-      case 'left': return this._handleKeyLeft(event, topmenu);
-      case 'right': return this._handleKeyRight(event, topmenu);
-      case "home": return this._handleKeyHome(event, topmenu);
-      case "end": return this._handleKeyEnd(event, topmenu);
-      case "meta+up": return this._handleKeyHome(event, topmenu);
-      case "meta+down": return this._handleKeyEnd(event, topmenu);
+        case "Enter": return this._handleKeyEnter(event);
+        case "ArrowUp": return event.metaKey ? this._handleKeyHome(event, topmenu) : this._handleKeyUp(event, topmenu);
+        case "ArrowDown": return event.metaKey ? this._handleKeyEnd(event, topmenu) : this._handleKeyDown(event, topmenu);
+        case "ArrowLeft": return this._handleKeyLeft(event, topmenu);
+        case "ArrowRight": return this._handleKeyRight(event, topmenu);
+        case "Home": return this._handleKeyHome(event, topmenu);
+        case "End": return this._handleKeyEnd(event, topmenu);
       default: return false;
     }
   }
@@ -684,7 +675,7 @@ class MenuBase {
       if (!this.selecteditem && !topmenu)
         return false;
 
-      // this._selectRelativeItem("previous", true);
+      this.selectRelativeItem("previous", true);
       return true;
     } else {
       if (this.selecteditem && this.exitdirection === "top") {
@@ -704,11 +695,11 @@ class MenuBase {
       if (!this.selecteditem && !topmenu)
         return false;
 
-      // this._selectRelativeItem("next", true);
+      this.selectRelativeItem("next", true);
       return true;
     } else {
       if (this.openedsubmenu && !this.openedsubmenu.selecteditem) {
-        // this.openedsubmenu._selectRelativeItem("first", true);
+        this.openedsubmenu.selectRelativeItem("first", true);
         return true;
       }
     }
@@ -729,7 +720,7 @@ class MenuBase {
       if (!this.selecteditem && !topmenu)
         return false;
 
-      // this._selectRelativeItem("previous", true);
+      this.selectRelativeItem("previous", true);
       return true;
     }
 
@@ -742,14 +733,14 @@ class MenuBase {
 
     if (this._isOrientationVertical()) {
       if (this.openedsubmenu && !this.openedsubmenu.selecteditem) {
-        // this.openedsubmenu._selectRelativeItem("first", true);
+        this.openedsubmenu.selectRelativeItem("first", true);
         return true;
       }
     } else {
       if (!this.selecteditem && !topmenu)
         return false;
 
-      // this._selectRelativeItem("next", true);
+      this.selectRelativeItem("next", true);
       return true;
     }
 
@@ -763,7 +754,7 @@ class MenuBase {
     if (!this.selecteditem && !topmenu)
       return false;
 
-    // this._selectRelativeItem("first", true);
+    this.selectRelativeItem("first", true);
     return true;
   }
 
@@ -774,7 +765,7 @@ class MenuBase {
     if (!this.selecteditem && !topmenu)
       return false;
 
-    // this._selectRelativeItem("last", true);
+    this.selectRelativeItem("last", true);
     return true;
   }
 

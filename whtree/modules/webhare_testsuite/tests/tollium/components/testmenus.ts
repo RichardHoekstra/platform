@@ -33,7 +33,12 @@ test.runTests(
       test.assert(X01.classList.contains("selected"));
       test.assert(X09.classList.contains("selected"));
       test.assert(!test.getCurrentApp().isBusy());
-      test.click(X09);
+      const X02 = X09.previousElementSibling as HTMLLIElement;
+      await test.pressKey('ArrowUp');
+      test.assert(X02.classList.contains("selected"));
+      await test.pressKey('ArrowDown');
+      test.assert(X09.classList.contains("selected"));
+      await test.pressKey('Enter');
       test.assert(test.getCurrentApp().isBusy());
       await test.waitForUI();
     },
