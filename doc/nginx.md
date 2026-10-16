@@ -1,6 +1,6 @@
 # nginx with njs (JavaScript)
 To build nginx with njs support:
-`WEBHARE_WEBSERVER=nginxjs wh mak install`
+`WEBHARE_WEBSERVER=nginxjs wh make install`
 
 To run WebHare with a nginx frontend:
 `WEBHARE_WEBSERVER=nginxjs wh console`
