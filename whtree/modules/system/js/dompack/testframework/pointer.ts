@@ -425,8 +425,8 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
   if (eventtype !== 'dragstart' && dragop.effectAllowed === "uninitialized")
     dragop.effectAllowed = "all";
 
-  const wantcopy = !dragop.options.shift && (browserPlatform === "mac" ? dragop.options.meta : dragop.options.ctrl);
-  const wantlink = dragop.options.shift && (browserPlatform === "mac" ? dragop.options.meta : dragop.options.ctrl);
+  const wantcopy = browserPlatform === "mac" ? dragop.options.alt && !ctrl : ctrl && !dragop.options.shift;
+  const wantlink = browserPlatform === "mac" ? ctrl && !dragop.options.alt : ctrl && dragop.options.shift;
 
   let dropEffect = "none";
   if (eventtype === "drop" || eventtype === "dragend")
@@ -457,8 +457,6 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
     } else if (getName() === "safari") {
       dataTransfer.dropEffect = 'none';
       dataTransfer.effectAllowed = ctrl ? dragop.options.shift ? "link" : "copy" : "all";
-    } else if (getName() === "firefox") {
-      dataTransfer.dropEffect = ctrl ? dragop.options.shift ? "link" : "copy" : "move";
     }
   }
 
