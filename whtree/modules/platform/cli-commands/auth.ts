@@ -2,11 +2,12 @@
 
 import jwt from "jsonwebtoken";
 import { type AnyWRDSchema, type WRDSchemaLike, type WRDSchemaType, getSchemaSettings, isValidWRDTag, wrd } from '@webhare/wrd';
+import YAML from 'yaml';
 import { loadlib } from '@webhare/harescript/src/contextvm';
 import type { HSVMObject } from '@webhare/harescript/src/harescript';
 import { backendConfig, importJSObject, type SessionScopes } from '@webhare/services';
 import { beginWork, commitWork, db } from '@webhare/whdb';
-import { compressUUID, createFirstPartyToken, IdentityProvider, type AuthTokenOptions } from "@webhare/auth/src/identity";
+import { compressUUID, createFirstPartyToken, decodeJWT, IdentityProvider, type AuthTokenOptions } from "@webhare/auth/src/identity";
 import { pick } from '@webhare/std';
 import { CLIRuntimeError, runCli } from "@webhare/cli";
 import { registerRelyingParty, initializeIssuer, getOpenIDMetadataURL, type AuthCustomizer, getDefaultOAuth2RedirectURL } from '@webhare/auth';
@@ -102,7 +103,14 @@ runCli({
         else
           console.dir(finalList, { depth: null });
       }
-
+    },
+    "decode-jwt": {
+      shortDescription: "Decode a JWT token",
+      arguments: [{ name: "<jwt>", description: "JWT token" }],
+      main: async ({ opts, args }) => {
+        const payload = decodeJWT(args.jwt);
+        console.log(opts.json ? JSON.stringify(payload, null, 2) : YAML.stringify(payload));
+      }
     },
     "idp-setup": {
       shortDescription: "Setup an identity provider for a schema",
