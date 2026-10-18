@@ -2,6 +2,7 @@ import * as test from '@mod-tollium/js/testframework';
 import * as tt from '@mod-webhare_testsuite/js/tolliumtest-wts';
 import type { IndyShell } from '@mod-tollium/web/ui/js/shell';
 import type { ObjFrame } from '@mod-tollium/webdesigns/webinterface/components/frame/frame';
+import { throwError } from '@webhare/std';
 
 
 function getDividers(menu: ParentNode): HTMLLIElement[] {
@@ -121,6 +122,7 @@ test.runTests(
       test.assert(X04submenu.matches(":popover-open"));
       test.eq(X04, X04submenu.parentElement);
       const openSubmenu = test.getOpenMenu();
+      test.assert(openSubmenu);
       X07 = test.qSA(openSubmenu, "li").filter(item => item.textContent.includes('X07'))[0];
       const X08 = test.qSA(openSubmenu, "li").filter(item => item.textContent.includes('X08'))[0];
       test.assert(X01.getBoundingClientRect().top === X04.getBoundingClientRect().top, "menubar items should stay on one row");
@@ -128,28 +130,28 @@ test.runTests(
       test.assert(getComputedStyle(X07).paddingTop === "0px", "submenu text should not inherit menubar padding");
 
       //verify that only X07, X08, and the divider between them are visible
-      test.assert(!test.qSA(test.getOpenMenu(), "li").filter(li => li.textContent.includes('X05'))[0]);
-      test.assert(!test.qSA(test.getOpenMenu(), "li").filter(li => li.textContent.includes('X06'))[0]);
-      test.assert(test.qSA(test.getOpenMenu(), "li").filter(li => li.textContent.includes('X07'))[0]);
-      test.assert(test.qSA(test.getOpenMenu(), "li").filter(li => li.textContent.includes('X08'))[0]);
-      test.assert(!test.qSA(test.getOpenMenu(), "li").filter(li => li.textContent.includes('X07'))[0].classList.contains("disabled"));
-      test.assert(test.qSA(test.getOpenMenu(), "li").filter(li => li.textContent.includes('X08'))[0].classList.contains("disabled"));
+      test.assert(!test.qSA(openSubmenu, "li").filter(li => li.textContent.includes('X05'))[0]);
+      test.assert(!test.qSA(openSubmenu, "li").filter(li => li.textContent.includes('X06'))[0]);
+      test.assert(test.qSA(openSubmenu, "li").filter(li => li.textContent.includes('X07'))[0]);
+      test.assert(test.qSA(openSubmenu, "li").filter(li => li.textContent.includes('X08'))[0]);
+      test.assert(!test.qSA(openSubmenu, "li").filter(li => li.textContent.includes('X07'))[0].classList.contains("disabled"));
+      test.assert(test.qSA(openSubmenu, "li").filter(li => li.textContent.includes('X08'))[0].classList.contains("disabled"));
 
-      const visibledividers = getDividers(test.getOpenMenu());
+      const visibledividers = getDividers(openSubmenu);
       test.eq(1, visibledividers.length);
       const previousElementSibling = visibledividers[0].previousElementSibling;
       test.assert(previousElementSibling);
       test.eq('X07 item', previousElementSibling.textContent);
 
       //Click the last menu item
-      test.click(test.qSA(test.getOpenMenu(), "li").filter(li => li.textContent.includes('X08'))[0]);
+      test.click(test.qSA(openSubmenu, "li").filter(li => li.textContent.includes('X08'))[0]);
 
       test.eq('1', test.compByName("action1count").textContent); //action was disabled, so nothing should have happened
 
       menu = test.qR('.wh-menubar');
       X04 = test.qR<HTMLLIElement>(menu, "li[data-menuitem$=':x04menu']");
       test.click(X04);
-      X07 = test.qSA(test.getOpenMenu(), "li").filter(item => item.textContent.includes('X07'))[0];
+      X07 = test.qSA(openSubmenu, "li").filter(item => item.textContent.includes('X07'))[0];
       test.click(X07);
       await test.waitForUI();
     },
@@ -159,7 +161,7 @@ test.runTests(
       const menu = test.qR('.wh-menubar');
       const X04 = test.qR<HTMLLIElement>(menu, "li[data-menuitem$=':x04menu']");
       test.click(X04);
-      const X05 = test.qSA(test.getOpenMenu(), "li").filter(li => li.textContent.includes('X05'))[0];
+      const X05 = test.qSA(test.getOpenMenu() ?? throwError("Missing menu"), "li").filter(li => li.textContent.includes('X05'))[0];
       test.assert(!X05.classList.contains("hidden"));
       test.eq(2, getDividers(test.qSA(".wh-menu:popover-open").slice(-1)[0]).length);
 

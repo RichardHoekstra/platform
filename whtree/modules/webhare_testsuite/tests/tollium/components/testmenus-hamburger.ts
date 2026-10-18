@@ -120,8 +120,10 @@ test.runTests(
         const lastbutton = test.getCurrentScreen().qR('t-toolbar .t-toolbar-buttongroup__right button:last-child');
         test.assert(lastbutton.classList.contains("ismenubutton"));
         test.click(lastbutton);
-        test.click(test.qR(test.getOpenMenu(), 'li[data-menuitem$=":x01menu"]'));
-        test.click(test.qR(test.getOpenMenu(), 'li[data-menuitem$=":x18"]'));
+        const menu = test.getOpenMenu();
+        test.assert(menu);
+        test.click(test.qR(menu, 'li[data-menuitem$=":x01menu"]'));
+        test.click(test.qR(menu, 'li[data-menuitem$=":x18"]'));
         await test.waitForUI();
       }
     },
