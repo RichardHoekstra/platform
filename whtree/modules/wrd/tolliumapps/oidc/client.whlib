@@ -22,7 +22,7 @@ PUBLIC STATIC OBJECTTYPE Providers EXTEND TolliumScreenBase <
   }
 
   RECORD ARRAY FUNCTION MapProviders(RECORD ARRAY rows) {
-    RETURN SELECT *, idpicon := ^providers->embeddedlist->GetIcon(GuessOpenIdIcon(metadataurl).tollium)  FROM rows;
+    RETURN SELECT *, idpicon := ^providers->embeddedlist->GetIcon(GuessOpenIdIcon(metadata_url).tollium)  FROM rows;
   }
 
   INTEGER FUNCTION OnEditProvider(OBJECT wrdtype, RECORD context, INTEGER entityid) {
@@ -38,6 +38,8 @@ PUBLIC STATIC OBJECTTYPE Providers EXTEND TolliumScreenBase <
 >;
 
 PUBLIC STATIC OBJECTTYPE EditProvider EXTEND WRDEntityEditScreenBase <
+  STRING initial_clientsecret;
+
   UPDATE MACRO Init(RECORD data) {
     ^entity->^redirect_uri->options :=
       [[ title := GetDefaultOauth2RedirectURL() ]
@@ -45,18 +47,35 @@ PUBLIC STATIC OBJECTTYPE EditProvider EXTEND WRDEntityEditScreenBase <
 
     WRDEntityEditScreenBase::Init(data);
 
+    IF(data.id != 0) {
+      RECORD signing := ^entity->wrdtype->GetEntityFields(data.id, [ "client_signing" ]).client_signing;
+      IF(RecordExists(signing) AND signing.type = "client_secret")
+        this->initial_clientsecret := signing.secret;
+      ELSE IF(RecordExists(signing)) {
+        ^clientsecret->enabled := FALSE;
+        ^showclientsecret->enabled := FALSE;
+      }
+    }
+    ^clientsecret->value := this->initial_clientsecret;
+
     IF(^entity->^redirect_uri->value = "")
       ^entity->^redirect_uri->value := GetDefaultOauth2RedirectURL();
 
-    ^entity->^loginfield->required := ^entity->^loginfield->value != ""; //should never go empty again!
+    ^entity->^login_field->required := ^entity->^login_field->value != ""; //should never go empty again!
+  }
+
+  UPDATE RECORD FUNCTION Submitter(OBJECT work, RECORD updatevalue) {
+    IF(^clientsecret->enabled AND ^clientsecret->value != this->initial_clientsecret)
+      updatevalue := CELL[ ...updatevalue, client_signing := ^clientsecret->value != "" ? CELL[ type := "client_secret", secret := ^clientsecret->value ] : DEFAULT RECORD ];
+    RETURN updatevalue;
   }
 
   MACRO OnOpenMetadataURL(OBJECT browser) {
-    browser->SendURL(^entity->^metadataurl->value);
+    browser->SendURL(^entity->^metadata_url->value);
   }
 
   MACRO OnReveal() {
-    ^entity->^clientsecret->password := NOT ^showclientsecret->value;
+    ^clientsecret->password := NOT ^showclientsecret->value;
   }
 >;
 

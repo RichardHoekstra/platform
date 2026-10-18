@@ -62,7 +62,7 @@ MACRO RunOpenIDAuth() {
   IF(NOT CellExists(decodedinfo,'idPayload'))
     THROW NEW Exception(`No ID token received from OIDC provider. Was 'openid' scope passed?`);
 
-  RECORD spinfo := wrdschema->GetTypeById(clientinfo.wrdtype)->GetEntityFields(decodedinfo.userdata.provider, ["WRD_ID", "WRD_TAG", "LOGINFIELD"]);
+  RECORD spinfo := wrdschema->GetTypeById(clientinfo.wrdtype)->GetEntityFields(decodedinfo.userdata.provider, ["WRD_ID", "WRD_TAG", "LOGIN_FIELD"]);
   RECORD payload := decodedinfo.idPayload;
 
   IF(IsDebugTagEnabled("oauth2"))
@@ -73,12 +73,12 @@ MACRO RunOpenIDAuth() {
     THROW NEW Exception(`No authplugin found for target ` || decodedinfo.userdata.redirect);
 
   INTEGER userid;
-  VARIANT lookupresult := CallJS("@mod-platform/js/auth/harescript.ts#lookupOIDCUser", targetplugin->__WRDAuthPluginSettings_HS(), decodedinfo.tokens, spinfo.loginfield, decodedinfo.userdata.provider, decodedinfo.userdata.redirect);
+  VARIANT lookupresult := CallJS("@mod-platform/js/auth/harescript.ts#lookupOIDCUser", targetplugin->__WRDAuthPluginSettings_HS(), decodedinfo.tokens, spinfo.login_field, decodedinfo.userdata.provider, decodedinfo.userdata.redirect);
   IF(TYPEID(lookupresult) = TYPEID(INTEGER))
     userid := lookupresult;;
 
   IF(TYPEID(lookupresult) = TYPEID(RECORD) AND NOT RecordExists(lookupresult)) {  //'null' then we fall back to a wrdauthsupport plugin
-    RECORD provider := [ oidc_client := spinfo.wrd_id, oidc_tag := spinfo.wrd_tag, loginfield := spinfo.loginfield ];
+    RECORD provider := [ oidc_client := spinfo.wrd_id, oidc_tag := spinfo.wrd_tag, loginfield := spinfo.login_field ];
     RECORD result := targetplugin->GetSupportObject()->LookupOIDCLogin(payload, provider);
     IF(NOT RecordExists(result) OR (CellExists(result,'userid') AND result.userid = 0)) {
       RECORD logininfo := GetOIDCLoginName(provider, payload);

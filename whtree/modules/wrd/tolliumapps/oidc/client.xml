@@ -19,11 +19,11 @@
                         onentityedit="oneditprovider"
                         onmaprows="mapproviders"
                         orderable="true"
-                        requestcolumns="wrd_title clientid metadataurl"
+                        requestcolumns="wrd_title client_id metadata_url"
                         wrdtype="wrdauth_server">
         <column name="wrd_title" type="text" tid=".buttontitle" />
-        <column name="metadataurl" type="text" />
-        <column name="clientid" type="text" />
+        <column name="metadata_url" type="text" tid=".metadataurl" />
+        <column name="client_id" type="text" tid=".clientid" />
       </wrd:entitiesedit>
     </body>
   </screen>
@@ -41,7 +41,7 @@
     <body>
       <heading doclink="platform:wrdauth/oidc/provider" tid=".provider" />
       <textedit composition="entity" cellname="wrd_title" width="1pr" required="true" tid=".buttontitle" />
-      <textedit composition="entity" cellname="metadataurl" width="1pr" required="true">
+      <textedit composition="entity" cellname="metadata_url" width="1pr" required="true" tid=".metadataurl">
         <button action="openmetadataurl" icon="tollium:actions/openlink" />
       </textedit>
       <textedit composition="entity" cellname="redirect_uri" name="redirect_uri" width="1pr" required="true">
@@ -54,15 +54,15 @@
         <!-- <option rowkey="ifused" /> hide 'ifused' for now, not sure how its viable in practice -->
       </select>
       <heading doclink="platform:wrdauth/oidc/clientsettings" tid=".clientsettings" />
-      <textedit composition="entity" cellname="clientid" width="1pr" minwidth="60x" />
+      <textedit composition="entity" cellname="client_id" width="1pr" minwidth="60x" tid=".clientid" />
       <line>
-        <textedit composition="entity" cellname="clientsecret" width="1pr" password="true" />
+        <textedit name="clientsecret" width="1pr" password="true" tid=".clientsecret" />
         <checkbox name="showclientsecret" labeltid=".reveal" onchange="onreveal" title="" />
       </line>
       <datetime composition="entity" cellname="secret_expiration" type="datetime" storeutc="true" />
       <heading doclink="platform:wrdauth/oidc/configuration" tid=".configuration" />
-      <textedit composition="entity" cellname="additionalscopes" width="1pr" />
-      <textedit composition="entity" cellname="loginfield" width="1pr" placeholder="sub" value="sub" />
+      <textedit composition="entity" cellname="additional_scopes" width="1pr" tid=".additionalscopes" />
+      <textedit composition="entity" cellname="login_field" width="1pr" placeholder="sub" value="sub" tid=".loginfield" />
       <imgedit composition="entity" cellname="icon" width="1pr" height="100px" publisher="false" recommendedsize="48x48" />
       <textarea composition="entity" cellname="comments" width="1pr" minheight="3gr" tid="~comments" />
       <textedit composition="entity" cellname="wrd_tag" width="1pr" minheight="3gr" />
