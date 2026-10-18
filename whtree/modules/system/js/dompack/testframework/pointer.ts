@@ -1,4 +1,3 @@
-/* eslint-disable */
 /// @ts-nocheck -- Bulk rename to enable TypeScript validation
 
 import * as dompack from 'dompack';
@@ -371,7 +370,7 @@ function deepContains(parent: Node, el: Node) {
 function isInDeepDom(el: Node) {
   if (!el.ownerDocument)
     return false;
-  return deepContains(el.ownerDocument.documentElement, el)
+  return deepContains(el.ownerDocument.documentElement, el);
 }
 
 export function getValidatedElementFromPoint(doc: Document, px: number, py: number, expectelement: boolean): Element | null {
@@ -682,7 +681,7 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
   }
 
   event.dataTransfer = dataTransfer;
-  result = checkedDispatchEvent(el, event);
+  result = el.dispatchEvent(event);
 
   if (eventtype === "dragover" && !result) { // dragover event is cancelled
     if (dataTransfer.dropEffect === "copy" && ["uninitialized", "copy", "copyLink", "copyMove", "all"].includes(dragop.effectAllowed))
@@ -774,9 +773,7 @@ function finishCurrentDrag(cancel, options) {
       fireDNDEvent("dragleave", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, null, mousestate.dndstate);
     }
   } else {
-    if (fireDNDEvent("drop", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, null, mousestate.dndstate)) {
-
-    }
+    fireDNDEvent("drop", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, null, mousestate.dndstate);
   }
   fireDNDEvent("dragend", mousestate.cx, mousestate.cy, mousestate.dndstate._sourcenode, 0, null, mousestate.dndstate);
   mousestate.dndstate = null;
@@ -916,20 +913,13 @@ function processGestureQueue() {
         if (now - mousestate.dndstate._lasthandled > 350)
           handleRunningDrag(part);
       } else {
-        let elchanged = mousestate.lastoverel !== elhere;
+        const elchanged = mousestate.lastoverel !== elhere;
 
         if (mousestate.lastoverel !== elhere || elchanged) {
           if (mousestate.lastoverel && mousestate.lastoverel.ownerDocument && mousestate.lastoverel.ownerDocument.defaultView) { // don't fire events for nonexisting documents
-            let canfire = true;
-            // Edge causes permission denied throws when accessing a freed window
-            try { mousestate.lastoverel.ownerDocument.defaultView.onerror; } catch (e) { canfire = false; }
-
-            if (canfire) {
-              fireMouseEvent("mouseout", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, elhere, part);
-              if ("onmouseenter" in window)
-                fireMouseEventsTree("mouseleave", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, elhere, { preventBubble: true, ...part });
-            } else
-              mousestate.lastoverel = null;
+            fireMouseEvent("mouseout", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, elhere, part);
+            if ("onmouseenter" in window)
+              fireMouseEventsTree("mouseleave", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, elhere, { preventBubble: true, ...part });
           }
 
           fireMouseEvent("mouseover", mousestate.cx, mousestate.cy, elhere, 0, mousestate.lastoverel, part);
@@ -1111,31 +1101,6 @@ function fireMouseEventsTree(eventtype: string, cx: number, cy: number, el: Elem
   }
 }
 
-export function checkedDispatchEvent(el, event) {
-  const win = (el.ownerDocument ? el.ownerDocument.defaultView : null) || window;
-  const saveonerror = win.onerror;
-
-  //Save and pass on errors during event
-  let eventerror;
-  win.onerror = function (msg, file, line, col, error) {
-    console.warn("checkedDispatchEvent error", msg, error);
-    if (saveonerror)
-      saveonerror.apply(win, arguments);
-    eventerror = { msg, error };
-  };
-
-  const result = el.dispatchEvent(event);
-  win.onerror = saveonerror;
-
-  if (eventerror) {
-    if (eventerror.error)
-      throw eventerror.error;
-    throw new Error("Error during event handler: " + eventerror.msg);
-  }
-  return result;
-}
-
-
 function fireMouseEvent(eventtype: string, cx: number, cy: number, el: Element, button: 0 | 1 | 2, relatedtarget: HTMLElement | null, options: PointEventOptions) {
   if (!el)
     return false;
@@ -1210,7 +1175,7 @@ export function click(element: ValidElementTarget, options?: ElementClickOptions
   const y = options && "y" in options ? options.y : "50%";
   const button: MouseButton = options?.button ?? 0;
 
-  sendMouseGesture([
+  void sendMouseGesture([
     { el: element, down: button, cmd: options && options.cmd, shift: options && options.shift, alt: options && options.alt, ctrl: options && options.ctrl, meta: options && options.meta, x: x, y: y },
     { up: button, cmd: options && options.cmd, shift: options && options.shift, alt: options && options.alt, ctrl: options && options.ctrl, meta: options && options.meta }
   ]);
@@ -1253,11 +1218,7 @@ export function canClick(element: ValidElementTarget, options?: ElementTargetOpt
 /** Simulate an incoming external file drag */
 export function startExternalFileDrag(file: File): void {
   mousestate.dndstate = new SimulatedDragDataStore(null);
-
-  const files = [].concat(file); // convert to array
-  for (const file of files)
-    mousestate.dndstate.addFile(file);
-
+  mousestate.dndstate.addFile(file);
   // ensure button 0 is down
   mousestate.downbuttons.add(0);
 }
