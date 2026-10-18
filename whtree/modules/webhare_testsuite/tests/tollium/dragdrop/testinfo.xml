@@ -1,6 +1,6 @@
 <group xmlns="http://www.webhare.net/xmlns/system/testinfo">
-  <jstest file="testframe.ts" tags="movable" />
-  <jstest file="testlist.ts" tags="list" />
-  <jstest file="testmulti.ts" tags="list" />
-  <jstest file="testsubscreen.ts" />
+  <jstest file="testframe.ts" tags="movable dragdrop" />
+  <jstest file="testlist.ts" tags="list dragdrop" />
+  <jstest file="testmulti.ts" tags="list dragdrop" />
+  <jstest file="testsubscreen.ts" tags="dragdrop" />
 </group>

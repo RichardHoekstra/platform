@@ -5,7 +5,7 @@
   <jstest file="test_selectlists_register.ts" />
   <jstest file="test_autosuggest.ts" />
   <jstest file="test_merge.ts" />
-  <jstest file="test_datatransfer.ts" />
+  <jstest file="test_datatransfer.ts" tags="dragdrop" />
   <jstest file="test_dialogapi.tsx" />
   <jstest file="test_storage.ts" />
   <jstest file="test_overlays.ts" />
