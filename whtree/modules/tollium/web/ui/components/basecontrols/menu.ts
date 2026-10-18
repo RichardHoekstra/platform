@@ -995,7 +995,7 @@ class MenuList extends MenuBase {
       @param preferreddirection - 'right', 'left', 'up', 'down'
       @param parentmenu
 -       @param preferredalign - left/right (only used when preferreddirection is 'up' or 'down')
-      @param exitdirection - '', 'top', 'left' - cursor directio in nwhich the selection can be removed
+      @param exitdirection - '', 'top', 'left' - cursor direction in which the selection can be removed
   */
   _openMenu(coords: dompack.Rect, preferreddirection: PreferredDirection, parentmenu: MenuBase | null, preferredalign: PreferredDirection | null, exitdirection: ExitDirection, minwidth: number, options?: MenuOptions, owner?: HTMLLIElement) {
     if (dompack.debugflags.men)
