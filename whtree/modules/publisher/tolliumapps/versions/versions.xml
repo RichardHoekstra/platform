@@ -142,11 +142,13 @@
                 <column name="changecontent" type="text" width="2pr" />
               </list>
             </tab>
-            <tab spacers="none" tid=".previewtab">
-              <statuspanel>
-                <text title="" valuetid=".previewisnothistoricsnapshot" wordwrap="true" />
-              </statuspanel>
-              <publisher:previewbrowser name="previewbrowser" urlbarvisible="false" />
+            <tab spacers="all" tid=".previewtab">
+              <panel spacers="none" borders="all" height="1pr">
+                <statuspanel borders="default">
+                  <text title="" valuetid=".previewisnothistoricsnapshot" wordwrap="true" />
+                </statuspanel>
+                <publisher:previewbrowser name="previewbrowser" urlbarvisible="false" />
+              </panel>
             </tab>
             <tab name="metadata" width="1pr" vscroll="true">
               <panel name="metadatacontent" height="1pr">
