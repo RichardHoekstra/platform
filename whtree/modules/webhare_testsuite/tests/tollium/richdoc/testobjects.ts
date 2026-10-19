@@ -15,6 +15,7 @@ test.runTests(
     "Test initial objects",
     async function () {
       test.click(test.qSA("nav t-text").filter(node => node.textContent === "Tab with Structured RTE")[0]);
+      await test.waitForUI();
 
       const rte = rtetest.getRTE(test.getWin(), 'structured');
       const inlineobj = rte.getBody().querySelector("span.wh-rtd-embeddedobject .wh-rtd-embeddedobject__preview");
@@ -136,6 +137,7 @@ test.runTests(
       name: 'objects-badpaste',
       test: async function () {
         test.clickTolliumLabel("Tab with Structured RTE");
+        await test.waitForUI();
 
         //make sure 'dirty' is still false. note that tollium checkboxes are hard to scan :/
         test.eq('NO', test.compByName('dirty').querySelector('input').value);
