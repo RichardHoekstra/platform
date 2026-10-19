@@ -17,8 +17,8 @@ LOADLIB "wh::graphics/canvas.whlib" EXPORT ColorBlackTransparent, ColorWhiteTran
     @param options Encoding options
     @cell(integer) options.size Max output size in pixels, defaults to 256 (=256x256 pixels)
     @cell(integer) options.margin QR code margin in modules, defaults to 4 modules
-    @cell(integer) options.colordark Draw color (CSS color value), defaults to black
-    @cell(integer) options.colorlight Background color (CSS color value), defaults to white
+    @cell(string) options.colordark Draw color (CSS color value), defaults to black
+    @cell(string) options.colorlight Background color (CSS color value), defaults to white
     @cell(string) options.correctlevel Error correction level, one of "L", "M", "Q" or "H", defaults to "H" (=highest)
     @cell(blob) options.logo A logo to add to the QR code. Adding a logo may require you to tune the QR code size or error correction
     @cell(integer) options.logosize Override the logo size if the QR code doesn't work with the automatically determined logo

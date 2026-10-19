@@ -89,5 +89,5 @@ export async function createQRCode(text: string, options?: QRCodeOptions) {
       dataBlob = new Blob([await qr.png().toBuffer()]);
     }
   }
-  return new File([dataBlob], "qr.png");
+  return new File([dataBlob], "qr.png", { type: "image/png" });
 }
