@@ -21,7 +21,7 @@
   <jstest file="testimageoverlays-mapedit.ts" />
   <test script="testimageoverlays.whscr" />
   <test script="testimgedit-recommendations.whscr" />
-  <jstest file="testimgedit.ts" />
+  <jstest file="testimgedit.ts" tags="dragdrop" />
   <jstest file="testimgedit-refpoint.ts" />
   <jstest file="testimgedit-rotate.ts" />
   <jstest file="testiframe.ts" />

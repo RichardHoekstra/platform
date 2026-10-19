@@ -1,4 +1,3 @@
-/* eslint-disable */
 /// @ts-nocheck -- Bulk rename to enable TypeScript validation
 
 import * as dompack from 'dompack';
@@ -6,7 +5,7 @@ import * as domevents from '../src/events';
 import * as domfocus from "../browserfix/focus";
 import { getName, getPlatform } from "../extra/browser";
 import { findElement, qSA } from '@webhare/test-frontend';
-import { SimulatedFileSystemFileEntry, type RawDragItem } from './filesystem';
+import { SimulatedFileSystemFileEntry } from './filesystem';
 
 const default_mousestate =
 {
@@ -36,6 +35,7 @@ interface PointEventOptions extends ElementActionOptions {
 
 const mousestate = { ...default_mousestate };
 const browserPlatform = getPlatform();
+const effectAllowedValues = ["none", "copy", "copyLink", "copyMove", "link", "linkMove", "move", "all", "uninitialized"];
 
 function arrayCombine(a, b) {
   for (const elt of b)
@@ -45,250 +45,91 @@ function arrayCombine(a, b) {
 }
 
 export class SimulatedDragDataStore {
-  items = new Array<RawDragItem>;
   currentDragOperation: string;
+  dataTransfer: DataTransfer;
+  effectAllowed: string;
 
   constructor(sourcenode, options?) {
     this._sourcenode = sourcenode;
     this._lasttarget = null;
     this._lasthandled = 0;
-    this._sourcenode = sourcenode;
 
-    this.items = [];
+    this.dataTransfer = new DataTransfer();
+    this.effectAllowed = "uninitialized";
+    this._dataTransferWritable = true;
+    const getNativeTypes = Object.getOwnPropertyDescriptor(DataTransfer.prototype, "types")!.get!;
+    const nativeItems = this.dataTransfer.items;
+    this._fileEntries = new WeakMap<File, FileSystemEntry>();
+    // Files added to a constructed DataTransfer have no native filesystem entry; adapt item reads for the upload code.
+    const wrapItem = item => new Proxy(item, {
+      get: (target, property) => {
+        if (property === "webkitGetAsEntry")
+          return () => {
+            const file = target.getAsFile();
+            return file ? this._fileEntries.get(file) ?? target.webkitGetAsEntry?.() ?? null : null;
+          };
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+    });
+    // Native item wrappers are fresh on each lookup; proxy the list to adapt reads while forwarding mutations.
+    const items = new Proxy(nativeItems, {
+      get: (target, property) => {
+        if (property === Symbol.iterator)
+          return function* () {
+            for (let index = 0; index < target.length; ++index)
+              yield wrapItem(target[index]);
+          };
+        if (property === "add")
+          return (data, type) => {
+            const item = type === undefined ? target.add(data) : target.add(data, type);
+            if (data instanceof File)
+              this._fileEntries.set(data, new SimulatedFileSystemFileEntry({ kind: "File", type: data.type, data }));
+            return item && wrapItem(item);
+          };
+        if (typeof property === "string" && /^\d+$/.test(property))
+          return wrapItem(target[Number(property)]);
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+    });
+    // A constructed transfer has no browser-managed lifecycle; allow effectAllowed writes only during synthetic dragstart.
+    let dropEffect = "none";
+    Object.defineProperties(this.dataTransfer, {
+      effectAllowed: {
+        get: () => this.effectAllowed,
+        set: value => { if (this._dataTransferWritable && effectAllowedValues.includes(value)) this.effectAllowed = value; }
+      },
+      dropEffect: {
+        get: () => dropEffect,
+        set: value => { if (["none", "copy", "move", "link"].includes(value)) dropEffect = value; }
+      },
+      types: {
+        // Some browsers omit Files from types for constructor-added file items, but Tollium uses it to detect file drags.
+        get: () => {
+          const types = Array.from(getNativeTypes.call(this.dataTransfer));
+          if (this.dataTransfer.files.length && !types.includes("Files"))
+            types.push("Files");
+          return types;
+        }
+      },
+      items: {
+        // Native list reads return fresh item wrappers, so expose the adapter proxy on every access.
+        get: () => items
+      }
+    });
     this.currentDragOperation = "none";
-    this.effectAllowed = 'uninitialized';
     this.dragimage = null;
     this.options = {}; // ctrl: false, meta: false, shift: false, alt: false
     updateDragOptions(this.options, options);
   }
 
   setDragImage(elt, x, y) {
-    this.dragimage =
-    {
-      elt: elt,
-      x: x,
-      y: y
-    };
+    this.dataTransfer.setDragImage(elt, x, y);
   }
 
   addFile(file: File) {
-    this.items.push({ kind: "File", type: file.type, data: file });
-  }
-}
-
-
-class SimulatedDataTransferItem implements DataTransferItem {
-  _dt;
-  _item;
-
-  constructor(dt: SimulatedDataTransfer, item: RawDragItem) {
-    this._dt = dt;
-    this._item = item;
-  }
-
-  valid() {
-    return this._dt._dds && this._dt._dds.items.indexOf(this._item) >= 0;
-  }
-
-  get kind() { return this.valid() ? (this._item.kind === "Plain Unicode string" ? "string" : "file") : ""; }
-  get type() { return this.valid() ? this._item.type : ""; }
-  getAsString(callback: (data: string) => void) {
-    if (!this.valid || this._item.kind !== "Plain Unicode string")
-      return;
-    void new Promise(resolve => resolve(this._item.data)).then(callback);
-  }
-  getAsFile() {
-    if (!this.valid || this._item.kind !== "File")
-      return null;
-
-    return this._item.data;
-  }
-  webkitGetAsEntry(): FileSystemEntry | null {
-    return this._item.kind === "File" ? new SimulatedFileSystemFileEntry(this._item) : null;
-  }
-}
-
-class SimulatedDataTransferItemList {
-  _dt;
-  _length;
-  _map;
-
-  constructor(dt: SimulatedDataTransfer) {
-    this._dt = dt;
-    this._length = 0;
-    this._map = new Map;
-    this._update();
-  }
-
-  get length() {
-    return this._dt._dds ? this._dt._dds.items.length : 0;
-  }
-
-  _update() {
-    for (let i = 0; i < this._length; ++i)
-      delete this[i];
-    this._length = this.length;
-    for (let i = 0; i < this.length; ++i) {
-      const rawitem = this._dt._dds.items[i];
-      let item = this._map.get(rawitem);
-      if (!item) {
-        item = new SimulatedDataTransferItem(this._dt, rawitem);
-        this._map.set(rawitem, item);
-      }
-      this[i] = item;
-    }
-    if (this._dt && this._dt.files)
-      this._dt.files._update();
-  }
-
-  add(data, type = "") {
-    if (!this._dt._dds || this._dt._mode !== "read/write")
-      return null;
-
-    if (typeof data === "string") {
-      this._dt._dds.items.push({ kind: "Plain Unicode string", type, data });
-      this._update();
-      return this[this.length - 1];
-
-    } else if (typeof data === "object") {
-      this._dt._dds.items.push({ kind: "File", type: data.type.toLowerCase(), data });
-      this._update();
-      return this[this.length - 1];
-    } else
-      throw new Error(`Cannot recognize first argument`);
-  }
-
-  clear() {
-    if (!this._dt._dds || this._dt._mode !== "read/write")
-      return;
-
-    this._dt._dds.items = [];
-    this._update();
-  }
-}
-
-export class SimulatedFileList {
-  constructor(dt) {
-    this._dt = dt;
-    this._length = 0;
-    this._update();
-  }
-
-  get length() { return this._length; }
-
-  _update() {
-    for (let i = 0; i < this._length; ++i)
-      delete this[i];
-
-    const files = [];
-    if (this._dt._dds && (this._dt._mode === "read/write" || this._dt._mode === "read"))
-      for (const item of Array.from(this._dt._dds.items))
-        if (item.kind === "File")
-          files.push(item.data);
-
-    this._length = files.length;
-    for (let i = 0; i < this.length; ++i)
-      this[i] = files[i];
-  }
-}
-
-const effectAllowedValues = ["none", "copy", "copyLink", "copyMove", "link", "linkMove", "move", "all", "uninitialized"];
-
-export class SimulatedDataTransfer {
-  _dds;
-  _mode;
-  _items;
-  _files;
-
-  constructor(dds: SimulatedDragDataStore, mode, dropEffect) {
-    this._dds = dds;
-    this._mode = mode;
-    this._items = new SimulatedDataTransferItemList(this);
-    this._files = new SimulatedFileList(this);
-    this._dropEffect = dropEffect;
-    this._effectAllowed = dds.effectAllowed;
-
-    if (!["read/write", "protected", "read"].includes(mode))
-      throw new Error(`Invalid protection mode '${mode}'`);
-
-    this.dragimage = null;
-  }
-
-  get items() { return this._items; }
-  get files() { return this._files; }
-
-  get dropEffect() { return this._dropEffect; }
-  set dropEffect(value) { if (["none", "copy", "move", "link"].includes(value)) this._dropEffect = value; }
-
-  get effectAllowed() { return this._dds ? this._dds.effectAllowed : this._effectAllowed; }
-  set effectAllowed(value) { if (this._dds && this._mode === "read/write" && effectAllowedValues.includes(value)) { this._effectAllowed = this._dds.effectAllowed = value; } }
-
-  get types() {
-    const retval = [];
-    for (const item of Array.from(this.items))
-      if (item.kind !== "File")
-        retval.push(item.type);
-      else if (!retval.includes("Files"))
-        retval.push("Files");
-    return retval;
-  }
-
-  setDragImage(element, x, y) {
-    if (this._dds && this._mode === "read/write")
-      this._dds.dragimage = { element, x, y };
-  }
-
-  getData(format) {
-    if (!this._dds || this._mode === "protected")
-      return "";
-    format = format.toLowerCase();
-    let converttourl;
-    if (format === "text")
-      format = "text/plain";
-    else if (format === "url") {
-      format = "text/uri-list";
-      converttourl = true;
-    }
-    const item = this._dds.items.find(i => i.kind === "Plain Unicode string" && i.type === format);
-    if (!item)
-      return "";
-
-    console.warn('get data', format, item);
-
-    return converttourl ? item.data.split(" ")[0] : item.data;
-  }
-
-  setData(format, data) {
-    if (!this._dds || this._mode !== "read/write")
-      return;
-
-    if (typeof data !== "string")
-      throw new Error(`Can only add strings`);
-
-    if (format)
-      this.clearData(format);
-
-    this._items.add(data, format);
-  }
-
-  clearData(format) {
-    if (!this._dds || this._mode !== "read/write")
-      return "";
-    format = (format || "").toLowerCase();
-    if (format === "text")
-      format = "text/plain";
-    else if (format === "url")
-      format = "text/uri-list";
-
-    this._dds.items = this._dds.items.filter(i => i.kind !== "Plain Unicode string" || (format && i.type !== format));
-    this._items._update();
-    this._files._update();
-  }
-
-  _detach() {
-    this._dds = null;
-    this._items._update();
-    this._files._update();
+    this.dataTransfer.items.add(file);
   }
 }
 
@@ -354,7 +195,7 @@ function deepContains(parent: Node, el: Node) {
 function isInDeepDom(el: Node) {
   if (!el.ownerDocument)
     return false;
-  return deepContains(el.ownerDocument.documentElement, el)
+  return deepContains(el.ownerDocument.documentElement, el);
 }
 
 export function getValidatedElementFromPoint(doc: Document, px: number, py: number, expectelement: boolean): Element | null {
@@ -558,23 +399,17 @@ function getBrowserFocusableElement(el: Element) {
 function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
   if (!el)
     return true;
+  dragop._dataTransferWritable = false;
 
   // Handle current key stuff
   const ctrl = dragop.options.ctrl || (browserPlatform !== "mac" && dragop.options.cmd);
   const meta = dragop.options.meta || (browserPlatform === "mac" && dragop.options.cmd);
 
-  // Calculate protection of datatransfer object
-  let mode = 'protected';
-  if (eventtype === 'dragstart')
-    mode = 'read/write';
-  else if (eventtype === 'drop')
-    mode = 'read';
-
   if (eventtype !== 'dragstart' && dragop.effectAllowed === "uninitialized")
     dragop.effectAllowed = "all";
 
-  const wantcopy = !dragop.options.shift && (browserPlatform === "mac" ? dragop.options.meta : dragop.options.ctrl);
-  const wantlink = dragop.options.shift && (browserPlatform === "mac" ? dragop.options.meta : dragop.options.ctrl);
+  const wantcopy = browserPlatform === "mac" ? dragop.options.alt && !ctrl : ctrl && !dragop.options.shift;
+  const wantlink = browserPlatform === "mac" ? ctrl && !dragop.options.alt : ctrl && dragop.options.shift;
 
   let dropEffect = "none";
   if (eventtype === "drop" || eventtype === "dragend")
@@ -593,7 +428,8 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
     }
   }
 
-  const dataTransfer = new SimulatedDataTransfer(dragop, mode, dropEffect);
+  const dataTransfer = dragop.dataTransfer;
+  dataTransfer.dropEffect = dropEffect;
 
   // Calc effectallowed / dropeffect
   // FIXME: figure out how these actually work & interact with event returns & setting of dropEffect/effectAllowed
@@ -604,8 +440,6 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
     } else if (getName() === "safari") {
       dataTransfer.dropEffect = 'none';
       dataTransfer.effectAllowed = ctrl ? dragop.options.shift ? "link" : "copy" : "all";
-    } else if (getName() === "firefox") {
-      dataTransfer.dropEffect = ctrl ? dragop.options.shift ? "link" : "copy" : "move";
     }
   }
 
@@ -665,7 +499,12 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
   }
 
   event.dataTransfer = dataTransfer;
-  result = checkedDispatchEvent(el, event);
+  dragop._dataTransferWritable = eventtype === "dragstart";
+  try {
+    result = el.dispatchEvent(event);
+  } finally {
+    dragop._dataTransferWritable = false;
+  }
 
   if (eventtype === "dragover" && !result) { // dragover event is cancelled
     if (dataTransfer.dropEffect === "copy" && ["uninitialized", "copy", "copyLink", "copyMove", "all"].includes(dragop.effectAllowed))
@@ -757,9 +596,7 @@ function finishCurrentDrag(cancel, options) {
       fireDNDEvent("dragleave", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, null, mousestate.dndstate);
     }
   } else {
-    if (fireDNDEvent("drop", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, null, mousestate.dndstate)) {
-
-    }
+    fireDNDEvent("drop", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, null, mousestate.dndstate);
   }
   fireDNDEvent("dragend", mousestate.cx, mousestate.cy, mousestate.dndstate._sourcenode, 0, null, mousestate.dndstate);
   mousestate.dndstate = null;
@@ -899,20 +736,13 @@ function processGestureQueue() {
         if (now - mousestate.dndstate._lasthandled > 350)
           handleRunningDrag(part);
       } else {
-        let elchanged = mousestate.lastoverel !== elhere;
+        const elchanged = mousestate.lastoverel !== elhere;
 
         if (mousestate.lastoverel !== elhere || elchanged) {
           if (mousestate.lastoverel && mousestate.lastoverel.ownerDocument && mousestate.lastoverel.ownerDocument.defaultView) { // don't fire events for nonexisting documents
-            let canfire = true;
-            // Edge causes permission denied throws when accessing a freed window
-            try { mousestate.lastoverel.ownerDocument.defaultView.onerror; } catch (e) { canfire = false; }
-
-            if (canfire) {
-              fireMouseEvent("mouseout", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, elhere, part);
-              if ("onmouseenter" in window)
-                fireMouseEventsTree("mouseleave", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, elhere, { preventBubble: true, ...part });
-            } else
-              mousestate.lastoverel = null;
+            fireMouseEvent("mouseout", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, elhere, part);
+            if ("onmouseenter" in window)
+              fireMouseEventsTree("mouseleave", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, elhere, { preventBubble: true, ...part });
           }
 
           fireMouseEvent("mouseover", mousestate.cx, mousestate.cy, elhere, 0, mousestate.lastoverel, part);
@@ -1090,31 +920,6 @@ function fireMouseEventsTree(eventtype: string, cx: number, cy: number, el: Elem
   }
 }
 
-export function checkedDispatchEvent(el, event) {
-  const win = (el.ownerDocument ? el.ownerDocument.defaultView : null) || window;
-  const saveonerror = win.onerror;
-
-  //Save and pass on errors during event
-  let eventerror;
-  win.onerror = function (msg, file, line, col, error) {
-    console.warn("checkedDispatchEvent error", msg, error);
-    if (saveonerror)
-      saveonerror.apply(win, arguments);
-    eventerror = { msg, error };
-  };
-
-  const result = el.dispatchEvent(event);
-  win.onerror = saveonerror;
-
-  if (eventerror) {
-    if (eventerror.error)
-      throw eventerror.error;
-    throw new Error("Error during event handler: " + eventerror.msg);
-  }
-  return result;
-}
-
-
 function fireMouseEvent(eventtype: string, cx: number, cy: number, el: Element, button: 0 | 1 | 2, relatedtarget: HTMLElement | null, options: PointEventOptions) {
   if (!el)
     return false;
@@ -1189,7 +994,7 @@ export function click(element: ValidElementTarget, options?: ElementClickOptions
   const y = options && "y" in options ? options.y : "50%";
   const button: MouseButton = options?.button ?? 0;
 
-  sendMouseGesture([
+  void sendMouseGesture([
     { el: element, down: button, cmd: options && options.cmd, shift: options && options.shift, alt: options && options.alt, ctrl: options && options.ctrl, meta: options && options.meta, x: x, y: y },
     { up: button, cmd: options && options.cmd, shift: options && options.shift, alt: options && options.alt, ctrl: options && options.ctrl, meta: options && options.meta }
   ]);
@@ -1232,11 +1037,7 @@ export function canClick(element: ValidElementTarget, options?: ElementTargetOpt
 /** Simulate an incoming external file drag */
 export function startExternalFileDrag(file: File): void {
   mousestate.dndstate = new SimulatedDragDataStore(null);
-
-  const files = [].concat(file); // convert to array
-  for (const file of files)
-    mousestate.dndstate.addFile(file);
-
+  mousestate.dndstate.addFile(file);
   // ensure button 0 is down
   mousestate.downbuttons.add(0);
 }

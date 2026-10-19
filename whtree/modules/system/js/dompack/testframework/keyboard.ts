@@ -1,4 +1,3 @@
-import { checkedDispatchEvent } from "./pointer";
 import { getName as browserName } from "../extra/browser";
 import * as domfocus from "../browserfix/focus";
 import { debugFlags } from "@webhare/env";
@@ -309,7 +308,8 @@ export function generateKeyboardEvent(target: HTMLElement, eventname: string, da
     Object.defineProperty(evt, 'charCode', { get: function () { return vals.charCode; } });
     Object.defineProperty(evt, 'keyCode', { get: function () { return vals.keyCode; } });
     Object.defineProperty(evt, 'which', { get: function () { return vals.which; } });
-  }
+  } else
+    throw new Error(`Unsupported browser: ` + browserName());
 
   if (debugFlags.testfw)
     console.log('[testfw] Constructed ' + browserName() + ' keyboardevent', evt);
@@ -328,7 +328,7 @@ function _fireKeyboardEvent(target: HTMLElement, eventname: string, props: Keybo
   if (debugFlags.testfw)
     console.log('[testfw] Dispatching event ', evt);
 
-  return checkedDispatchEvent(target, evt);
+  return target.dispatchEvent(evt);
 }
 
 export function normalizeKeys(key: string | string[], props?: KeyboardModifierOptions) {
