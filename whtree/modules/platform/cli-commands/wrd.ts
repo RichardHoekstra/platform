@@ -4,7 +4,7 @@ import { WRDSchema, describeEntity, listSchemas, type WRDEntityMatch } from '@we
 import { regExpFromWildcards, throwError } from '@webhare/std';
 import { decodeHSON } from '@webhare/hscompat';
 import { beginWork, runInWork } from '@webhare/whdb';
-import { CLIRuntimeError, runCli } from "@webhare/cli";
+import { CLIRuntimeError, intOption, runCli } from "@webhare/cli";
 import { parseSchema } from '@webhare/wrd/src/schemaparser';
 import { checkWRDSchema, type WRDIssue } from '@webhare/wrd/src/check';
 import YAML from 'yaml';
@@ -91,11 +91,11 @@ runCli({
       description: "Export an entity",
       options: { ...commonOptions.resources },
       arguments: [
-        { name: "<id>", description: "Entity ID" },
+        { name: "<id>", description: "Entity ID", type: intOption() },
         { name: "[field]", description: "Single entity field to export" }
       ],
       main: async ({ opts, args }) => {
-        const entityId = parseInt(args.id);
+        const entityId = args.id;
         const entityInfo = await describeEntity(entityId) ?? throwError(`Entity #${entityId} not found`);
         await exportEntity(new WRDSchema(entityInfo.schema), entityInfo.type, entityId, opts, args.field);
       }
@@ -146,11 +146,11 @@ runCli({
         "dry-run": "Perform the update but roll back the transaction"
       },
       arguments: [
-        { name: "<id>", description: "Entity ID" },
+        { name: "<id>", description: "Entity ID", type: intOption() },
         { name: "<source>", description: "Data to import - path to a file or '-' for stdin" }
       ],
       main: async ({ opts, args }) => {
-        const entityId = parseInt(args.id);
+        const entityId = args.id;
         const entityInfo = await describeEntity(entityId) ?? throwError(`Entity #${entityId} not found`);
         await updateEntity(new WRDSchema(entityInfo.schema), entityInfo.type, entityId, args.source, opts);
       }
@@ -186,13 +186,13 @@ runCli({
     "update": {
       description: "Update an entity",
       arguments: [
-        { name: "<id>", description: "Entity ID" },
+        { name: "<id>", description: "Entity ID", type: intOption() },
         { name: "<field>", description: "Field to set" },
         { name: "<value>", description: "Value to set" }
       ],
       main: async ({ opts, args }) => {
         const { id, field, value } = args;
-        const entityid = parseInt(id);
+        const entityid = id;
         const entityinfo = await describeEntity(entityid) ?? throwError(`Entity #${entityid} not found`);
         const wrdschema = new WRDSchema(entityinfo.schema);
         // const type = await wrdschema.describeType(entityinfo.type) ?? throwError("Type not found");
@@ -209,7 +209,7 @@ runCli({
             throw new CLIRuntimeError(`Unsupported attribute type '${attr.attributeType}'`);
         }
 
-        await runInWork(() => wrdschema.update(entityinfo.type, parseInt(id), toset));
+        await runInWork(() => wrdschema.update(entityinfo.type, id, toset));
         console.log(opts.json ? '"updated"' : `Updated entity #${entityid}`);
       }
     }
