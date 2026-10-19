@@ -31,6 +31,7 @@ test.runTests(
       test: async function () {
         test.sendMouseGesture([{ el: test.getCurrentScreen().getListRow('samlproviders!entities', 'IDP'), down: 2 }, { up: 2 }]);
         const ctxtmenu = test.getOpenMenu();
+        test.assert(ctxtmenu);
         const menuitem = test.qSA(ctxtmenu, "li").filter(li => li.textContent.includes('Add connected SP'))[0];
         test.click(menuitem);
         await test.waitForUI();
@@ -66,6 +67,7 @@ test.runTests(
       test: async function () {
         test.sendMouseGesture([{ el: test.getCurrentScreen().getListRow('samlproviders!entities', 'TEST-SP'), down: 2 }, { up: 2 }]);
         const ctxtmenu = test.getOpenMenu();
+        test.assert(ctxtmenu);
         const menuitem = test.qSA(ctxtmenu, "li").filter(li => li.textContent.includes('Add connected IDP'))[0];
         test.click(menuitem);
         await test.waitForUI();

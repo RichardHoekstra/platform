@@ -220,8 +220,8 @@ export async function pressKey(key: string | string[], options?: keyboard.Keyboa
   return await testfw.sendDevtoolsRequest({ type: "pressKeys", keys: keyboard.normalizeKeys(key, options), options });
 }
 
-export function getOpenMenu() {
-  return qSA('ul:last-of-type.wh-menulist.open')[0] || null;
+export function getOpenMenu(): TestQueriedElement | null {
+  return qSA('ul.wh-menulist:popover-open').slice(-1)[0] || null;
 }
 export function getOpenMenuItem(containstext: string) {
   const menu = getOpenMenu();

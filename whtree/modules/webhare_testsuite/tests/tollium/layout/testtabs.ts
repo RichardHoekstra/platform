@@ -180,8 +180,8 @@ test.runTests(
       test.assert(test.isElementClickable(tablabel), 'nav pulldown should have appeared');
       test.click(tablabel);
 
-      test.assert(test.getOpenMenu());
       const openedmenu = test.getOpenMenu();
+      test.assert(openedmenu);
 
       test.eq(4, openedmenu.querySelectorAll("li").length); // 4 tabs
       test.eq(openedmenu.querySelector("li").offsetHeight, openedmenu.querySelectorAll("li")[2].offsetHeight); //all the same height, even the anonymous ones
