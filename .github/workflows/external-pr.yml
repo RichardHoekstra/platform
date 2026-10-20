@@ -13,7 +13,7 @@ permissions:
 jobs:
   # Job 1: Run pre-requisite steps & capture credentials into outputs
   setup:
-    if: github.event.pull_request.head.repo.fork == true
+    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     runs-on: ${{ vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     environment: external-ci # 🔐 Pauses here for maintainer approval before fetching credentials
 
