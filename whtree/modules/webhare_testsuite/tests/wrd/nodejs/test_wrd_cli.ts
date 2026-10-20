@@ -7,7 +7,58 @@ import { beginWork, commitWork } from "@webhare/whdb";
 import { spawnSync } from "node:child_process";
 import type { RTDExport } from "@webhare/services/src/richdocument";
 import { omit } from "@webhare/std";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { YAML } from "@webhare/deps";
 
+async function testWRDSettingsCli() {
+  await createWRDTestSchema();
+  const testSchema = wrd("wrd:testschema");
+  const settingsId = await testSchema.search("wrdSettings", "wrdTag", "WRD_SETTINGS");
+  test.assert(settingsId);
+
+  const getResult = spawnSync("wh", ["wrd", "get-setting", "--json", testSchemaTag], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+  test.eq(0, getResult.status);
+  const settings = JSON.parse(getResult.stdout);
+  test.eq(settingsId, settings.wrdId);
+  test.eq("WRD_SETTINGS", settings.wrdTag);
+
+  const tempDir = mkdtempSync(join(tmpdir(), "wrd-settings-cli-"));
+  try {
+    const source = join(tempDir, "settings.yml");
+    writeFileSync(source, YAML.stringify({ defaultSenderName: "CLI test sender" }));
+    const originalSenderName = await testSchema.getFields("wrdSettings", settingsId, "defaultSenderName");
+
+    const dryUpdateResult = spawnSync("wh", ["wrd", "update-setting", "--json", "--dry-run", testSchemaTag, source], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+    test.eq(0, dryUpdateResult.status);
+    test.eq({ wrdId: settingsId }, JSON.parse(dryUpdateResult.stdout));
+    test.eq(originalSenderName, await testSchema.getFields("wrdSettings", settingsId, "defaultSenderName"));
+
+    const updateResult = spawnSync("wh", ["wrd", "update-setting", "--json", testSchemaTag, source], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+    test.eq(0, updateResult.status);
+    test.eq({ wrdId: settingsId }, JSON.parse(updateResult.stdout));
+    test.eq("CLI test sender", await testSchema.getFields("wrdSettings", settingsId, "defaultSenderName"));
+
+    const yamlResult = spawnSync("wh", ["wrd", "get-setting", testSchemaTag], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+    test.eq(0, yamlResult.status);
+    test.eqPartial({ wrdId: settingsId, wrdTag: "WRD_SETTINGS", defaultSenderName: "CLI test sender" }, YAML.parse(yamlResult.stdout));
+
+    const fieldResult = spawnSync("wh", ["wrd", "get-setting", "--json", testSchemaTag, "defaultSenderName"], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+    test.eq(0, fieldResult.status);
+    test.eq("CLI test sender", JSON.parse(fieldResult.stdout));
+
+    const yamlFieldResult = spawnSync("wh", ["wrd", "get-setting", testSchemaTag, "wrdId"], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+    test.eq(0, yamlFieldResult.status);
+    test.eq(settingsId, YAML.parse(yamlFieldResult.stdout));
+
+    const invalidFieldResult = spawnSync("wh", ["wrd", "get-setting", testSchemaTag, "nonexistentField"], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'pipe'] });
+    test.eq(1, invalidFieldResult.status);
+    test.eq(/nonexistentField/i, invalidFieldResult.stderr);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
 
 async function testWRDCli() { //  tests
   type TestSchemaType = Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensions]>;
@@ -33,6 +84,14 @@ async function testWRDCli() { //  tests
     map(_ => _.tag) as Array<keyof WRDInsertable<TestSchemaType["wrdPerson"]>>;
   const original = await wrdschema.getFields("wrdPerson", newPerson, clonableAttributes);
 
+  const fieldResult = spawnSync("wh", ["wrd", "get-entity", "--json", String(newPerson), "wrdFirstName"], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+  test.eq(0, fieldResult.status);
+  test.eq("Alice", JSON.parse(fieldResult.stdout));
+
+  const yamlFieldResult = spawnSync("wh", ["wrd", "get-entity", String(newPerson), "wrdId"], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+  test.eq(0, yamlFieldResult.status);
+  test.eq(newPerson, YAML.parse(yamlFieldResult.stdout));
+
   for (const resourceMode of ["fetch", "base64"] as const) {
     const options = resourceMode === "fetch" ? [] : ["--resources", "base64"];
 
@@ -52,16 +111,45 @@ async function testWRDCli() { //  tests
 
     const insertPerson = omit(exportData, ["wrdId", "wrdGuid"]);
     insertPerson.wrdContactEmail = `import-${resourceMode}@beta.webhare.net`;
+    const dryInsertResult = spawnSync("wh", ["wrd", "create-entity", "--json", "--dry-run", testSchemaTag, "wrdPerson", "-"], { shell: false, encoding: "utf-8", input: JSON.stringify(insertPerson), stdio: ['pipe', 'pipe', 'inherit'] });
+    test.eq(0, dryInsertResult.status);
+    const dryInsertOutput = JSON.parse(dryInsertResult.stdout);
+    test.eq(null, await wrdschema.search("wrdPerson", "wrdId", dryInsertOutput.wrdId));
+    test.eq(null, await wrdschema.search("wrdPerson", "wrdContactEmail", insertPerson.wrdContactEmail));
+
     const insertResult = spawnSync("wh", ["wrd", "create-entity", "--json", testSchemaTag, "wrdPerson", "-"], { shell: false, encoding: "utf-8", input: JSON.stringify(insertPerson), stdio: ['pipe', 'pipe', 'inherit'] });
     test.eq(0, insertResult.status, "wrd insert command should succeed");
     const insertOutput = JSON.parse(insertResult.stdout);
 
     const inserted = await wrdschema.getFields("wrdPerson", insertOutput.wrdId, clonableAttributes);
     test.eq(original, inserted);
+
+    exportData.wrdFirstName = "Updated";
+    exportData.wrdContactEmail = insertPerson.wrdContactEmail;
+    exportData.wrdGuid = insertOutput.wrdGuid;
+    const dryUpdateResult = spawnSync("wh", ["wrd", "update-entity", "--json", "--dry-run", String(insertOutput.wrdId), "-"], { shell: false, encoding: "utf-8", input: JSON.stringify(exportData), stdio: ['pipe', 'pipe', 'inherit'] });
+    test.eq(0, dryUpdateResult.status);
+    test.eq({ wrdId: insertOutput.wrdId }, JSON.parse(dryUpdateResult.stdout));
+    test.eq(original, await wrdschema.getFields("wrdPerson", insertOutput.wrdId, clonableAttributes));
+
+    const updateResult = spawnSync("wh", ["wrd", "update-entity", "--json", String(insertOutput.wrdId), "-"], { shell: false, encoding: "utf-8", input: JSON.stringify(exportData), stdio: ['pipe', 'pipe', 'inherit'] });
+    test.eq(0, updateResult.status);
+    test.eq({ wrdId: insertOutput.wrdId }, JSON.parse(updateResult.stdout));
+    const updated = await wrdschema.getFields("wrdPerson", insertOutput.wrdId, [...clonableAttributes, "wrdGuid"]);
+    test.eq({ ...original, wrdFirstName: "Updated", wrdGuid: insertOutput.wrdGuid }, updated);
+
+    const searchResult = spawnSync("wh", ["wrd", "search", testSchemaTag, "wrdPerson", "wrdContactEmail", insertPerson.wrdContactEmail], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+    test.eq(0, searchResult.status);
+    test.eq(String(insertOutput.wrdId) + "\n", searchResult.stdout);
   }
+
+  const missingResult = spawnSync("wh", ["wrd", "search", "--json", testSchemaTag, "wrdPerson", "wrdContactEmail", "missing@beta.webhare.net"], { shell: false, encoding: "utf-8", stdio: ['inherit', 'pipe', 'inherit'] });
+  test.eq(0, missingResult.status);
+  test.eq("null\n", missingResult.stdout);
 }
 
 test.runTests([
   //basic exports to get typings right
+  testWRDSettingsCli,
   testWRDCli,
 ]);
