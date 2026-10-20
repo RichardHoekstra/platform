@@ -23,6 +23,32 @@ PUBLIC RECORD FUNCTION RenameOIDCClient(OBJECT wrdschema) {
   RETURN DEFAULT RECORD;
 }
 
+PUBLIC RECORD FUNCTION MigrateOIDCServerAttributes(OBJECT wrdschema) {
+  OBJECT server_type := wrdschema->GetType("wrdauth_server");
+  IF(NOT ObjectExists(server_type))
+    RETURN DEFAULT RECORD;
+
+  FOREVERY(RECORD attribute FROM [[ oldtag := "clientid", newtag := "client_id" ]
+                                , [ oldtag := "metadataurl", newtag := "metadata_url" ]
+                                , [ oldtag := "additionalscopes", newtag := "additional_scopes" ]
+                                , [ oldtag := "loginfield", newtag := "login_field" ]])
+    IF(RecordExists(server_type->GetAttribute(attribute.oldtag)))
+      server_type->UpdateAttribute(attribute.oldtag, CELL[ tag := attribute.newtag ]);
+
+  IF(RecordExists(server_type->GetAttribute("clientsecret"))) {
+    IF(NOT RecordExists(server_type->GetAttribute("client_signing")))
+      server_type->CreateAttribute("client_signing", "JSON", CELL[ isunsafetocopy := TRUE ]);
+
+    FOREVERY(RECORD server FROM server_type->RunQuery(CELL[ outputcolumns := CELL[ "wrd_id", "clientsecret" ], historymode := "all" ]))
+      IF(server.clientsecret != "")
+        server_type->UpdateEntity(server.wrd_id, CELL[ client_signing := CELL[ type := "client_secret", secret := server.clientsecret ] ]);
+
+    server_type->DeleteAttribute("clientsecret");
+  }
+
+  RETURN DEFAULT RECORD;
+}
+
 PUBLIC RECORD FUNCTION MigrateAccountStatus(OBJECT wrdschema) {
   IF(NOT RecordExists(wrdschema->^wrd_person->GetAttribute("whuser_disabled")))
     RETURN DEFAULT RECORD; //this schema never had whuser_disabled. even though we use at=update this may happen if usermgmt is applied to an already created wrdschema

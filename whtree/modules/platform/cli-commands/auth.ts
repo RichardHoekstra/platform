@@ -245,10 +245,11 @@ runCli({
         const wrdId = await schema.insert("wrdauthServer", {
           isIdp: true,
           wrdTag: args.tag,
-          clientid: args.clientid,
-          clientsecret: args.clientsecret,
-          metadataurl: opts.metadataurl,
-          additionalscopes: (opts.additionalscopes || '').replaceAll(',', ' '),
+          clientId: args.clientid,
+          clientSigning: { type: "client_secret", secret: args.clientsecret },
+          metadataUrl: opts.metadataurl,
+          additionalScopes: (opts.additionalscopes || '').replaceAll(',', ' '),
+          loginField: opts.loginfield || '',
           wrdTitle: opts.title || args.tag.toLowerCase()
         });
         await commitWork();

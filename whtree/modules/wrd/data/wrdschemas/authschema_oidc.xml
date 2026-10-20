@@ -8,6 +8,12 @@
              stage="beforeTypes"
              updatefunction="mod::platform/lib/internal/migrations.whlib#RenameOIDCClient" />
 
+  <migration tag="platform:migrate_oidc_server_attributes"
+             at="update"
+             revision="2"
+             stage="beforeTypes"
+             updatefunction="mod::platform/lib/internal/migrations.whlib#MigrateOIDCServerAttributes" />
+
   <object tag="wrdauth_server" keephistorydays="1100" comment="A server we authorize against. Also known Authorization Server (OAuth2) or Identity Provider (OpenID Connect). Formerly known as wrdauth_oidc_client">
     <!-- keep history for about 3 years (1 or 2 rotations if secrets expire after 1 or 2 years) -->
 
@@ -18,17 +24,16 @@
       <free tag="wrd_title" required="true" unique="true" />
       <boolean tag="is_idp" description="If set, this client is an identity provider" />
       <integer tag="wrd_ordering" />  <!-- TODO make this object a domain and then use the builtin wrd_ordering -->
-      <free tag="metadataurl" />
-      <free tag="clientid" />
+      <free tag="metadata_url" />
+      <free tag="client_id" />
       <json tag="client_signing" typedeclaration="@webhare/auth#ClientSigning" unsafetocopy="true" />
       <array tag="extra_params" description="Extra parameters to pass in the authorize request (eg 'claims')">
         <free tag="param" />
         <free tag="value" />
       </array>
-      <free tag="clientsecret" description="Old string format client secret key" unsafetocopy="true" />
       <datetime tag="secret_expiration" description="When is the secret known to expire (allows us to give warnings)" />
-      <free tag="additionalscopes" />
-      <free tag="loginfield" />  <!-- eg 'email' or 'sub'.  todo should default to 'sub' but transitionally support email/employeeid/sub -->
+      <free tag="additional_scopes" />
+      <free tag="login_field" />  <!-- eg 'email' or 'sub'.  todo should default to 'sub' but transitionally support email/employeeid/sub -->
       <free tag="redirect_uri"
             description="Override the redirect URI used. Must point a page implementing the OAuth2 landing code" />
       <enum tag="visibility"

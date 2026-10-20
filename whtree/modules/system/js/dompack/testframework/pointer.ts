@@ -3,7 +3,7 @@
 import * as dompack from 'dompack';
 import * as domevents from '../src/events';
 import * as domfocus from "../browserfix/focus";
-import { getName, getPlatform } from "../extra/browser";
+import { getPlatform } from "../extra/browser";
 import { findElement, qSA } from '@webhare/test-frontend';
 import { SimulatedFileSystemFileEntry } from './filesystem';
 
@@ -37,15 +37,7 @@ const mousestate = { ...default_mousestate };
 const browserPlatform = getPlatform();
 const effectAllowedValues = ["none", "copy", "copyLink", "copyMove", "link", "linkMove", "move", "all", "uninitialized"];
 
-function arrayCombine(a, b) {
-  for (const elt of b)
-    if (a.indexOf(elt) === -1)
-      a.push(elt);
-  return a;
-}
-
 export class SimulatedDragDataStore {
-  currentDragOperation: string;
   dataTransfer: DataTransfer;
   effectAllowed: string;
 
@@ -118,7 +110,6 @@ export class SimulatedDragDataStore {
         get: () => items
       }
     });
-    this.currentDragOperation = "none";
     this.dragimage = null;
     this.options = {}; // ctrl: false, meta: false, shift: false, alt: false
     updateDragOptions(this.options, options);
@@ -411,10 +402,9 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
   const wantcopy = browserPlatform === "mac" ? dragop.options.alt && !ctrl : ctrl && !dragop.options.shift;
   const wantlink = browserPlatform === "mac" ? ctrl && !dragop.options.alt : ctrl && dragop.options.shift;
 
-  let dropEffect = "none";
-  if (eventtype === "drop" || eventtype === "dragend")
-    dropEffect = dragop.currentDragOperation;
-  else if (eventtype === "dragenter" || eventtype === "dragover") {
+  const dataTransfer = dragop.dataTransfer;
+  let dropEffect = dataTransfer.dropEffect;
+  if (eventtype === "dragenter" || eventtype === "dragover") {
     switch (dragop.effectAllowed) {
       case "none": dropEffect = "none"; break;
       case "copy": dropEffect = "copy"; break;
@@ -428,20 +418,7 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
     }
   }
 
-  const dataTransfer = dragop.dataTransfer;
   dataTransfer.dropEffect = dropEffect;
-
-  // Calc effectallowed / dropeffect
-  // FIXME: figure out how these actually work & interact with event returns & setting of dropEffect/effectAllowed
-  if (['dragenter', 'dragover', 'drop', 'dragend'].includes(eventtype)) {
-    if (getName() === "chrome") {
-      //dataTransfer.dropEffect = 'none';
-      //dataTransfer.effectAllowed = ctrl ? dragop.options.shift ? "link" : "copy" : "all";
-    } else if (getName() === "safari") {
-      dataTransfer.dropEffect = 'none';
-      dataTransfer.effectAllowed = ctrl ? dragop.options.shift ? "link" : "copy" : "all";
-    }
-  }
 
   // detect document by testing for defaultview
   const doc = el.defaultView ? el : el.ownerDocument;
@@ -450,55 +427,23 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
   if (doc.contains && !doc.contains(el))
     return result;
 
-  // Create a mousevent to get correctly filled contents
-  const mouseevent = doc.createEvent("MouseEvent");
-  const cancelable = !["dragend", "dragexit", "dragleave"].includes(eventtype);
-  mouseevent.initMouseEvent(eventtype, true, cancelable, doc.defaultView, 0/*clickcount? is 0 correct?*/, cx + 25, cy + 25, cx, cy,
-    ctrl || false, dragop.options.alt || false, dragop.options.shift || false, meta || false,
-    button, null, dataTransfer);
-
-  // Can't update the dataTransfer attr, though. Create a htmlevent, and place all mousevent attrs in it
-  // That one can be fired!
-  const event = doc.createEvent("HTMLEvents");
-  event.initEvent(eventtype, true, true);
-
-  const keys = Object.keys(mouseevent);
-
-  // Browsers won't enumerate the event properties.
-  arrayCombine(keys,
-    [
-      "altKey", "bubbles", "button", "buttons", "cancelBubble", "cancelable",
-      "clientX", "clientY", "ctrlKey", "currentTarget", "dataTransfer",
-      "defaultPrevented", "detail", "eventPhase",
-      "layerX", "layerY",
-      "metaKey",
-      "pageX", "pageY",
-      "relatedTarget", "screenX", "screenY", "shiftKey", "target", "timeStamp",
-      "view", "which"
-    ]);
-
-  if (getName() === "firefox") {
-    arrayCombine(keys,
-      [
-        "explicitOriginalTarget", "isChar", "isTrusted", "mozInputSource", "mozMovementX", "mozMovementY", "mozPressure",
-        "rangeOffset", "rangeParent", "region"
-      ]);
-  } else if (getName() === "ie") {
-    arrayCombine(keys,
-      ["isTrusted", "srcElement", "toElement", "x", "y"]);
-  } else if (getName() === "chrome") {
-    arrayCombine(keys,
-      [
-        "fromElement", "keyCode", "movementX", "movementY", "offsetX", "offsetY", "returnValue", "srcElement",
-        "toElement", "webkitMovementX", "webkitMovementY", "x", "y"
-      ]);
-  }
-
-  for (let i = 0; i < keys.length; ++i) {
-    try { event[keys[i]] = mouseevent[keys[i]]; } catch (e) { } //ignore 'cannot set' errors
-  }
-
-  event.dataTransfer = dataTransfer;
+  const event = new (doc.defaultView ?? window).DragEvent(eventtype, {
+    bubbles: true,
+    cancelable: !["dragend", "dragexit", "dragleave"].includes(eventtype),
+    view: doc.defaultView,
+    detail: 0,
+    screenX: cx + 25,
+    screenY: cy + 25,
+    clientX: cx,
+    clientY: cy,
+    ctrlKey: Boolean(ctrl),
+    altKey: Boolean(dragop.options.alt),
+    shiftKey: Boolean(dragop.options.shift),
+    metaKey: Boolean(meta),
+    button,
+    relatedTarget: relatedtarget,
+    dataTransfer
+  });
   dragop._dataTransferWritable = eventtype === "dragstart";
   try {
     result = el.dispatchEvent(event);
@@ -506,15 +451,14 @@ function fireDNDEvent(eventtype, cx, cy, el, button, relatedtarget, dragop) {
     dragop._dataTransferWritable = false;
   }
 
-  if (eventtype === "dragover" && !result) { // dragover event is cancelled
-    if (dataTransfer.dropEffect === "copy" && ["uninitialized", "copy", "copyLink", "copyMove", "all"].includes(dragop.effectAllowed))
-      dragop.currentDragOperation = "copy";
-    else if (dataTransfer.dropEffect === "link" && ["uninitialized", "link", "copyLink", "linkMove", "all"].includes(dragop.effectAllowed))
-      dragop.currentDragOperation = "link";
-    else if (dataTransfer.dropEffect === "move" && ["uninitialized", "move", "copyMove", "linkMove", "all"].includes(dragop.effectAllowed))
-      dragop.currentDragOperation = "move";
-    else
-      dragop.currentDragOperation = "none";
+  if (eventtype === "dragover") {
+    const allowed = !result && (
+      (dataTransfer.dropEffect === "copy" && ["uninitialized", "copy", "copyLink", "copyMove", "all"].includes(dragop.effectAllowed))
+      || (dataTransfer.dropEffect === "link" && ["uninitialized", "link", "copyLink", "linkMove", "all"].includes(dragop.effectAllowed))
+      || (dataTransfer.dropEffect === "move" && ["uninitialized", "move", "copyMove", "linkMove", "all"].includes(dragop.effectAllowed))
+    );
+    if (!allowed)
+      dataTransfer.dropEffect = "none";
   }
 
   return result;
@@ -580,7 +524,7 @@ function handleRunningDrag(options) {
     }
     //    else console.log('dragover not cancelled');
   } else {
-    mousestate.dndstate.currentDragOperation = "none";
+    mousestate.dndstate.dataTransfer.dropEffect = "none";
     console.error('drag cancelled');
     finishCurrentDrag(true, options);
   }
@@ -592,6 +536,7 @@ function finishCurrentDrag(cancel, options) {
   updateDragOptions(mousestate.dndstate.options, options);
 
   if (cancel) {
+    mousestate.dndstate.dataTransfer.dropEffect = "none";
     if (mousestate.lastoverel) {
       fireDNDEvent("dragleave", mousestate.cx, mousestate.cy, mousestate.lastoverel, 0, null, mousestate.dndstate);
     }

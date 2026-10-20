@@ -40,10 +40,10 @@ PUBLIC RECORD FUNCTION GetOIDCMetadata(STRING metadataurl)
 
 PUBLIC OBJECT FUNCTION GetOIDCOauth2Connection(RECORD spinfo)
 {
-  RECORD metadata := GetOIDCMetadata(spinfo.metadataurl);
+  RECORD metadata := GetOIDCMetadata(spinfo.metadata_url);
   OBJECT oauth2 := NEW Oauth2Connection(
-      CELL[ spinfo.clientid
-          , spinfo.clientsecret
+        CELL[ clientid := spinfo.client_id
+          , spinfo.client_signing
           , metadata.authorizeurl
           , metadata.authtokenurl
           , rpclogsource := "wrd:auth-oidc"

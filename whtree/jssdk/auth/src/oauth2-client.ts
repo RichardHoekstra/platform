@@ -239,16 +239,15 @@ export class OAuth2Client {
 
 export async function createOAuth2Client<S extends SchemaTypeDefinition>(wrdSchemaIn: WRDSchemaType<S>, server: WRDEntityMatch<"system:usermgmt", "wrdauthServer">) {
   const wrdSchema = wrdSchemaIn as unknown as WRDSchema<WRDSchemaLike["system:usermgmt"]>; //TODO better schema type but at least this one has the OIDC Client
-  const spData = await wrdSchema.getFields("wrdauthServer", server, ["wrdId", "metadataurl", "clientid", "clientsecret", "additionalscopes", "redirectUri", "clientSigning", "extraParams"]);
+  const spData = await wrdSchema.getFields("wrdauthServer", server, ["wrdId", "metadataUrl", "clientId", "additionalScopes", "redirectUri", "clientSigning", "extraParams"]);
 
   return new OAuth2Client({
-    metadataUrl: spData.metadataurl,
+    metadataUrl: spData.metadataUrl,
     clientScope: wrdSchema.tag,
     redirectUrl: spData.redirectUri,
-    clientId: spData.clientid,
-    clientSecret: spData.clientsecret,
+    clientId: spData.clientId,
     clientSigning: spData.clientSigning || undefined,
-    additionalScopes: spData.additionalscopes.split(" ").map(s => s.trim()).filter(s => s),
+    additionalScopes: spData.additionalScopes.split(" ").map(s => s.trim()).filter(s => s),
     clientWrdId: spData.wrdId,
     extraParams: spData.extraParams
   });
@@ -408,10 +407,10 @@ export async function handleOAuth2LandingPage(req: WebRequest): Promise<WebRespo
  * @param accessToken - Access token to use for the userinfo request
 */
 export async function fetchUserInfo(wrdSchema: AnyWRDSchema, server: WRDEntityMatch<"system:usermgmt", "wrdauthServer">, accessToken: string) {
-  const spData = await wrdSchema.getFields("wrdauthServer", server, ["metadataurl"]);
-  const providerInfo = await getOpenIDConnectMetadata(spData.metadataurl);
+  const spData = await wrdSchema.getFields("wrdauthServer", server, ["metadataUrl"]);
+  const providerInfo = await getOpenIDConnectMetadata(spData.metadataUrl);
   if (!providerInfo.config.userinfo_endpoint)
-    throw new Error(`Authentication server at ${spData.metadataurl} has no userinfo_endpoint, can't fetch user info`);
+    throw new Error(`Authentication server at ${spData.metadataUrl} has no userinfo_endpoint, can't fetch user info`);
 
   const res = await fetch(providerInfo.config.userinfo_endpoint, {
     headers: {

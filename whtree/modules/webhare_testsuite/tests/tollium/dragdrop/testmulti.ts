@@ -146,7 +146,7 @@ test.runTests(
       ]);
 
       test.assert(cpanel.classList.contains("droptarget--hover"));
-      test.eq("copy", test.getCurrentDragDataStore()?.currentDragOperation);
+      test.eq("copy", test.getCurrentDragDataStore()?.dataTransfer.dropEffect);
 
       await test.sendMouseGesture([{ el: cpanel, up: 0, delay: gesture_time }]);
 
@@ -165,7 +165,7 @@ test.runTests(
       ]);
 
       test.assert(cpanel.classList.contains("droptarget--hover"));
-      test.eq("link", test.getCurrentDragDataStore()?.currentDragOperation);
+      test.eq("link", test.getCurrentDragDataStore()?.dataTransfer.dropEffect);
 
       await test.sendMouseGesture([{ el: cpanel, up: 0, delay: gesture_time }]);
 
