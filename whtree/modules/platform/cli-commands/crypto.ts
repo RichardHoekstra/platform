@@ -8,6 +8,7 @@ import { loadlib, type HSVMObject } from "@webhare/harescript";
 import type { HSVMBlob } from "@webhare/harescript/src/wasm-hsvmvar";
 import { decryptForThisServer, type WebHareBlob } from "@webhare/services";
 import { beginWork, commitWork } from "@webhare/whdb";
+import { openFolder } from "@webhare/whfs";
 import { X509Certificate } from "node:crypto";
 
 type KeyPair = HSVMObject & {
@@ -32,7 +33,7 @@ async function openKey(rawkeyname: boolean, hostname: string): Promise<KeyPair> 
   return keypair;
 }
 
-async function requestCertficate(primaryhostname: string, hostnames: string[], options: { staging: boolean; debug: boolean }): Promise<void> {
+async function requestCertificate(primaryhostname: string, hostnames: string[], options: { staging: boolean; debug: boolean }): Promise<void> {
   const result = await requestACMECertificate({
     domains: [primaryhostname, ...hostnames],
     //TODO get debug output to go to stdout instead of logDebug
@@ -47,6 +48,11 @@ async function requestCertficate(primaryhostname: string, hostnames: string[], o
 
     throw new CLIRuntimeError(JSON.stringify(result));
   }
+
+  await commitWork();
+  console.log(result.certificateId
+    ? `Certificate has been applied and stored as ${(await openFolder(result.certificateId)).whfsPath}`
+    : "Staging certificate request succeeded (certificate not stored)");
 }
 
 async function getKeyInfo(rawkeyname: boolean, hostname: string, which: "privatekey" | "certificatechain"): Promise<void> {
@@ -103,7 +109,7 @@ runCli({
         { name: "[hostnames...]", description: "Additional domains" },
       ],
       async main({ args, opts }) {
-        await requestCertficate(args.primaryhostname, args.hostnames, opts);
+        await requestCertificate(args.primaryhostname, args.hostnames, opts);
       }
     },
     "list-keys": {
