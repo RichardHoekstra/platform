@@ -204,6 +204,9 @@ async function generateServerConfig(webServerConfig: Configuration): Promise<Ngi
 }
 
 export async function reconfigureNginx() {
+  if (process.env.WEBHARE_WEBSERVER !== "nginxjs")
+    return;
+
   const configRoot = backendConfig.dataRoot + "config/nginx/";
   //create configRoot and a state subfolder
   await mkdir(configRoot + "state", { recursive: true });
