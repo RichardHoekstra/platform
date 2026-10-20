@@ -36,11 +36,12 @@ async function openKey(rawkeyname: boolean, hostname: string): Promise<KeyPair> 
 async function requestCertificate(primaryhostname: string, hostnames: string[], options: { staging: boolean; debug: boolean }): Promise<void> {
   const result = await requestACMECertificate({
     domains: [primaryhostname, ...hostnames],
-    //TODO get debug output to go to stdout instead of logDebug
-    debug: options.debug,
     staging: options.staging,
     //TODO offer more flags to the CLI ? eg testonly?
-  });
+  }, options.debug ? record => {
+    const { "#what": what, ...details } = record;
+    console.log(`[${new Date().toISOString()}] ${String(what)}`, details);
+  } : undefined);
 
   if (!result.success) {
     if (result.error === "hostnotlocal")
