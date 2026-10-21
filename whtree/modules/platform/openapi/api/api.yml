@@ -171,7 +171,7 @@ paths:
     get:
       description: List the WRD types in a schema
       parameters:
-        - $ref: "#/components/parameters/xschema"
+        - $ref: "#/components/parameters/schema"
       responses:
         "200":
           description: The types
@@ -187,7 +187,7 @@ paths:
     post:
       description: Query call
       parameters:
-        - $ref: "#/components/parameters/xschema"
+        - $ref: "#/components/parameters/schema"
         - $ref: "#/components/parameters/type"
       requestBody:
         description: The query
@@ -213,7 +213,7 @@ paths:
       # TODO we could offer an importMode parameter OR an import endpoint. but do we even want external users to use importMode? eg sync won't require it as its a pull interface and using Temp entities may be safer anyway
       description: Create a new WRD entity
       parameters:
-        - $ref: "#/components/parameters/xschema"
+        - $ref: "#/components/parameters/schema"
         - $ref: "#/components/parameters/type"
       requestBody:
         description: The entity data to import
@@ -237,7 +237,7 @@ paths:
       # TODO we could offer an importMode parameter OR an import endpoint. but do we even want external users to use importMode? eg sync won't require it as its a pull interface and using Temp entities may be safer anyway
       description: Update an entity
       parameters:
-        - $ref: "#/components/parameters/xschema"
+        - $ref: "#/components/parameters/schema"
         - $ref: "#/components/parameters/type"
         - $ref: "#/components/parameters/entity"
       requestBody:
@@ -257,7 +257,7 @@ paths:
     get:
       description: List API tokens owned by the entity
       parameters:
-        - $ref: "#/components/parameters/xschema"
+        - $ref: "#/components/parameters/schema"
         - $ref: "#/components/parameters/type"
         - $ref: "#/components/parameters/entity"
       responses:
@@ -276,7 +276,7 @@ paths:
     post:
       description: Create a new API token for the entity
       parameters:
-        - $ref: "#/components/parameters/xschema"
+        - $ref: "#/components/parameters/schema"
         - $ref: "#/components/parameters/type"
         - $ref: "#/components/parameters/entity"
       requestBody:
@@ -300,7 +300,7 @@ paths:
 
 components:
   parameters:
-    xschema: # Prefixed with 'x' otherwise openapi-typescript doesn't pick it up
+    schema:
       in: path
       name: schema
       required: true
@@ -493,7 +493,7 @@ components:
 
     Types:
       type: object
-      #patternProperties: # "^[a-z][A-Z0-9_]{0,63}$": # the type's camelcased tag TODO not supported by openapi=typescript but see https://github.com/openapi-ts/openapi-typescript/pull/2288/files
+      #patternProperties: # "^[a-z][A-Z0-9_]{0,63}$": # the type's camelcased tag
       additionalProperties: # the type's camelcased tag
         $ref: "#/components/schemas/Type"
 

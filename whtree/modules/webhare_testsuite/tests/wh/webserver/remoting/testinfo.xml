@@ -7,6 +7,7 @@
   <test script="test_restapi.whscr" />
   <test script="test_openapi.ts" />
   <test script="test_openapi_types.ts" />
+  <test script="test_openapi_generation.ts" />
   <test script="test_whremoting.whscr" />
   <test name="test_whremoting_wasm" script="test_whremoting.whscr" engine="wasm" />
   <jstest file="test_whrpc.ts" />
