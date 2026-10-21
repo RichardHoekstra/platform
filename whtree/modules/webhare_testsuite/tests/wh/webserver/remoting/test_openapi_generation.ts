@@ -3,6 +3,8 @@ import ts from "typescript";
 import type { OpenAPIV3_1 } from "openapi-types";
 import { createOpenAPITypeDocuments } from "@mod-system/js/internal/generation/gen_openapi";
 import { toFSPath } from "@webhare/services";
+import { decodeYAML } from "@mod-platform/js/devsupport/validation";
+import { mergeIntoBundled } from "@mod-system/js/internal/openapi/merge";
 
 function checkTypes(generated: string, assertions: string) {
   const source = ts.createSourceFile("generated.ts", generated, ts.ScriptTarget.Latest, true);
@@ -139,7 +141,115 @@ type SchemaParameter = Assert<components["parameters"]["schema"] extends string 
   }
 }
 
+async function testOpenAPI31EdgeCases() {
+  // openapi-types does not describe boolean schemas or arbitrary specification extensions.
+  const specification = decodeYAML(`
+openapi: 3.1.0
+info: { title: Edge cases, version: "1" }
+paths:
+  x-note: metadata
+  x-object:
+    get:
+      x-webhare-implementation: invalid.ts#notAnOperation
+  /empty:
+    get: {}
+  /content:
+    get:
+      parameters:
+        - name: text
+          in: query
+          required: true
+          content:
+            text/plain:
+              schema: { type: string }
+        - name: forbidden
+          in: query
+          schema: false
+        - name: forbiddenRef
+          in: query
+          schema:
+            $ref: "#/components/schemas/Forbidden"
+      responses:
+        x-note: response metadata
+        x-object: { anything: metadata }
+        "200":
+          description: Forbidden response
+          headers:
+            X-Text:
+              content:
+                text/plain:
+                  schema: { type: string }
+            X-Forbidden:
+              schema: false
+          content:
+            application/json:
+              schema: false
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: false
+      responses:
+        "200":
+          description: Anything
+          content:
+            application/json:
+              schema: true
+components:
+  schemas:
+    Forbidden: false
+    Anything: true
+  parameters:
+    encoded:
+      in: query
+      name: encoded
+      content:
+        application/json:
+          schema: { type: object, properties: { value: { type: string } } }
+  pathItems:
+    empty:
+      get: {}
+webhooks:
+  empty:
+    post: {}
+`) as OpenAPIV3_1.Document;
+  const generated = await createOpenAPITypeDocuments(specification, undefined, { name: "test", spec: "" }, "test", "test", true);
+  test.checkTypes(extractGeneratedTypes(generated), `
+type Assert<T extends true> = T;
+type Equal<A, B> = [A] extends [B] ? [B] extends [A] ? true : false : false;
+type Routes = Assert<Equal<keyof paths, "/empty" | "/content">>;
+type Empty = Assert<Equal<keyof paths["/empty"]["get"]["responses"], never>>;
+type Responses = Assert<Equal<keyof paths["/content"]["get"]["responses"], "200">>;
+type Text = Assert<Equal<NonNullable<paths["/content"]["get"]["parameters"]["query"]>["text"], string>>;
+type ForbiddenParameter = Assert<Equal<NonNullable<paths["/content"]["get"]["parameters"]["query"]>["forbidden"], undefined>>;
+type ForbiddenReference = Assert<Equal<NonNullable<paths["/content"]["get"]["parameters"]["query"]>["forbiddenRef"], undefined>>;
+type Encoded = Assert<Equal<components["parameters"]["encoded"], { value?: string }>>;
+type Header = Assert<Equal<paths["/content"]["get"]["responses"]["200"]["headers"]["X-Text"], string | undefined>>;
+type ForbiddenHeader = Assert<Equal<paths["/content"]["get"]["responses"]["200"]["headers"]["X-Forbidden"], undefined>>;
+type ForbiddenResponse = Assert<Equal<paths["/content"]["get"]["responses"]["200"]["content"]["application/json"], never>>;
+type ForbiddenBody = Assert<Equal<paths["/content"]["post"]["requestBody"]["content"]["application/json"], never>>;
+type AnythingResponse = Assert<Equal<paths["/content"]["post"]["responses"]["200"]["content"]["application/json"], unknown>>;
+type ForbiddenComponent = Assert<Equal<components["schemas"]["Forbidden"], never>>;
+type AnythingComponent = Assert<Equal<components["schemas"]["Anything"], unknown>>;
+type EmptyPathItem = Assert<Equal<keyof components["pathItems"]["empty"]["get"]["responses"], never>>;
+type EmptyWebhook = Assert<Equal<keyof webhooks["empty"]["post"]["responses"], never>>;
+`);
+  test.assert(!generated.includes("notAnOperation"));
+}
+
+function testMergePrototypeGuard() {
+  const target: { nested: { kept: boolean; added?: number } } = { nested: { kept: true } };
+  mergeIntoBundled(target, JSON.parse('{"__proto__":{"polluted":true},"nested":{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}},"added":42}}'), "");
+  test.eq({ nested: { kept: true, added: 42 } }, target);
+  test.eq(Object.prototype, Object.getPrototypeOf(target));
+  test.eq(Object.prototype, Object.getPrototypeOf(target.nested));
+  test.eq(false, Object.hasOwn(Object.prototype, "polluted"));
+}
+
 test.runTests([
   testGeneratedTypes,
-  testExternalReferences
+  testExternalReferences,
+  testOpenAPI31EdgeCases,
+  testMergePrototypeGuard
 ]);

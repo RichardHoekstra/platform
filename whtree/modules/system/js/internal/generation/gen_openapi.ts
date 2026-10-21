@@ -227,8 +227,8 @@ export async function createOpenAPITypeDocuments(openapifilepath: string | OpenA
 
   const sourcefiles = new Map<string, { symbols: Set<string>; defs: string }>;
 
-  for (const [pathkey, path] of Object.entries(parsed.paths) as [[string, object]]) {
-    if (pathkey === "parameters")
+  for (const [pathkey, path] of Object.entries(parsed.paths ?? {}) as [[string, object]]) {
+    if (!pathkey.startsWith("/") || !path)
       continue;
 
     const pathfuncname = "check" + pathkey.replace(/[{}]/g, "").split("/").map(e => e.substring(0, 1).toUpperCase() + e.slice(1)).join("");

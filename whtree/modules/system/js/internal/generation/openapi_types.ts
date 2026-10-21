@@ -45,17 +45,22 @@ function resolved<T extends object>(value: T | OpenAPIV3.ReferenceObject): T {
  * this adapter preserves the indexing contract consumed by WebHare's typed clients and requests.
  */
 export async function generateOpenAPITypes(parsed: OpenAPIV3.Document): Promise<string> {
-  const schemas: Record<string, OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject> = { ...parsed.components?.schemas };
+  const schemas: Record<string, OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject> = {};
   const names = new Map<string, string>();
   const schemaNames = new Map<object, string>();
-  for (const [key, schema] of Object.entries(schemas)) {
+  for (const [key, schema] of Object.entries(parsed.components?.schemas ?? {})) {
+    if (typeof schema === "boolean")
+      continue;
+    schemas[key] = schema;
     const name = `WebHareSchema${names.size}`;
     names.set(key, name);
     schemaNames.set(schema, name);
   }
 
-  function schemaType(schema: OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject | undefined): string {
-    if (!schema)
+  function schemaType(schema: OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject | boolean | undefined): string {
+    if (schema === false)
+      return "never";
+    if (schema === true || schema === undefined)
       return "unknown";
     const existing = schemaNames.get(schema);
     if (existing)
@@ -75,7 +80,7 @@ export async function generateOpenAPITypes(parsed: OpenAPIV3.Document): Promise<
   }
 
   function parameterType(parameter: OpenAPIV3.ParameterObject | OpenAPIV3.HeaderObject): string {
-    return parameter.schema ? schemaType(parameter.schema) : parameter.content ? contentType(parameter.content) : "unknown";
+    return parameter.schema !== undefined ? schemaType(parameter.schema) : schemaType(Object.values(parameter.content ?? {})[0]?.schema);
   }
 
   function parametersType(parameters: OpenAPIV3.ParameterObject[]): string {
@@ -121,7 +126,7 @@ export async function generateOpenAPITypes(parsed: OpenAPIV3.Document): Promise<
       const type = objectType([
         { name: "parameters", type: parametersType([...inherited, ...overrides]) },
         { name: "requestBody", type: body ? bodyType(body) : "never", optional: !body?.required },
-        { name: "responses", type: objectType(Object.entries(operation.responses).map(([name, response]) => ({ name, type: responseType(resolved(response)) }))) }
+        { name: "responses", type: objectType(Object.entries(operation.responses ?? {}).filter(([name]) => !name.startsWith("x-")).map(([name, response]) => ({ name, type: responseType(resolved(response)) }))) }
       ]);
       properties.push({ name: method, type });
       if (operation.operationId)
@@ -134,7 +139,7 @@ export async function generateOpenAPITypes(parsed: OpenAPIV3.Document): Promise<
   function componentType<T>(values: Record<string, T> | undefined, convert: (value: T) => string): string {
     return values ? objectType(Object.entries(values).map(([name, value]) => ({ name, type: convert(value) }))) : "never";
   }
-  const paths = objectType(Object.entries(parsed.paths).map(([name, path]) => ({ name, type: path ? pathType(path) : "never" })));
+  const paths = objectType(Object.entries(parsed.paths ?? {}).filter(([name]) => name.startsWith("/")).map(([name, path]) => ({ name, type: path ? pathType(path) : "never" })));
   const componentTypes = objectType([
     { name: "schemas", type: componentType(components?.schemas, schemaType) },
     { name: "responses", type: componentType(components?.responses, value => responseType(resolved(value))) },
