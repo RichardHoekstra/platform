@@ -686,6 +686,32 @@ async function testCollections() {
   test.eq({ a: 1, b: 2 }, typedFromEntriesB);
 }
 
+function testSafePropertyNames() {
+  const unsafeNames = ["", "__proto__", "constructor", "prototype"];
+  const safeNames = ["name", "0", " ", "toString", "hasOwnProperty", "__Proto__", "Constructor", "Prototype", "__proto__suffix", "prefixconstructor", "prototype.suffix"];
+
+  for (const name of unsafeNames) {
+    test.eq(false, std.isSafePropertyName(name));
+    test.eq(false, std.isSafeObjectEntry([name, "safe value"]));
+  }
+  for (const name of safeNames) {
+    test.eq(true, std.isSafePropertyName(name));
+    test.eq(true, std.isSafeObjectEntry([name, { constructor: "not checked" }] as const));
+  }
+
+  const obj = Object.fromEntries([...unsafeNames, ...safeNames].map(name => [name, null]));
+  const keys = Object.keys(obj).filter(std.isSafePropertyName);
+  test.typeAssert<test.Equals<string[], typeof keys>>();
+  test.eq(safeNames.toSorted(), keys.toSorted());
+
+  const entries = Object.entries(obj).filter(std.isSafeObjectEntry);
+  test.eq(Object.entries(obj).filter(([key]) => safeNames.includes(key)), entries);
+
+  const typedEntries = Object.entries({ name: 1, constructor: 2 }).filter(std.isSafeObjectEntry);
+  test.typeAssert<test.Equals<Array<[string, number]>, typeof typedEntries>>();
+  test.eq([["name", 1]], typedEntries);
+}
+
 async function testSortedSetMap() {
   // List (sorted on 'a', then 'b')
   const multimap1 = new std.SortedMultiMap(std.compareProperties(["a", "b"]), std.shuffle([
@@ -1115,6 +1141,7 @@ test.runTests([
   testCompare,
   "Collections",
   testCollections,
+  testSafePropertyNames,
   testSortedSetMap,
   "Promises",
   testPromises,

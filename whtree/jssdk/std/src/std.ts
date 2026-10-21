@@ -11,7 +11,7 @@ export type { ToSnakeCase, ToCamelCase, ComparableType, MaybePromise } from "./t
 export { encodeString, decodeString, escapeRegExp, regExpFromWildcards, stringify, parseTyped, slugify, isValidEmail, type StringEncodings, toCLocaleLowercase, toCLocaleUppercase, levenshteinDistance, getUTF8Length, limitUTF8Length, updateURL } from "./strings.ts";
 export { generateRandomId, isLikeRandomId, isValidUUID } from "./platformbased.ts";
 
-export { shuffle, emplace, pick, omit, isTruthy, appendToArray, typedEntries, typedFromEntries, typedKeys, SortedMultiSet, SortedMultiMap, type TypedEntries, type TypedFromEntries } from "./collections.ts";
+export { shuffle, emplace, pick, omit, isTruthy, isSafePropertyName, isSafeObjectEntry, appendToArray, typedEntries, typedFromEntries, typedKeys, SortedMultiSet, SortedMultiMap, type TypedEntries, type TypedFromEntries } from "./collections.ts";
 export type { EmplaceHandler, DistributedKeys, DistributedOmit, DistributedPick } from "./collections.ts";
 
 export { Money, type MoneyRoundingMode, type MoneyFormatOptions } from "./money.ts";

@@ -172,6 +172,28 @@ export function isTruthy<T>(a: T): a is (T & {}) {
   return Boolean(a);
 }
 
+/** Check whether a property name is non-empty and not exactly "__proto__", "constructor", or "prototype".
+ * Comparison is case-sensitive. This only checks the name, not any associated value or nested properties.
+ * @param name - Property name to check
+ * @returns Whether the property name passes these checks
+ * @example
+ * const keys = Object.keys(obj).filter(isSafePropertyName);
+ */
+export function isSafePropertyName(name: string): boolean {
+  return name !== "" && name !== "__proto__" && name !== "constructor" && name !== "prototype";
+}
+
+/** Check whether an object's [key, value] entry has a safe property name.
+ * Uses {@link isSafePropertyName} to check the key. The value is not checked.
+ * @param entry - [key, value] pair to check
+ * @returns Whether the entry's key passes the property name checks
+ * @example
+ * const entries = Object.entries(obj).filter(isSafeObjectEntry);
+ */
+export function isSafeObjectEntry(entry: readonly [string, unknown]): boolean {
+  return isSafePropertyName(entry[0]);
+}
+
 /** Append to array, without overflowing the stack (eg V8 overflows at more than 32K entries)
  * @param array - Array to append to
  * @param values - Values to append
