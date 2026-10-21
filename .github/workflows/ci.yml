@@ -71,7 +71,7 @@ jobs:
     outputs:
       CI_COMMIT_REF_SLUG: ${{ steps.slug.outputs.CI_COMMIT_REF_SLUG }}
       PUBLIC_REGISTRY_IMAGE: ${{ steps.slug.outputs.PUBLIC_REGISTRY_IMAGE }}
-    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    runs-on: ${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     steps:
       - id: slug
         env:
@@ -92,7 +92,7 @@ jobs:
     needs: [prepare]
     name: Build container
     # See https://github.com/actions/runner-images. Fork PRs (via pull-request.yml) never get our own runners
-    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    runs-on: ${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     env:
       CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
       PUBLIC_REGISTRY_IMAGE: ${{ needs.prepare.outputs.PUBLIC_REGISTRY_IMAGE }}
@@ -125,7 +125,7 @@ jobs:
   test-vscode-extension:
     name: VS Code extension tests
     needs: [prepare]
-    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    runs-on: ${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -143,7 +143,7 @@ jobs:
     name: ${{ matrix.name }}
     needs: [prepare,buildcontainer]
     if: needs.buildcontainer.result == 'success'
-    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    runs-on: ${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     continue-on-error: ${{ matrix.allow_failure }}
     env:
       CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
@@ -201,7 +201,7 @@ jobs:
     needs: [buildcontainer, test-vscode-extension, testcontainers]
     # The gate must run even when a dependency fails so the required check reports failure rather than skipped.
     if: always()
-    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    runs-on: ${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     steps:
       - name: Verify all tests passed
         if: >-
@@ -215,7 +215,7 @@ jobs:
     name: Deploy container
     needs: [prepare, all-tests-passed]
     if: github.event_name == 'push' && !inputs.scheduled
-    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    runs-on: ${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     env:
       CI_COMMIT_REF_SLUG: ${{ needs.prepare.outputs.CI_COMMIT_REF_SLUG }}
       DOCKERHUB_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_REGISTRY_PASSWORD }}
