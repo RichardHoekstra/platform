@@ -568,18 +568,16 @@ components:
             type: string
           description: The scopes for the API token
         expires:
-          type: string
+          type: [string, "null"]
           format: date-time
-          nullable: true
 
     ApiToken:
       type: object
       required: [created]
       properties:
         created:
-          type: string
+          type: [string, "null"]
           format: date-time
-          nullable: true
         expires:
           type: string
           format: date-time
