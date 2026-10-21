@@ -8,7 +8,7 @@ const parameterLocations = ["query", "header", "path", "cookie"] as const;
 type Property = { name: string; type: string; optional?: boolean };
 
 function objectType(properties: Property[]): string {
-  return `{ ${properties.map(property => `${JSON.stringify(property.name)}${property.optional ? "?" : ""}: ${property.type};`).join("\n")} }`;
+  return `{\n${properties.map(property => `${JSON.stringify(property.name)}${property.optional ? "?" : ""}: ${property.type};`).join("\n")}\n}`;
 }
 
 function resolved<T extends object>(value: T | OpenAPIV3.ReferenceObject): T {

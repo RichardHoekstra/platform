@@ -347,10 +347,7 @@ type APIAuthInfo = null;
 
   const clientname = `OpenAPI${tag}Client`;
 
-  result = `/* eslint-disable @typescript-eslint/array-type -- generated types may use array syntax */
-/* eslint-disable no-tabs -- don't care about tabs from source files */
-
-${isservice ? `import type { OperationIds, OpenApiTypedRestAuthorizationRequest, OpenApiTypedRestRequest } from "@webhare/openapi-client/src/types";
+  result = `${isservice ? `import type { OperationIds, OpenApiTypedRestAuthorizationRequest, OpenApiTypedRestRequest } from "@webhare/openapi-client/src/types";
 ` : ``}import { TypedOpenAPIClient, type TypedClientRequestBody, type TypedClientResponse, type GetClientTypeParams, type PathsForMethod } from "@webhare/openapi-client/src/typedclient";
 
 ${result}
