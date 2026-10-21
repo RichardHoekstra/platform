@@ -23,7 +23,7 @@ jobs:
   builddocker:
     name: Build Docker
     # See https://github.com/actions/runner-images
-    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    runs-on: ${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,7 +34,7 @@ jobs:
   make-install:
     name: Make install
     # See https://github.com/actions/runner-images
-    runs-on: ${{ github.event.pull_request.head.repo.fork != true && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
+    runs-on: ${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && vars.WHBUILD_RUNNER && fromJSON(vars.WHBUILD_RUNNER) || 'ubuntu-26.04' }}
     steps:
       - uses: actions/checkout@v4
         with:
