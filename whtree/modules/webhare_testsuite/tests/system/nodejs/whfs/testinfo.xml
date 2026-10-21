@@ -1,5 +1,4 @@
-<group xmlns="http://www.webhare.net/xmlns/system/testinfo"
-       tags="nodejs">
+<group xmlns="http://www.webhare.net/xmlns/system/testinfo" tags="nodejs">
   <test script="test_whfs.ts" />
   <test script="test_whfs_list.ts" />
   <test script="test_whfs_lookup.ts" />
@@ -9,4 +8,5 @@
   <test script="test_whfs_imexport.ts" />
   <test script="test_whfs_archiving.ts" />
   <test script="test_whfs_cli.ts" />
+  <test script="test_site_cli.ts" />
 </group>

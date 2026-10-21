@@ -107,6 +107,12 @@ webFeatures:
     title: "WH testsuite: never used feature"
     siteProfile: webfeatures/neverused_feature.siteprl.xml
     hidden: true
+  boundfeature:
+    title: "WH testsuite: boundfeature"
+    siteProfile: webfeatures/neverused_feature.siteprl.xml
+    hidden: true
+    webDesignMasks:
+      - webhare_testsuite:basetest
 
 moduleFileTypes:
   - resourceMask: ^mod::webhare_testsuite/.*\.test\.yml$

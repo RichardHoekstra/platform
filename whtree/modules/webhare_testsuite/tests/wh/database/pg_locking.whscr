@@ -12,6 +12,8 @@ LOADLIB "mod::system/lib/internal/dbase/updatecommands.whlib";
 IF (IsWithinFunctionRunningJob())
   RETURN;
 
+CONSTANT INTEGER job_done_time := 999999;
+
 TABLE
 < INTEGER id
 , STRING val
@@ -105,19 +107,31 @@ MACRO TestLocking()
   trans1->RollbackWork();
 }
 
+OBJECT remotelink;
+
+INTEGER currenttime;
+INTEGER runnerid;
+
+MACRO HandleSleep(INTEGER wait) {
+  IF (wait != 0) {
+    remotelink->DoRequest(CELL[ currenttime, wait ]);
+    currenttime := currenttime + wait;
+  }
+}
+
 BOOLEAN FUNCTION SlowWhere(INTEGER wait, INTEGER id)
 {
-  Sleep(wait);
+  HandleSleep(wait);
   RETURN TRUE;
 }
 
 STRING FUNCTION SlowCalc(STRING invalue, INTEGER wait, STRING append)
 {
-  Sleep(wait);
+  HandleSleep(wait);
   RETURN invalue || append;
 }
 
-PUBLIC MACRO TestChaseWorker(RECORD options)
+PUBLIC MACRO TestChaseWorker(RECORD options, INTEGER runnerarg, STRING portname)
 {
   options := ValidateOptions(
       [ action := ""
@@ -133,7 +147,14 @@ PUBLIC MACRO TestChaseWorker(RECORD options)
   table1 := BindTransactionToTable(trans1->id, "webhare_testsuite_testschema.locktest");
 
   trans1->BeginWork();
-  Sleep(options.beforewait);
+
+  // Connect within work to make sure the work has been opened when starting timing
+  currenttime := 0;
+  runnerid := runnerarg;
+  remotelink := ConnectToIPCPort(portname);
+  remotelink->DoRequest(CELL[ trans1->backendpid, currenttime, waituntil := currenttime ]);
+
+  HandleSleep(options.beforewait);
   SWITCH (options.action)
   {
     CASE "delete"
@@ -166,11 +187,102 @@ PUBLIC MACRO TestChaseWorker(RECORD options)
     }
   }
 
-  IF (options.commitwait != 0)
-    Sleep(options.commitwait);
+  HandleSleep(options.commitwait);
 
   trans1->CommitWork();
+  remotelink->Close();
+  remotelink := DEFAULT OBJECT;
 }
+
+OBJECT port;
+OBJECT ARRAY FUNCTION CreateLinkPair() {
+  IF (NOT ObjectExists(port))
+    port := CreateIPCPort(GenerateTemporaryIPCPortName());
+  OBJECT link := ConnectToIPCPort(port->name);
+  RETURN [ link, port->Accept(MAX_DATETIME) ];
+}
+
+STATIC OBJECTTYPE TestRunner <
+  /// Ports for the runners to connect to
+  PUBLIC OBJECT ARRAY ports;
+  /// Links to the runners
+  OBJECT ARRAY links;
+
+  /// Data for the runners { backendpid: number, currenttime: number, waituntil: number, waiter: PromiseWithResolvers<BOOLEAN> }[]
+  RECORD ARRAY data;
+
+  /// Deferred promise for main loop notification
+  RECORD waiter;
+
+  MACRO NEW() {
+    this->ports := [ CreateIPCPort(GenerateTemporaryIPCPortName()), CreateIPCPort(GenerateTemporaryIPCPortName()) ];
+    this->MainLoop();
+    this->HandleLocalPort();
+  }
+
+  ASYNC MACRO MainLoop() {
+    WHILE (TRUE) {
+      this->waiter := CreateDeferredPromise();
+      INTEGER ARRAY pids := SELECT AS INTEGER ARRAY COLUMN backendpid FROM this->data;
+      // Repeat locked transaction detection every 100ms
+      AWAIT CreatePromiseRace(OBJECT[ this->waiter.promise, CreateDeadlinePromise(AddTimeToDate(20, GetCurrentDateTime())) ]);
+      RECORD ARRAY translist := GetPrimary()->__ExecSQL("SELECT * FROM pg_stat_activity WHERE pid = ANY($1) ORDER BY pid", [ args := VARIANT[ pids ] ]);
+      INTEGER ARRAY locked := SELECT AS INTEGER ARRAY COLUMN pid FROM translist WHERE wait_event_type = 'Lock';
+      INTEGER time := SELECT AS INTEGER Min(COLUMN currenttime) FROM this->data WHERE backendpid NOT IN locked;
+      IF (time = job_done_time) // all jobs are done
+        BREAK;
+      INTEGER minwaituntil := SELECT AS INTEGER Min(COLUMN waituntil) FROM this->data WHERE COLUMN currenttime = time AND backendpid NOT IN locked;
+      FOREVERY (RECORD rec FROM this->data) {
+        IF (rec.currenttime = time AND rec.waituntil = minwaituntil) {
+          // the runner with the earliest time & shortest deadline may proceed
+          rec.waiter.resolve(TRUE);
+        }
+        // advance every runner's time (unless it is job_done_time already)
+        IF (this->data[#rec].currenttime < minwaituntil AND this->data[#rec].waituntil < minwaituntil)
+          this->data[#rec].currenttime := minwaituntil;
+      }
+    }
+  }
+
+  // Handle connects from the runners and the initial handshake
+  ASYNC MACRO HandleLocalPort() {
+    OBJECT l2 := AWAIT this->ports[1]->AsyncAccept(MAX_DATETIME);
+    OBJECT l1 := AWAIT this->ports[0]->AsyncAccept(MAX_DATETIME);
+    this->ports[0]->Close();
+    this->ports[1]->Close();
+    this->links := [ l1, l2 ];
+    RECORD r1 := AWAIT l1->AsyncReceiveMessage(MAX_DATETIME);
+    RECORD r2 := AWAIT l2->AsyncReceiveMessage(MAX_DATETIME);
+    this->data := RECORD[
+      CELL[ ...r1.msg, waiter := CreateDeferredPromise() ],
+      CELL[ ...r2.msg, waiter := CreateDeferredPromise() ],
+    ];
+    this->links[0]->SendReply(CELL[], r1.msgid);
+    this->links[1]->SendReply(CELL[], r2.msgid);
+    this->HandleLink(0);
+    this->HandleLink(1);
+  }
+
+  ASYNC MACRO HandleLink(INTEGER runner) {
+    WHILE (TRUE) {
+      // Receive sleep messages from the runner
+      RECORD rec := AWAIT this->links[runner]->AsyncReceiveMessage(MAX_DATETIME);
+      IF (rec.status = "gone")
+        BREAK;
+      this->data[runner].currenttime := rec.msg.currenttime;
+      this->data[runner].waituntil := rec.msg.currenttime + rec.msg.wait;
+      this->data[runner].waiter := CreateDeferredPromise();
+      this->waiter.resolve(TRUE);
+      AWAIT this->data[runner].waiter.promise;
+      this->links[runner]->SendReply(CELL[], rec.msgid);
+    }
+    this->links[runner]->Close();
+    this->data[runner].currenttime := job_done_time;
+    this->data[runner].waituntil := job_done_time;
+    this->waiter.resolve(TRUE);
+  }
+>;
+
 
 MACRO TestChase()
 {
@@ -258,13 +370,17 @@ MACRO TestChase()
 
   FOREVERY (RECORD test FROM tests)
   {
+    PRINT(`******** Starting chase test #${#test}: ${test.title} ********\n`);
+
     trans1->BeginWork();
     DELETE FROM table1;
     INSERT [ id := 1, val := "1", ival := 0 ] INTO table1;
     trans1->CommitWork();
 
-    OBJECT test1 := AsyncCallFunctionFromJob(Resolve("#TestChaseWorker"), test.t1);
-    OBJECT test2 := AsyncCallFunctionFromJob(Resolve("#TestChaseWorker"), test.t2);
+    OBJECT r := NEW TestRunner;
+
+    OBJECT test2 := AsyncCallFunctionFromJob(Resolve("#TestChaseWorker"), test.t2, 0, r->ports[0]->name);
+    OBJECT test1 := AsyncCallFunctionFromJob(Resolve("#TestChaseWorker"), test.t1, 1, r->ports[1]->name);
 
     WaitForPromise(CreatePromiseAll([ test1, test2 ]));
 
@@ -335,7 +451,7 @@ MACRO TestDeadlockBreaking()
   WaitUntil(DEFAULT RECORD, AddTimeToDate(200, GetCurrentDateTime()));
   TestEQ(FALSE, IsValueSet(got_result));
 
-  test2->Cancel(); // will close the yob, must succeed!
+  test2->Cancel(); // will close the job, must succeed!
 
   // Wait for the cancel to come through
   FOR (INTEGER i := 0; i < 20; i := i + 1)
