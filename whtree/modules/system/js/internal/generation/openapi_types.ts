@@ -45,7 +45,7 @@ function resolved<T extends object>(value: T | OpenAPIV3.ReferenceObject): T {
  * this adapter preserves the indexing contract consumed by WebHare's typed clients and requests.
  */
 export async function generateOpenAPITypes(parsed: OpenAPIV3.Document): Promise<string> {
-  const schemas: Record<string, OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject> = {};
+  const schemas: Record<string, OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject> = Object.create(null);
   const names = new Map<string, string>();
   const schemaNames = new Map<object, string>();
   for (const [key, schema] of Object.entries(parsed.components?.schemas ?? {})) {
