@@ -1,6 +1,6 @@
 import * as test from "@webhare/test";
-import ts from "typescript";
-import type { OpenAPIV3_1 } from "openapi-types";
+import ts from "wh-internal:/typescript";
+import type { OpenAPIV3_1 } from "wh-internal:/openapi-types";
 import { createOpenAPITypeDocuments } from "@mod-system/js/internal/generation/gen_openapi";
 import { toFSPath } from "@webhare/services";
 import { decodeYAML } from "@mod-platform/js/devsupport/validation";
@@ -215,7 +215,7 @@ webhooks:
     post: {}
 `) as OpenAPIV3_1.Document;
   const generated = await createOpenAPITypeDocuments(specification, undefined, { name: "test", spec: "" }, "test", "test", true);
-  test.checkTypes(extractGeneratedTypes(generated), `
+  checkTypes(generated, `
 type Assert<T extends true> = T;
 type Equal<A, B> = [A] extends [B] ? [B] extends [A] ? true : false : false;
 type Routes = Assert<Equal<keyof paths, "/empty" | "/content">>;

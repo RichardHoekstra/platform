@@ -65,6 +65,11 @@ function getDataRootNodeModules(): DataRootItem[] {
       target: `${installationroot}jssdk/`
     },
     {
+      subPath: "wh-internal:",
+      type: "symboliclink",
+      target: `${installationroot}node_modules`
+    },
+    {
       subPath: "wh:db",
       type: "symboliclink",
       target: `${whdataroot}config/db`
