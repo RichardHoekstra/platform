@@ -14,6 +14,7 @@ import {
   logError,
   resolveResource,
   ResourceDescriptor,
+  type LoggableRecord,
   type TaskRequest,
   type TaskResponse,
 } from "@webhare/services";
@@ -99,13 +100,20 @@ type CertificateRequestData = {
   isRenewal?: boolean;
   staging?: boolean;
   testOnly?: boolean;
+};
+
+type CertificateRequestTaskData = CertificateRequestData & {
   debug?: boolean;
 };
 
+type DebugCallback = (record: LoggableRecord) => void;
+
 //Implements task platform:requestcertificate
-export async function requestCertificateTask(req: TaskRequest<ToSnakeCase<CertificateRequestData>, CertificateRequestResult>): Promise<TaskResponse> {
+export async function requestCertificateTask(req: TaskRequest<ToSnakeCase<CertificateRequestTaskData>, CertificateRequestResult>): Promise<TaskResponse> {
   const taskdata = toCamelCase(req.taskdata);
-  const result = await requestACMECertificate(taskdata);
+  const { debug: enableDebug, ...requestData } = taskdata;
+  const debug = enableDebug ? (record: LoggableRecord) => logDebug("platform:certbot", record) : undefined;
+  const result = await requestACMECertificate(requestData, debug);
   if (result.success === false) {
     if (result.error === "stillvalid")
       return req.resolveByCompletion(result);
@@ -124,7 +132,7 @@ export async function requestCertificateTask(req: TaskRequest<ToSnakeCase<Certif
   }
 }
 
-export async function requestACMECertificate(taskdata: CertificateRequestData): Promise<CertificateRequestResult> {
+export async function requestACMECertificate(taskdata: CertificateRequestData, debug?: DebugCallback): Promise<CertificateRequestResult> {
   await beginWork();
 
   // Find the domains to request certificates for
@@ -259,8 +267,7 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
           };
         const serverUuid = await response.text();
         if (serverUuid !== myUuid) {
-          if (taskdata.debug)
-            logDebug("platform:certbot", { "#what": "Server mismatch", myUuid, serverUuid });
+          debug?.({ "#what": "Server mismatch", myUuid, serverUuid });
           return {
             provider: { id: provider.wrdId, domain: provider.issuerDomain },
             success: false,
@@ -287,26 +294,25 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
 
   let result: Awaited<ReturnType<typeof doRequestACMECertificate>>;
   try {
-    if (taskdata.debug)
-      logDebug("platform:certbot", {
-        "#what": "request",
-        directory,
-        domains: requestDomains,
-        provider: provider.issuerDomain,
-        // For wildcard certificates, use dns-01, otherwise use http-01 challenges
-        dnsChallenge: wildcard,
-        httpChallenge: !wildcard,
-        skippedDomains,
-      });
+    debug?.({
+      "#what": "request",
+      directory,
+      domains: requestDomains,
+      provider: provider.issuerDomain,
+      // For wildcard certificates, use dns-01, otherwise use http-01 challenges
+      dnsChallenge: wildcard,
+      httpChallenge: !wildcard,
+      skippedDomains,
+    });
     result = await doRequestACMECertificate(directory, requestDomains, {
       emails: provider.email ? [provider.email] : undefined,
       keyPair,
       keyPairAlgorithm: provider.keyPairAlgorithm ?? "rsa",
       kid: provider.eabKid ? provider.eabKid : undefined,
       hmacKey: provider.eabHmackey ? provider.eabHmackey : undefined,
-      updateDnsRecords: wildcard ? updateDnsRecords.bind(null, provider.acmeChallengeHandler, taskdata.debug ?? false) : undefined,
-      updateHttpResources: !wildcard ? updateHttpResources.bind(null, provider.acmeChallengeHandler, taskdata.debug ?? false) : undefined,
-      cleanup: cleanup.bind(null, provider.acmeChallengeHandler, taskdata.debug ?? false),
+      updateDnsRecords: wildcard ? updateDnsRecords.bind(null, provider.acmeChallengeHandler, debug) : undefined,
+      updateHttpResources: !wildcard ? updateHttpResources.bind(null, provider.acmeChallengeHandler, debug) : undefined,
+      cleanup: cleanup.bind(null, provider.acmeChallengeHandler, debug),
     });
   } catch (e) {
     logError(e as Error);
@@ -412,44 +418,39 @@ export async function requestACMECertificate(taskdata: CertificateRequestData): 
   }
 }
 
-async function updateDnsRecords(acmeChallengeHandler: string, debug: boolean, dnsRecord: acme.DnsTxtRecord[]) {
+async function updateDnsRecords(acmeChallengeHandler: string, debug: DebugCallback | undefined, dnsRecord: acme.DnsTxtRecord[]) {
   const handler = await createACMEChallengeHandler(acmeChallengeHandler, debug);
 
   try {
     await handler.setupDNSChallenge(dnsRecord);
-    if (debug)
-      logDebug("platform:certbot", { "#what": "update dns records", dnsRecords: dnsRecord.map(_ => pick(_, ["domain", "name"])) });
+    debug?.({ "#what": "update dns records", dnsRecords: dnsRecord.map(_ => pick(_, ["domain", "name"])) });
   } catch (e) {
     logError(e as Error);
-    if (debug)
-      logDebug("platform:certbot", { "#what": "update dns records error", dnsRecords: dnsRecord.map(_ => pick(_, ["domain", "name"])), error: (e as Error).message });
+    debug?.({ "#what": "update dns records error", dnsRecords: dnsRecord.map(_ => pick(_, ["domain", "name"])), error: (e as Error).message });
     throw e;
   }
 }
 
-async function updateHttpResources(acmeChallengeHandler: string, debug: boolean, httpResource: acme.HttpResource[]) {
+async function updateHttpResources(acmeChallengeHandler: string, debug: DebugCallback | undefined, httpResource: acme.HttpResource[]) {
   const handler = await createACMEChallengeHandler(acmeChallengeHandler, debug);
 
   try {
     await handler.setupHTTPChallenge(httpResource);
-    if (debug)
-      logDebug("platform:certbot", { "#what": "update http resources", httpResources: httpResource.map(_ => pick(_, ["domain", "name"])) });
+    debug?.({ "#what": "update http resources", httpResources: httpResource.map(_ => pick(_, ["domain", "name"])) });
   } catch (e) {
     logError(e as Error);
-    if (debug)
-      logDebug("platform:certbot", { "#what": "update http resources error", httpResources: httpResource.map(_ => pick(_, ["domain", "name"])), error: (e as Error).message });
+    debug?.({ "#what": "update http resources error", httpResources: httpResource.map(_ => pick(_, ["domain", "name"])), error: (e as Error).message });
   }
 }
 
-async function cleanup(acmeChallengeHandler: string, debug: boolean, challenge: {
+async function cleanup(acmeChallengeHandler: string, debug: DebugCallback | undefined, challenge: {
   dnsRecords?: acme.DnsTxtRecord[];
   httpResources?: acme.HttpResource[];
 }) {
   const handler = await createACMEChallengeHandler(acmeChallengeHandler, debug);
 
   if (challenge.httpResources) {
-    if (debug)
-      logDebug("platform:certbot", { "#what": "cleanup http resources", httpResources: challenge.httpResources.map(_ => _.name) });
+    debug?.({ "#what": "cleanup http resources", httpResources: challenge.httpResources.map(_ => _.name) });
     try {
       await handler.cleanupHTTPChallenge(challenge.httpResources);
     } catch (e) {
@@ -458,8 +459,7 @@ async function cleanup(acmeChallengeHandler: string, debug: boolean, challenge: 
   }
   if (challenge.dnsRecords) {
 
-    if (debug)
-      logDebug("platform:certbot", { "#what": "cleanup dns records", dnsRecords: challenge.dnsRecords.map(_ => _.name) });
+    debug?.({ "#what": "cleanup dns records", dnsRecords: challenge.dnsRecords.map(_ => _.name) });
     try {
       await handler.cleanupDNSChallenge(challenge.dnsRecords);
     } catch (e) {
@@ -468,10 +468,10 @@ async function cleanup(acmeChallengeHandler: string, debug: boolean, challenge: 
   }
 }
 
-async function createACMEChallengeHandler(acmeChallengeHandler: string, debug: boolean) {
+async function createACMEChallengeHandler(acmeChallengeHandler: string, debug: DebugCallback | undefined) {
   // Initialize the ACME challenge handler
-  if (debug)
-    logDebug("platform:certbot", { "#what": "initialize challenge handler", acmeChallengeHandler });
+  debug?.({ "#what": "initialize challenge handler", acmeChallengeHandler });
+  const handlerContext = { debug: Boolean(debug) };
   const module = acmeChallengeHandler.split(":")[0];
   const handler = acmeChallengeHandler.substring(module.length + 1);
   for (const modyml of await getAllModuleYAMLs())
@@ -479,9 +479,9 @@ async function createACMEChallengeHandler(acmeChallengeHandler: string, debug: b
       if (handler in modyml.acmeChallengeHandlers) {
         const onCreate = modyml.acmeChallengeHandlers[handler].onCreateHandler || modyml.acmeChallengeHandlers[handler].handlerFactory || throwError(`ACME challenge handler '${acmeChallengeHandler}' must have a handlerFactory or onCreateHandler`);
         const factory = resolveResource(modyml.baseResourcePath, onCreate);
-        return (await importJSFunction<ACMEChallengeHandlerFactory>(factory))({ debug });
+        return (await importJSFunction<ACMEChallengeHandlerFactory>(factory))(handlerContext);
       }
-  return new ACMEChallengeHandlerBase({ debug });
+  return new ACMEChallengeHandlerBase(handlerContext);
 }
 
 export async function cleanupOutdatedHttpResources(debug?: boolean) {
