@@ -3,6 +3,7 @@ import { generatorBanner, type FileToUpdate, type GenerateContext } from "./shar
 import SwaggerParser from "@apidevtools/swagger-parser";
 import type { OpenAPIV3, OpenAPIV3_1 } from "openapi-types";
 import { generateOpenAPITypes } from "./openapi_types";
+import { mergeIntoBundled } from "../openapi/merge";
 import { splitFileReference } from "@webhare/services/src/naming";
 import { backendConfig, toFSPath } from "@webhare/services";
 import { getExtractedConfig } from "../configuration";
@@ -196,24 +197,6 @@ function replaceRefsIterate(node: object, remap: Map<object, { $ref: string }>, 
       }
   }
   stack.delete(node);
-}
-
-export function mergeIntoBundled(data: unknown, merge: unknown, path: string) {
-  if (typeof merge !== "object" || !merge || typeof data !== "object" || !data)
-    throw new Error(`Cannot merge a non-object into an object`);
-
-  if (Array.isArray(data) !== Array.isArray(merge))
-    throw new Error(`Cannot merge array into object or vice versa`);
-
-  for (const [key, value] of Object.entries(merge)) {
-    const datavalue = (data as Record<typeof key, unknown>)[key];
-    if (typeof value !== "object" || !value)
-      (data as Record<typeof key, unknown>)[key] = value;
-    else if (typeof datavalue !== "object" || !datavalue)
-      (data as Record<typeof key, unknown>)[key] = value;
-    else
-      mergeIntoBundled((data as Record<typeof key, unknown>)[key], value, `${path}/${key.replace(/~/g, "~0").replace(/\//g, "~1")}`);
-  }
 }
 
 export async function createOpenAPITypeDocuments(openapifilepath: string | OpenAPIV3.Document | OpenAPIV3_1.Document, merge: object | string | undefined, service: OpenAPIDescriptor, importname: string, name: string, isservice: boolean) {
