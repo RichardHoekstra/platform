@@ -19,14 +19,17 @@ export let client: (
 async function focusOurWorkspace() {
 	// Bring us to the front. Have VSCode focus the proper workspace
 	const toOpen = vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.[0].uri;
+	const appName = vscode.env.appRoot.match(/^(.*\.app)/)?.[1];
+
+	console.log(`focusOurWorkspace: appName=${appName}, toOpen=${toOpen}`)
+
 	if (toOpen) //reopening it should bring it to the top
 		await vscode.commands.executeCommand('vscode.openFolder', toOpen);
 
 	// And bring VSCode itself to the front (FIXME only works on mac)
-	// appRoot contains eg '"/Applications/Visual Studio Code.app/Contents/Resources/app". we strip after .app
-	const appname = vscode.env.appRoot.match(/^(.*\.app)/)?.[1];
-	if (appname)
-		spawn("osascript", ['-e', `activate application ${JSON.stringify(appname)}`], { detached: true });
+	if (appName) {
+		spawn("open", ["-a", appName], { detached: true });
+	}
 }
 
 export function startClient(serverOptions: ServerOptions, clientOptions: LanguageClientOptions) {
