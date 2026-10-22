@@ -4,7 +4,7 @@ import { type TypedMessagePort, createTypedMessageChannel, registerTransferredPo
 import { RefTracker } from "./refs";
 import { generateRandomId } from "@webhare/std";
 import * as envbackend from "@webhare/env/src/envbackend";
-import { type MessagePort, receiveMessageOnPort, type TransferListItem } from 'node:worker_threads';
+import { type MessagePort, receiveMessageOnPort, type Transferable as TransferListItem } from 'node:worker_threads';
 import { type StackTrace, parseTrace } from "@webhare/js-api-tools";
 
 export type IPCEncodedException = {
