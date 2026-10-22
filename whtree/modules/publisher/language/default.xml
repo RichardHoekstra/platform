@@ -1917,7 +1917,7 @@
           <text tid="newdocumentnopreview">This version (document creation) does not have a preview</text>
           <text tid="openinpublisher">Open in Publisher</text>
           <text tid="openinversions">Versions</text>
-          <text tid="previewisnothistoricsnapshot">This preview is not a historic snapshot, but the the contents of this version rendered in the current site.</text>
+          <text tid="previewisnothistoricsnapshot">The preview shows the contents of this version rendered in the current site.</text>
           <text tid="previewtab">Preview</text>
           <text tid="to">until</text>
           <text tid="unknownuser">Unknown user</text>
