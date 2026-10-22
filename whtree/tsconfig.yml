@@ -27,7 +27,8 @@ compilerOptions:
   jsxFragmentFactory: dompack.jsxfragment
   isolatedModules: true # disallow constructs that tsc supports but esbuild wouldn't
   noEmit: true # prevent accidental aTS Compiler invocations from generating code
-  target: es2022
+  target: es2025
+  types: ["node"]
   paths:
     dompack:
       - ./modules/system/js/dompack
