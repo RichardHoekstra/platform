@@ -57,16 +57,25 @@ export function startClient(serverOptions: ServerOptions, clientOptions: Languag
 	// Watch for 'reveal' requests from WebHare. This is the reason we need `activationEvents`: `onStartupFinished`
 	client!.onRequest("window/showDocument", async param => {
 
-		const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(param.uri));
+		let uri = vscode.Uri.parse(param.uri);
+		if (uri.scheme === "file") {
+			try {
+				await vscode.workspace.fs.stat(uri);
+			} catch (error) {
+				if (!(error instanceof vscode.FileSystemError) || error.code !== "FileNotFound")
+					throw error;
+				uri = uri.with({ scheme: "untitled" });
+			}
+		}
+		const doc = await vscode.workspace.openTextDocument(uri);
 		const editor = await vscode.window.showTextDocument(doc);
-		// Line added - by having a selection at the same position twice, the cursor jumps there
-		editor.selections = [new vscode.Selection(param.selection.start, param.selection.end)];
-
-		// And the visible range jumps there too
-		var range = new vscode.Range(param.selection.start, param.selection.start);
-		editor.revealRange(range);
+		if (param.selection) {
+			editor.selections = [new vscode.Selection(param.selection.start, param.selection.end)];
+			editor.revealRange(new vscode.Range(param.selection.start, param.selection.end));
+		}
 
 		await focusOurWorkspace();
+		return { success: true };
 	});
 }
 
