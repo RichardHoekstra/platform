@@ -102,7 +102,7 @@ RECORD wrdattributes :=
                                 ]
  , "date" :=                    [ attributetype := wrd_attributetype_date
                                 , image := "date.gif"
-                                , options := [ "isunique" ]
+                                , options := DEFAULT STRING ARRAY
                                 , canchangeto := [ "DATETIME" ]
                                 ]
  , "password" :=                [ attributetype := wrd_attributetype_password
@@ -126,12 +126,12 @@ RECORD wrdattributes :=
                                 ]
  , "time" :=                    [ attributetype := wrd_attributetype_time
                                 , image := "dummy.gif"
-                                , options := [ "isunique" ]
+                                , options := DEFAULT STRING ARRAY
                                 , canchangeto := [ "INTEGER" ]
                                 ]
  , "datetime" :=                [ attributetype := wrd_attributetype_datetime
                                 , image := "dummy.gif"
-                                , options := [ "isunique" ]
+                                , options := DEFAULT STRING ARRAY
                                 , canchangeto := [ "DATE" ]
                                 ]
  , "array" :=                   [ attributetype := wrd_attributetype_array

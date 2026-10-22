@@ -2,8 +2,8 @@ import * as test from "@webhare/test-backend";
 import { generateWRDDefs, WRDSchemaCache } from "@mod-system/js/internal/generation/gen_wrd";
 import { buildGeneratorContext } from "@mod-system/js/internal/generation/generator";
 import { parseSchema } from "@webhare/wrd/src/schemaparser";
-import { createSchema, openSchemaById, wrd, type WRDSchemaLike } from "@webhare/wrd";
-import { beginWork, commitWork } from "@webhare/whdb";
+import { createSchema, extendSchema, openSchemaById, wrd, type WRDSchemaLike } from "@webhare/wrd";
+import { beginWork, commitWork, rollbackWork } from "@webhare/whdb";
 import { throwError } from "@webhare/std";
 
 const testschemaSchema = wrd("webhare_testsuite:testschema");
@@ -73,6 +73,21 @@ async function testSchemaApply() {
   }, await testschemaSchema.getFields("testArrayFields", testArrayEntry, ["translated"]));
 
   await commitWork();
+
+  //unique is not implemented for the date/time types, so a schema declaring it must be rejected
+  for (const attrtype of ["date", "datetime", "time"]) {
+    await beginWork();
+    await test.throws(/cannot be set on attributes of type/, extendSchema("webhare_testsuite:testschema", {
+      schemaDefinitionXML: `<schemadefinition xmlns="http://www.webhare.net/xmlns/wrd/schemadefinition">
+        <domain tag="TEST_UNIQUE_${attrtype.toUpperCase()}">
+          <attributes>
+            <${attrtype} tag="UNIQUE_VALUE" unique="true" />
+          </attributes>
+        </domain>
+      </schemadefinition>`
+    }), `unique ${attrtype}`);
+    await rollbackWork();
+  }
 }
 
 async function testFileGeneration() {
