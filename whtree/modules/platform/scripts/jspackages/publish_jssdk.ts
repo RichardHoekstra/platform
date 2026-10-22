@@ -142,16 +142,17 @@ runCli({
 
       //Prepare tsconfig.json
       const tsconfig = {
-        include: [packagejson.main, join(backendConfig.installationRoot, "node_modules/temporal-spec/global.d.ts")],
+        include: [packagejson.main],
         compilerOptions: {
           target: "es2024",
-          lib: ["es2024", "dom", "dom.iterable"],
+          lib: ["es2024", "esnext.temporal", "dom", "dom.iterable"],
           noEmit: false,
           declaration: true,
           strict: true,
           module: "commonjs",
           types: [join(backendConfig.installationRoot, "node_modules/@types/node")],
           paths: { ["@webhare/" + pkgname]: ["."] } as Record<string, string[]>,
+          rootDir: "./src",
           rewriteRelativeImportExtensions: true,
           //needed to allow fs.ts to include node:stream
           esModuleInterop: true,

@@ -69,7 +69,7 @@
     "stacktrace-js": "^2.0.2",
     "stacktrace-parser": "^0.1.11",
     "typeface-roboto": "^1.1.13",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.1",
     "typescript-json-schema": "^0.67.4",
     "undici": "^8.12.3",

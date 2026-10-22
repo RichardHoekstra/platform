@@ -91,16 +91,19 @@ function getRunKitPath() {
   if (!runkitPath) {
     const tryLocations = [
       process.env.WHRUNKIT_HOME,
-      path.join(process.env.HOME, "projects/webhare-runkit/bin/runkit"),
-      path.join(process.env.HOME, "webhare-runkit/bin/runkit")];
+      ...process.env.HOME ? [
+        path.join(process.env.HOME, "projects/webhare-runkit/bin/runkit"),
+        path.join(process.env.HOME, "webhare-runkit/bin/runkit")
+      ] : []
+    ];
     for (const loc of tryLocations)
-      if (existsSync(loc))
+      if (loc && existsSync(loc))
         runkitPath = loc;
   }
   return runkitPath;
 }
 
-function checkRunkitPath() {
+function checkRunkitPath() { //invoked by both activate and on config change
   const newRunkitPath = getRunKitPath();
   if (newRunkitPath === usingRunKitPath)
     return;
@@ -109,7 +112,7 @@ function checkRunkitPath() {
 
   stopClient();
   if (currentMcpServer) {
-    currentMcpServer[Symbol.dispose]();
+    currentMcpServer.dispose();
     currentMcpServer = null;
   }
 

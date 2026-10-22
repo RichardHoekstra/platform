@@ -12,7 +12,6 @@ import { convertWaitPeriodToDate, isTruthy, omit, pick, type WaitPeriod } from "
 import { whconstant_consilio_catalogtype_managed, whconstant_consilio_catalogtype_unmanaged, whconstant_consilio_default_suffix_mask, whconstant_consilio_osportoffset } from "@mod-system/js/internal/webhareconstants";
 import "@webhare/env";
 import type { API as OpenSearchAPI, Client as OpenSearchClient } from "@opensearch-project/opensearch";
-import type { ErrorCause } from "@opensearch-project/opensearch/api/_types/_common";
 import { getStackTrace } from "@webhare/js-api-tools";
 import { scheduleTimedTask, WebHareBlob } from "@webhare/services";
 import { encodeHSON } from "@webhare/hscompat";
@@ -80,6 +79,7 @@ export type SearchResult<TDocument> = OpenSearchAPI.Search_ResponseBody & {
   };
 };
 
+type ErrorCause = NonNullable<OpenSearchAPI.Bulk_ResponseBody["items"][number][string]["error"]>;
 type OpenSearchError<TDocument extends OpenSearchDocument = OpenSearchDocument> = ErrorCause & { doc: TDocument };
 
 class BulkUploadError<TDocument extends OpenSearchDocument = OpenSearchDocument> extends Error {

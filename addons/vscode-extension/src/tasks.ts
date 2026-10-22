@@ -2,7 +2,10 @@ import path = require('path');
 import { ProcessExecution, ShellExecution, Task, TaskPanelKind, TaskScope, type Uri, tasks, window } from 'vscode';
 
 export async function runScript(uri: Uri) {
-	const resourcepath = (uri || window.activeTextEditor.document.uri).path;
+	const resourcepath = (uri || window.activeTextEditor?.document.uri)?.path;
+	if (!resourcepath)
+		return;
+
 	const task = new Task(
 		{ type: 'shell' },
 		TaskScope.Workspace,

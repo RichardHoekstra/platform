@@ -1,3 +1,5 @@
+/// <reference types="gtag.js" />
+
 import { debugFlags } from '@webhare/env';
 import { loadScript } from '@webhare/dompack';
 import { onConsentChange } from "./consenthandler";

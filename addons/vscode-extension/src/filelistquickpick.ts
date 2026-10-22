@@ -93,13 +93,13 @@ export function showFileListQuickPick(entries: FileListQuickPickEntry[]) {
 		quickPick.activeItems = [firstExternal];
 	// When selecting an item, open it
 	quickPick.onDidChangeSelection(selection => {
-		if (selection[0]) {
+		if (selection[0]?.detail) {
 			showFileListDocument(selection[0].detail, false);
 		}
 	});
 	// When changing the active item, preview it
 	quickPick.onDidChangeActive(selection => {
-		if (selection[0]) {
+		if (selection[0]?.detail) {
 			showFileListDocument(selection[0].detail, true);
 		}
 	});
