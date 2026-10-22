@@ -28,7 +28,7 @@ async function onRequestSchemaContent(schemaUri: string): Promise<string | undef
 	try {
 		const resource = "mod::" + parsedUri.path.substring(1);
 		const schema = await getWebHareResource(resource);
-		return schema as string;
+		return schema ?? undefined;
 	} catch (e) {
 		console.error(e);
 	}
@@ -45,7 +45,7 @@ export async function activateYAML(context: ExtensionContext) {
 		api.registerContributor(SCHEMA, onRequestSchemaURI, onRequestSchemaContent);
 		console.log("vscode-yaml configured");
 	} catch (e) {
-		console.error("Error activating YAML extension: " + e.message);
+		console.error("Error activating YAML extension: " + (e as Error).message);
 		console.log(e);
 		//ignore to prevent uncaught exception, we don't expect our callers to catch
 	}

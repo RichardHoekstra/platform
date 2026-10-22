@@ -1,5 +1,5 @@
 import type { WHServerInitializeResult } from '@webhare/lsp-types';
-import { spawn, spawnSync } from 'child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as vscode from 'vscode';
 import {
 	LanguageClient,
@@ -14,7 +14,7 @@ export const firstConfig = Promise.withResolvers<InitializeResult & WHServerInit
 export let client: (
 	LanguageClient & {
 		get initializeResult(): (InitializeResult & WHServerInitializeResult) | undefined;
-	}) | undefined;
+	}) | null = null;
 
 async function focusOurWorkspace() {
 	// Bring us to the front. Have VSCode focus the proper workspace
@@ -24,7 +24,7 @@ async function focusOurWorkspace() {
 
 	// And bring VSCode itself to the front (FIXME only works on mac)
 	// appRoot contains eg '"/Applications/Visual Studio Code.app/Contents/Resources/app". we strip after .app
-	const appname = vscode.env.appRoot.match(/^(.*\.app)/)[1];
+	const appname = vscode.env.appRoot.match(/^(.*\.app)/)?.[1];
 	if (appname)
 		spawn("osascript", ['-e', `activate application ${JSON.stringify(appname)}`], { detached: true });
 }
@@ -41,15 +41,18 @@ export function startClient(serverOptions: ServerOptions, clientOptions: Languag
 	) as typeof client;
 
 	// Start the client. This will also launch the server
-	client.start();
+	client!.start();
 
-	client.onDidChangeState(event => {
+	client!.onDidChangeState(event => {
 		if (event.newState === State.Running)
-			firstConfig.resolve(client.initializeResult);
+			if (client?.initializeResult)
+				firstConfig.resolve(client?.initializeResult);
+			else
+				console.error("Client initialized but initializeResult is undefined");
 	});
 
 	// Watch for 'reveal' requests from WebHare. This is the reason we need `activationEvents`: `onStartupFinished`
-	client.onRequest("window/showDocument", async param => {
+	client!.onRequest("window/showDocument", async param => {
 
 		const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(param.uri));
 		const editor = await vscode.window.showTextDocument(doc);
@@ -71,12 +74,12 @@ export function stopClient() {
 	client = null;
 }
 
-export async function getWebHareResource(path: string): Promise<string> {
-	const schema = await client.sendRequest("webHare/getWebHareResource", path);
-	return schema as string;
+export async function getWebHareResource(path: string): Promise<string | null> {
+	const schema = await client?.sendRequest<string>("webHare/getWebHareResource", path);
+	return schema || null;
 }
 
-export async function toFSPath(path: string): Promise<string> {
-	const schema = await client.sendRequest("webHare/toFSPath", path);
-	return schema as string;
+export async function toFSPath(path: string): Promise<string | null> {
+	const schema = await client?.sendRequest<string>("webHare/toFSPath", path);
+	return schema || null;
 }

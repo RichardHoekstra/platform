@@ -18,7 +18,7 @@ export async function activateXML(context: ExtensionContext) {
 		});
 		console.log("vscode-xml configured");
 	} catch (e) {
-		console.error("Error activating XML extension: " + e.message);
+		console.error("Error activating XML extension: " + (e as Error).message);
 		console.log(e);
 		//ignore to prevent uncaught exception, we don't expect our callers to catch
 	}

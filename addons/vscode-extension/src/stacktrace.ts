@@ -17,9 +17,9 @@ export async function getStackTraceHandler() {
       textDocument: { uri: window.activeTextEditor.document.uri.toString() },
       lastGuid: ""
     };
-    const response: StackTraceResponse = await client.sendRequest("webHare/getStackTrace", trace);
+    const response = await client?.sendRequest<StackTraceResponse>("webHare/getStackTrace", trace);
     // If there are any stack traces, save and show them
-    if (response.errors.length) {
+    if (response?.errors.length) {
       lastStackTrace = response.errors[0];
       showLastStackTraceHandler();
     }
@@ -55,10 +55,10 @@ export async function showLastStackTraceHandler() {
   }
 }
 
-class StackTraceQuickPickItem implements QuickPickItem {
-  label: string
-  detail: string
-  error: StackTraceError
+interface StackTraceQuickPickItem extends QuickPickItem {
+  label: string;
+  detail: string;
+  error: StackTraceError;
 }
 
 export async function getLastStackTracesHandler() {
@@ -68,14 +68,15 @@ export async function getLastStackTracesHandler() {
       textDocument: { uri: window.activeTextEditor.document.uri.toString() },
       lastGuid: ""
     };
-    const response: StackTraceResponse = await client.sendRequest("webHare/getStackTrace", trace);
+    const response = await client?.sendRequest<StackTraceResponse>("webHare/getStackTrace", trace);
 
     const items: StackTraceQuickPickItem[] = [];
-    for (const error of response.errors) {
-      const item = new StackTraceQuickPickItem;
-      item.label = error.stack.length ? error.stack[0].message ?? "no message" : "no message";
-      item.detail = `${error.date}, ${error.groupid}`;
-      item.error = error;
+    for (const error of response?.errors ?? []) {
+      const item: StackTraceQuickPickItem = {
+        label: error.stack.length ? error.stack[0].message ?? "no message" : "no message",
+        detail: `${error.date}, ${error.groupid}`,
+        error: error
+      };
       items.push(item);
     }
 
