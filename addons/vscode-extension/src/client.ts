@@ -19,14 +19,17 @@ export let client: (
 async function focusOurWorkspace() {
 	// Bring us to the front. Have VSCode focus the proper workspace
 	const toOpen = vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.[0].uri;
+	const appName = vscode.env.appRoot.match(/^(.*\.app)/)?.[1];
+
+	console.log(`focusOurWorkspace: appName=${appName}, toOpen=${toOpen}`)
+
 	if (toOpen) //reopening it should bring it to the top
 		await vscode.commands.executeCommand('vscode.openFolder', toOpen);
 
 	// And bring VSCode itself to the front (FIXME only works on mac)
-	// appRoot contains eg '"/Applications/Visual Studio Code.app/Contents/Resources/app". we strip after .app
-	const appname = vscode.env.appRoot.match(/^(.*\.app)/)?.[1];
-	if (appname)
-		spawn("osascript", ['-e', `activate application ${JSON.stringify(appname)}`], { detached: true });
+	if (appName) {
+		spawn("open", ["-a", appName], { detached: true });
+	}
 }
 
 export function startClient(serverOptions: ServerOptions, clientOptions: LanguageClientOptions) {
@@ -54,16 +57,25 @@ export function startClient(serverOptions: ServerOptions, clientOptions: Languag
 	// Watch for 'reveal' requests from WebHare. This is the reason we need `activationEvents`: `onStartupFinished`
 	client!.onRequest("window/showDocument", async param => {
 
-		const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(param.uri));
+		let uri = vscode.Uri.parse(param.uri);
+		if (uri.scheme === "file") {
+			try {
+				await vscode.workspace.fs.stat(uri);
+			} catch (error) {
+				if (!(error instanceof vscode.FileSystemError) || error.code !== "FileNotFound")
+					throw error;
+				uri = uri.with({ scheme: "untitled" });
+			}
+		}
+		const doc = await vscode.workspace.openTextDocument(uri);
 		const editor = await vscode.window.showTextDocument(doc);
-		// Line added - by having a selection at the same position twice, the cursor jumps there
-		editor.selections = [new vscode.Selection(param.selection.start, param.selection.end)];
-
-		// And the visible range jumps there too
-		var range = new vscode.Range(param.selection.start, param.selection.start);
-		editor.revealRange(range);
+		if (param.selection) {
+			editor.selections = [new vscode.Selection(param.selection.start, param.selection.end)];
+			editor.revealRange(new vscode.Range(param.selection.start, param.selection.end));
+		}
 
 		await focusOurWorkspace();
+		return { success: true };
 	});
 }
 
