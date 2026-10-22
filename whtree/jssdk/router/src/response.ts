@@ -2,7 +2,7 @@ import { debugFlags, type NavigateInstruction } from "@webhare/env";
 import { getCallStackAsText } from "@mod-system/js/internal/util/stacktrace";
 import type { WebResponseInfo } from "@mod-system/js/internal/types";
 import { WebHareBlob } from "@webhare/services";
-import type { TransferListItem } from "worker_threads";
+import type { Transferable as TransferListItem } from "node:worker_threads";
 import { encodeString, generateRandomId, stringify } from "@webhare/std";
 import type { RPCResponse } from "@webhare/rpc/src/rpc";
 import { isLitty, littyToString, type Litty } from "@webhare/litty";

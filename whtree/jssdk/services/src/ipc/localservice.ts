@@ -3,7 +3,7 @@ import { type TypedMessagePort, getSingleMessage } from "@mod-system/js/internal
 import { describePublicInterface } from "./ipc-base";
 import type { WebHareServiceDescription } from "@mod-system/js/internal/types";
 import { type IPCExceptionMessage, encodeIPCException, parseIPCException } from "@mod-system/js/internal/whmanager/ipc";
-import type { TransferListItem } from "node:worker_threads";
+import type { Transferable as TransferListItem } from "node:worker_threads";
 import type { ServiceBase } from "./backendservice";
 import { localServiceHandlerAddPort } from "../symbols";
 export type { ServiceBase } from "./backendservice";

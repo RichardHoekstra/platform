@@ -3,7 +3,7 @@ import { isResourceDescriptor } from "@webhare/services/src/descriptor";
 import { WebHareDiskBlob, WebHareMemoryBlob } from "@webhare/services/src/webhareblob";
 import { Money, stdTypeOf } from "@webhare/std";
 import { getWHType } from "@webhare/std/src/quacks";
-import type { TransferListItem } from "node:worker_threads";
+import type { Transferable as TransferListItem } from "node:worker_threads";
 
 export function runReplacerRecursive(value: unknown, replacer: (arg: object) => object | undefined): unknown {
   if (typeof value === "object" && value) {

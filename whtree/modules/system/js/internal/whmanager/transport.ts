@@ -1,4 +1,4 @@
-import { MessageChannel, type MessagePort, type TransferListItem } from 'node:worker_threads';
+import { MessageChannel, type MessagePort, type Transferable as TransferListItem } from 'node:worker_threads';
 import { dumpRefs } from './refs';
 import { getCallStackAsText } from "@mod-system/js/internal/util/stacktrace";
 import { debugFlags } from "@webhare/env";

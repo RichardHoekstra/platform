@@ -15,7 +15,7 @@ import * as envbackend from "@webhare/env/src/envbackend";
 import { getCallerLocation } from "../util/stacktrace";
 import { invalidateGeneratedFilesCache, reloadBackendConfig } from "../configuration";
 import { getActiveCodeContexts, getCodeContext } from "@webhare/services/src/codecontexts";
-import { isMainThread, type TransferListItem, workerData } from "node:worker_threads";
+import { isMainThread, type Transferable as TransferListItem, workerData } from "node:worker_threads";
 import { formatLogObject, type LoggableRecord } from "@webhare/services/src/logmessages";
 import { type ConvertLocalServiceInterfaceToClientInterface, initNewLocalServiceProxy, type LocalServiceRequest, type LocalServiceResponse, type ServiceBase } from "@webhare/services/src/ipc/localservice";
 import { getScriptName } from "@webhare/system-tools";

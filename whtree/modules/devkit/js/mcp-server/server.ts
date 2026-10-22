@@ -31,7 +31,7 @@ const WEBHARE_DATAROOT = `${homedir()}/whrunkit/myserver/whdata/`;
  */
 async function executeCommand(command: string): Promise<string> {
   try {
-    const { stdout, stderr } = await execAsync(command);
+    const { stdout, stderr } = await execAsync(command, { encoding: "utf8" });
 
     if (stderr) {
       console.error(`Command stderr: ${stderr}`);
@@ -39,8 +39,9 @@ async function executeCommand(command: string): Promise<string> {
 
     return stdout.trim();
   } catch (error) {
-    if ((error as ExecException).stdout) {
-      return (error as ExecException).stdout?.trim() || '';
+    const stdout = (error as ExecException).stdout;
+    if (stdout) {
+      return (typeof stdout === "string" ? stdout : stdout.toString("utf8")).trim();
     }
     throw new McpError(
       ErrorCode.InternalError,
@@ -57,13 +58,13 @@ async function executeWebHareCommand(command: string, args: string[] = []): Prom
     console.error("MUST EXECUTE", command, args);
     logDebug("mcptest:whcommand", { command, args });
 
-    const result = spawnSync("runkit", ["wh", ...args], { shell: true });
+    const result = spawnSync("runkit", ["wh", ...args], { shell: true, encoding: "utf8" });
     logDebug("mcptest:whcommandoutput", { stdout: result.stdout });
     if (result.error) {
       console.error("executeWebHareCommand", result);
       throw new Error(`Failed to execute WebHare command: ${result.error.message}`);
     }
-    return result.stdout.toString().trim();
+    return result.stdout.trim();
   } catch (error) {
     throw new McpError(ErrorCode.InternalError, `WebHare command execution failed: ${(error as Error).message}`
     );
