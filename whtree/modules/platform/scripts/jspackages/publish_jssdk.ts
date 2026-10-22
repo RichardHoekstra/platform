@@ -152,6 +152,7 @@ runCli({
           module: "commonjs",
           types: [join(backendConfig.installationRoot, "node_modules/@types/node")],
           paths: { ["@webhare/" + pkgname]: ["."] } as Record<string, string[]>,
+          rootDir: ".",
           rewriteRelativeImportExtensions: true,
           //needed to allow fs.ts to include node:stream
           esModuleInterop: true,

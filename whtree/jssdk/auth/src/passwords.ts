@@ -19,7 +19,6 @@ export type PasswordCheckResult = {
   success: true;
 };
 
-//@ts-expect-error Requires TS 6.0.2
 let durationFormat: Intl.DurationFormat | undefined = undefined;
 
 /** Parse password checks
@@ -261,7 +260,6 @@ function getRequirementTid(check: { check: string; value: number; duration: stri
 */
 function getDurationTitle(duration: string): string {
   if (durationFormat?.resolvedOptions().locale !== getTidLanguage())
-    //@ts-expect-error Requires TS 6.0.2
     durationFormat = new Intl.DurationFormat(getTidLanguage(), { style: "long" });
   return durationFormat.format(parseDuration(duration));
 }

@@ -645,7 +645,6 @@ export function registerBaseFunctions(wasmmodule: WASMModule) {
     }
 
     try {
-      //@ts-expect-error Requires TS 6.0.2
       const formatted = new Intl.DurationFormat(var_locale.getString(), options).format(value);
       id_set.setString(formatted);
     } catch (e) {
