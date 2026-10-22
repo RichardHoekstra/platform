@@ -7,6 +7,14 @@ import * as std from '@webhare/std';
 import * as child_process from 'node:child_process';
 import { parseDocAsXML } from '@mod-system/js/internal/generation/xmlhelpers';
 
+import { YAML as YAMLThroughDeps } from "@webhare/deps";
+import YAMLDirectly from "wh-internal:/yaml";
+
+function testWHInternal() {
+  //verify that wh-internal:/ and other routes, eg @webhare/deps, do not introduce aliassing but are in fact the same API
+  test.assert(YAMLThroughDeps === YAMLDirectly);
+}
+
 async function testChecks() {
   //test.throws should fail if a function did not throw. this will generate noise so tell the user to ignore
   test.throws(/Lemme throw/, () => { throw new Error("Lemme throw"); });
@@ -369,6 +377,7 @@ async function checkTestFailures() {
 }
 
 test.runTests([
+  testWHInternal,
   testChecks,
   testSupport,
   testTestMonitoring,

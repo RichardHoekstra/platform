@@ -1,8 +1,9 @@
 import { whconstant_builtinmodules } from "../webhareconstants";
 import { generatorBanner, type FileToUpdate, type GenerateContext } from "./shared";
 import SwaggerParser from "@apidevtools/swagger-parser";
-import { astToString, type OpenAPI3, type SchemaObject } from "openapi-typescript";
-import type { OpenAPIV3 } from "openapi-types";
+import type { OpenAPIV3, OpenAPIV3_1 } from "openapi-types";
+import { generateOpenAPITypes } from "./openapi_types";
+import { mergeIntoBundled } from "../openapi/merge";
 import { splitFileReference } from "@webhare/services/src/naming";
 import { backendConfig, toFSPath } from "@webhare/services";
 import { getExtractedConfig } from "../configuration";
@@ -100,14 +101,12 @@ function addInternalFormatTags(root: object, node: object, path: string) {
   }
 }
 
-/** Moves all SchemaObjects that are used more than once to a $defs.__sharedDefXXX and replaces them with a $ref.
- *  This way of using references can be handled by openapi-type (which doesn't handle references that reference
- *  within a path schema or inside an allOf or anyOf node correctly).
+/** Moves shared schema objects into components.schemas and replaces them with references, breaking dereferenced cycles.
  */
-function moveSharedSchemaObjects(parsed: OpenAPI3) {
+function moveSharedSchemaObjects(parsed: OpenAPIV3.Document) {
   // Detect all shared schema objects
-  const visited = new Set<SchemaObject>;
-  const shared = new Set<SchemaObject>;
+  const visited = new Set<object>;
+  const shared = new Set<OpenAPIV3.SchemaObject>;
   detectSharedSchemaObjectsIterate(parsed, parsed, visited, shared, "", undefined, "#");
 
   if (!visited.size)
@@ -120,7 +119,7 @@ function moveSharedSchemaObjects(parsed: OpenAPI3) {
     parsed.components.schemas = {};
 
   let idx = 0;
-  const defs: Record<string, SchemaObject> = {};
+  const defs: Record<string, OpenAPIV3.SchemaObject> = {};
   for (const node of shared) {
     let defName;
     do //guard against name clashes (reprocessing our own schema somehow?)
@@ -138,14 +137,15 @@ function moveSharedSchemaObjects(parsed: OpenAPI3) {
   Object.assign(parsed.components.schemas, defs);
 }
 
-function detectSharedSchemaObjectsIterate(parsed: OpenAPI3, node: object, visited: Set<object>, shared: Set<object>, keyname: string, isSchema: boolean | undefined, path: string) {
+function detectSharedSchemaObjectsIterate(parsed: OpenAPIV3.Document, node: object, visited: Set<object>, shared: Set<object>, keyname: string, isSchema: boolean | undefined, path: string) {
   /* This function uses heuristics to detect SchemaObjects. Everything within an 'example' key is probably not a Schema
      object. An array is probably not a Schema object, and the value of a 'properties' key are also probably not Schema,
      but should be checked recursively
   */
   if (keyname === "example") // don't use $ref in examples
     return;
-  if (keyname === "schema" || keyname === "schemas" || keyname === "$defs")
+  // A component named "schema" (eg components.parameters.schema) is a container, not a schema keyword.
+  if ((keyname === "schema" && !/^#\/components\/[^/]+\/[^/]+$/.test(path)) || keyname === "schemas" || keyname === "$defs")
     isSchema = true;
 
   if (Array.isArray(node)) {
@@ -199,25 +199,7 @@ function replaceRefsIterate(node: object, remap: Map<object, { $ref: string }>, 
   stack.delete(node);
 }
 
-export function mergeIntoBundled(data: unknown, merge: unknown, path: string) {
-  if (typeof merge !== "object" || !merge || typeof data !== "object" || !data)
-    throw new Error(`Cannot merge a non-object into an object`);
-
-  if (Array.isArray(data) !== Array.isArray(merge))
-    throw new Error(`Cannot merge array into object or vice versa`);
-
-  for (const [key, value] of Object.entries(merge)) {
-    const datavalue = (data as Record<typeof key, unknown>)[key];
-    if (typeof value !== "object" || !value)
-      (data as Record<typeof key, unknown>)[key] = value;
-    else if (typeof datavalue !== "object" || !datavalue)
-      (data as Record<typeof key, unknown>)[key] = value;
-    else
-      mergeIntoBundled((data as Record<typeof key, unknown>)[key], value, `${path}/${key.replace(/~/g, "~0").replace(/\//g, "~1")}`);
-  }
-}
-
-export async function createOpenAPITypeDocuments(openapifilepath: string | OpenAPIV3.Document, merge: object | string | undefined, service: OpenAPIDescriptor, importname: string, name: string, isservice: boolean) {
+export async function createOpenAPITypeDocuments(openapifilepath: string | OpenAPIV3.Document | OpenAPIV3_1.Document, merge: object | string | undefined, service: OpenAPIDescriptor, importname: string, name: string, isservice: boolean) {
   // First bundle to resolve the references to external files
   const bundled = await SwaggerParser.bundle(openapifilepath) as OpenAPIV3.Document;
 
@@ -231,33 +213,22 @@ export async function createOpenAPITypeDocuments(openapifilepath: string | OpenA
   // Add __internal_format_tag optional keys before validation resolves every $ref reference
   addInternalFormatTags(bundled, bundled, "#");
 
-  /* openapi-typescript doesn't handle references to schemas of a parameter
-     correctly, and also miscompiles imports from other files. Using
-     .validate will resolve all references (but result in a massive file though)
-     ADDME: try to work with typescript-openapi to resolve these issues
-     (validate mutates in-place, so use a structured clone)
-  */
+  // Resolve references before adapting parameter, request and response containers. Validation mutates its input.
   const parsed = await SwaggerParser.validate(structuredClone(bundled)) as OpenAPIV3.Document;
   if (!(parsed as OpenAPIV3.Document).openapi?.startsWith("3."))
     throw new Error(`not the right OpenAPI version: got ${JSON.stringify(parsed.openapi)}, wanted 3.x.x`);
 
-  /* openapi-typescripts leaves $defs from the root of imported files as members of the objects defined in the root of
-     those files. Because all references have already been resolved, it's safe to remove them.
-  */
+  // Imported files can leave $defs on their root objects; their references have already been resolved.
   recursiveRemoveDefs(parsed, "", new Set<unknown>);
 
-  /* Move all shared schema objects into $defs, breaking circular references that openapi-typescript can't handle and
-     making the generated code more compact
-  */
-  moveSharedSchemaObjects(parsed as OpenAPI3);
+  moveSharedSchemaObjects(parsed);
 
-  const openapiTSfunc = (await import("openapi-typescript")).default;
-  let result = astToString(await openapiTSfunc(parsed as OpenAPI3));
+  let result = await generateOpenAPITypes(parsed);
 
   const sourcefiles = new Map<string, { symbols: Set<string>; defs: string }>;
 
-  for (const [pathkey, path] of Object.entries(parsed.paths) as [[string, object]]) {
-    if (pathkey === "parameters")
+  for (const [pathkey, path] of Object.entries(parsed.paths ?? {}) as [[string, object]]) {
+    if (!pathkey.startsWith("/") || !path)
       continue;
 
     const pathfuncname = "check" + pathkey.replace(/[{}]/g, "").split("/").map(e => e.substring(0, 1).toUpperCase() + e.slice(1)).join("");
@@ -376,11 +347,7 @@ type APIAuthInfo = null;
 
   const clientname = `OpenAPI${tag}Client`;
 
-  result = `/* eslint-disable @typescript-eslint/no-explicit-any -- used in helper functions emitted by openapi-typescript */
-/* eslint-disable @typescript-eslint/array-type -- openapi-typescript doesn't follow the WebHare convention */
-/* eslint-disable no-tabs -- don't care about tabs from source files */
-
-${isservice ? `import type { OperationIds, OpenApiTypedRestAuthorizationRequest, OpenApiTypedRestRequest } from "@webhare/openapi-client/src/types";
+  result = `${isservice ? `import type { OperationIds, OpenApiTypedRestAuthorizationRequest, OpenApiTypedRestRequest } from "@webhare/openapi-client/src/types";
 ` : ``}import { TypedOpenAPIClient, type TypedClientRequestBody, type TypedClientResponse, type GetClientTypeParams, type PathsForMethod } from "@webhare/openapi-client/src/typedclient";
 
 ${result}

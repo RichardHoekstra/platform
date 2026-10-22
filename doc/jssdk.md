@@ -12,6 +12,9 @@ Any other JS import should be considerd an unstable/internal API. This includes
 - `@webhare/hscompat/src/...` - avoid individual hscompat subpackages
 - `dompack/...` - use `@webhare/deps/dompack` instead which is a cleaned up version
 - `@mod-<any core module>/...` - these are now considered internal or deprecated apis, although for some packages that were intended to be a public API replacements should exist in one of the jssdk packages.
+- `wh-internal:/...` - accesses the Node.js dependencies shipped with WebHare. Their presence, versions, and APIs are internal implementation details, not a public WebHare API.
+
+See [Code structure and API boundaries](code-structure.md) for the repository layout and the corresponding HareScript conventions.
 
 See also https://www.webhare.dev/manuals/typescript/library-structure/
 

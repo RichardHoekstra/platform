@@ -13,7 +13,7 @@ import { isTruthy, pick, whenAborted } from "@webhare/std";
 import { handleCrossOriginResourceSharing } from "../../../../platform/js/webserver/cors";
 import { decodeYAML } from "@mod-platform/js/devsupport/validation";
 import { CodeContext } from "@webhare/services/src/codecontexts";
-import { mergeIntoBundled } from "../generation/gen_openapi";
+import { mergeIntoBundled } from "./merge";
 import { signalOnResourceChange } from "@webhare/services/src/resourcetools";
 
 const cache: Record<string, Promise<RestService> | undefined> = {};
