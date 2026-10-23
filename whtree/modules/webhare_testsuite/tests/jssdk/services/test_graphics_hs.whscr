@@ -1,0 +1,20 @@
+<?wh
+LOADLIB "wh::files.whlib";
+LOADLIB "mod::platform/lib/graphics.whlib";
+LOADLIB "mod::system/lib/resources.whlib";
+LOADLIB "mod::system/lib/testframework.whlib";
+
+RECORD qr := GenerateQRCode("https://webhare.dev/", CELL[]);
+TestEqMembers([ filename := "qr.png", mimetype := "image/png", width := 256, height := 256 ], qr, "*");
+TestEqMembers([ mimetype := "image/png", width := 256, height := 256 ], ScanBlob(qr.data), "*");
+
+RECORD qrwithlogo := GenerateQRCode("https://webhare.dev/", [
+  size := 500,
+  correctlevel := "L",
+  colordark := "#52aefe",
+  colorlight := "#4a4a4a",
+  logo := GetWebHareResource("mod::tollium/webdesigns/webinterface/web/img/favicon/apple-touch-icon.png"),
+  logosize := 15
+]);
+TestEqMembers([ filename := "qr.png", mimetype := "image/png", width := 500, height := 500 ], qrwithlogo, "*");
+TestEqMembers([ mimetype := "image/png", width := 500, height := 500 ], ScanBlob(qrwithlogo.data), "*");

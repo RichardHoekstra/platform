@@ -247,7 +247,7 @@ async function renderImageForCache(request: HSImgCacheRequest): Promise<Buffer> 
   };
 
   const sourceimage = request.sourcepath || __getBlobDiskFilePath(request.pgblobid);
-  const img = await resizeImage(resource, sourceimage, method);
+  const img = await resizeImageData(resource, sourceimage, method);
   return img ? await img.toBuffer() : await readFile(sourceimage); //TODO avoid copying. consider hardlink or reflink?
 }
 
@@ -263,7 +263,8 @@ export async function isImageLossless(mimetype: string, sourceimage: string): Pr
   return ["image/x-bmp", "image/png", "image/gif"].includes(mimetype);
 }
 
-export async function resizeImage(resource: Pick<ResourceMetadata, "width" | "height" | "refPoint" | "mediaType">, sourceimage: string, method: PackableResizeMethod, options?: { unsafe?: boolean }): Promise<Sharp | null> {
+/** Prepare an image resize, using separate data and metadata  */
+export async function resizeImageData(resource: Pick<ResourceMetadata, "width" | "height" | "refPoint" | "mediaType">, sourceimage: Blob | string, method: PackableResizeMethod, options?: { unsafe?: boolean }): Promise<Sharp | null> {
   // TODO: we're reading the file twice, but not sure whether we'd want to use fs.openAsBlob (extra stat ops before every read)
   const lossless = await isImageLossless(resource.mediaType, sourceimage);
   const resizeOptions = getSharpResizeOptions(resource, method, { lossless });

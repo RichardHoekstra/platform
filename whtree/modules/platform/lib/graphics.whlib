@@ -40,7 +40,7 @@ PUBLIC RECORD FUNCTION GenerateQRCode(STRING intext, RECORD options) {
     ]
   ]);
 
-  BLOB qrpng := CallJS([ camelcase := TRUE ], "@webhare/services#createQRCode", intext, CELL[
+  BLOB qrpng := CallJS([ camelcase := TRUE ], "@webhare/graphics#createQRCode", intext, CELL[
     options.size,
     options.margin,
     color_dark := options.colordark,
