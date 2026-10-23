@@ -11,7 +11,7 @@ import { appendToArray, compare, generateRandomId, isPromise, omit } from "@webh
 import { debugFlags } from "@webhare/env/src/envbackend";
 import { isDefaultHareScriptValue, recordRangeIterator } from "@webhare/hscompat/src/algorithms";
 import { getBestMatch, getStackTrace } from "@webhare/js-api-tools";
-import { type Changes, type ChangesWHFSLinks, getWHFSLinksForChanges, mapChangesIdsToRefs, saveEntitySettingAttachments } from "./changes";
+import { type Changes, type ChangesWHFSLinks, getWHFSLinksForChanges, mapChangesIdsToRefs, prepareChangesForDatabase, saveEntitySettingAttachments } from "./changes";
 import { wrdFinishHandler } from "./finishhandler";
 import { wrdSettingsGuid } from "./settings";
 import { ValueQueryChecker } from "./checker";
@@ -1078,8 +1078,8 @@ export async function __internalUpdEntity<S extends SchemaTypeDefinition, T exte
         changes.modifications.whfslinks = await getWHFSLinksForChanges(changes.modifications.settings.map(s => (s as { id: number }).id));
 
         const mappedChanges = await mapChangesIdsToRefs(typeRec, changes); //Convert ids to guids / attribute tags
-        const { data: oldsettings, datablob: oldsettings_blob } = await prepareAnyForDatabase(mappedChanges.oldsettings);
-        const { data: modifications, datablob: modifications_blob } = await prepareAnyForDatabase(mappedChanges.modifications);
+        const { data: oldsettings, datablob: oldsettings_blob } = await prepareChangesForDatabase(mappedChanges.oldsettings);
+        const { data: modifications, datablob: modifications_blob } = await prepareChangesForDatabase(mappedChanges.modifications);
         const { data: source, datablob: source_blob } = await prepareAnyForDatabase(historyDebugging ? { stacktrace: getStackTrace() } : null);
 
         let changeset = options.changeset ?? wrdFinishHandler().getAutoChangeSet(schemadata.schema.id);

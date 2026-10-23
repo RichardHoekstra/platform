@@ -4,11 +4,13 @@ import * as whdb from "@webhare/whdb";
 import { createWRDTestSchema, testSchemaTag, type CustomExtensions } from "@mod-webhare_testsuite/js/wrd/testhelpers";
 import type { Combine } from "@webhare/wrd/src/types";
 import { loadlib, type HSVMObject } from "@webhare/harescript";
-import { ResourceDescriptor } from "@webhare/services";
+import { buildInstance, buildRTD, IntExtLink, ResourceDescriptor } from "@webhare/services";
 import { db } from "@webhare/whdb";
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
 import { generateRandomId, throwError } from "@webhare/std";
-import { UUIDToWrdGuid, maxDateTime } from "@webhare/hscompat";
+import { buildRTDFromHareScriptRTD, UUIDToWrdGuid, maxDateTime, type HareScriptRTD } from "@webhare/hscompat";
+import { whconstant_whfsid_webharebackend } from "@mod-system/js/internal/webhareconstants";
+import { readAnyFromDatabase } from "@webhare/whdb/src/formats";
 
 
 const keepHistoryDays = 1;
@@ -25,7 +27,7 @@ async function testChanges() { //  tests
   await whdb.beginWork(); //change 0 - initial insert
 
   // TODO testframework should manage the beta test unit
-  const testunit = await wrdschema.insert("whuserUnit", { wrdTitle: "Root unit", wrdTag: "TAG" });
+  const testunit = await wrdschema.insert("whuserUnit", { wrdTitle: "Root unit", wrdTag: "TESTFW_ROOTUNIT" });
 
   const domain1value1 = await wrdschema.find("testDomain_1", { wrdTag: "TEST_DOMAINVALUE_1_1" }) ?? throwError("Domain value not found");
   const domain2value2 = await wrdschema.find("testDomain_2", { wrdTag: "TEST_DOMAINVALUE_2_2" }) ?? throwError("Domain value not found");
@@ -727,7 +729,93 @@ async function testChanges() { //  tests
 
 //TODO ? ASYNC MACRO TestHistoryDialogs() - but we need an API to run and test HS Tollium apps first
 
+async function testRTDHistory() {
+  const schema = wrd<Combine<[WRDSchemaLike["wrd:testschema"], CustomExtensions]>>(testSchemaTag);
+  const hsSchema = await loadlib("mod::wrd/lib/api.whlib").OpenWRDSchema(testSchemaTag) as HSVMObject;
+  const hsPersonType = await hsSchema.getType("WRD_PERSON") as HSVMObject;
+  const image = await ResourceDescriptor.fromResource("mod::system/web/tests/goudvis.png", { getImageMetadata: true });
+  const inlineRTD = await buildRTD([{ p: ["Inline image: ", { image }] }]);
+  const linkedRTD = await buildRTD([
+    { p: [{ text: "Internal link", link: new IntExtLink(whconstant_whfsid_webharebackend, { append: "#history" }) }, { image }] },
+    {
+      widget: await buildInstance({
+        whfsType: "http://www.webhare.net/xmlns/publisher/widgets/twocolumns",
+        data: {
+          rtdleft: await buildRTD([
+            { p: [{ text: "Nested link", link: new IntExtLink(whconstant_whfsid_webharebackend) }, { image }] }
+          ]),
+          rtdright: null
+        }
+      })
+    }
+  ]);
+  const replacementRTD = await buildRTD([
+    { p: [{ text: "Replacement link", link: new IntExtLink(whconstant_whfsid_webharebackend, { append: "#replacement" }) }] }
+  ]);
+
+  await whdb.beginWork();
+  const person = await schema.insert("wrdPerson", {
+    wrdContactEmail: "rtd-history@example.com",
+    wrdauthAccountStatus: { status: "active" },
+    richie: linkedRTD,
+    testArray: [{ testRTD: linkedRTD }],
+    whuserUnit: "TESTFW_ROOTUNIT"
+  });
+  await whdb.commitWork();
+  const versions = [null, await schema.getFields("wrdPerson", person, ["richie", "testArray"], { export: true })];
+
+  for (const value of [replacementRTD, inlineRTD, linkedRTD, null]) {
+    await whdb.beginWork();
+    await schema.update("wrdPerson", person, { richie: value, testArray: [{ testRTD: value }] });
+    await whdb.commitWork();
+    versions.push(await schema.getFields("wrdPerson", person, ["richie", "testArray"], { export: true }));
+  }
+
+  // Read after all updates so both old and new snapshots must survive replacement and clearing.
+  const changesets = await hsPersonType.ListChangesets(person);
+  test.eq(5, changesets.length);
+  for (const [index, changeset] of changesets.entries()) {
+    const stored = await db<PlatformDB>().selectFrom("wrd.changes")
+      .select(["modifications", "modifications_blob"]).where("changeset", "=", changeset.id).executeTakeFirstOrThrow();
+    if (index === 0) {
+      test.eq("", stored.modifications);
+      test.assert(stored.modifications_blob && stored.modifications_blob.size > 4096);
+    } else if (index === 1) {
+      test.eq(/^hson:/, stored.modifications);
+      test.eq(null, stored.modifications_blob);
+    }
+    if (index === 0 || index === 1 || index === 3) {
+      test.eqPartial({
+        whfslinks: [
+          { linktype: 0, data: { links: [{ linkref: "site::WebHare backend/" }] } },
+          { linktype: 0, data: { links: [{ linkref: "site::WebHare backend/" }] } }
+        ]
+      }, await readAnyFromDatabase(stored.modifications, stored.modifications_blob));
+    }
+    const changes = await hsPersonType.GetChanges(changeset.id);
+    test.eq(1, changes.length);
+    test.eq(index === 0 ? "new" : "edit", changes[0].changetype);
+    test.eq(person, changes[0].entity);
+    if (index === 0)
+      test.eq(null, changes[0].oldsettings);
+    for (const [settings, value] of [
+      [changes[0].oldsettings, versions[index]],
+      [changes[0].modifications, versions[index + 1]]
+    ] as const) {
+      if (!settings)
+        continue;
+      const rtd = settings.richie as HareScriptRTD | null;
+      test.eq(value?.richie ?? null, rtd ? await (await buildRTDFromHareScriptRTD(rtd)).export() : null, `Changeset ${index}, ${settings === changes[0].oldsettings ? "old" : "new"} richie`);
+
+      const arrayRTD = settings.test_array[0].test_r_t_d as HareScriptRTD | null;
+      const expectedArrayRTD = value?.testArray[0].testRTD ?? null;
+      test.eq<typeof expectedArrayRTD>(expectedArrayRTD, arrayRTD ? await (await buildRTDFromHareScriptRTD(arrayRTD)).export() : null, `Changeset ${index}, ${settings === changes[0].oldsettings ? "old" : "new"} testArray.testRTD`);
+    }
+  }
+}
+
 test.runTests([
   async () => { await createWRDTestSchema({ keepHistoryDays }); }, //TODO ? forcereload := TRUE, withrichdoc := TRUE
   testChanges,
+  testRTDHistory,
 ]);

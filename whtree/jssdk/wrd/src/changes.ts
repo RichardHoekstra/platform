@@ -1,9 +1,12 @@
 import type { PlatformDB } from "@mod-platform/generated/db/platform";
-import { db, nextVal } from "@webhare/whdb";
+import { db, nextVal, uploadBlob } from "@webhare/whdb";
 import { type EntityPartialRec, type EntityRec, type EntitySettingsRec, type TypeRec, selectEntitySettingWHFSLinkColumns } from "./db";
 import { omit } from "@webhare/std";
-import { setHareScriptType, type IPCMarshallableData, HareScriptType } from "@webhare/hscompat/src/hson";
+import { encodeHSON, setHareScriptType, type IPCMarshallableData, HareScriptType } from "@webhare/hscompat/src/hson";
 import { getIdToGuidMap } from "./accessors";
+import { loadlib, makeObject } from "@webhare/harescript";
+import { prepareAnyForDatabase } from "@webhare/whdb/src/formats";
+import { WebHareBlob } from "@webhare/services";
 
 
 export type ChangesSettings<T extends string | number | null> = Array<Omit<EntitySettingsRec, "blobdata" | "entity" | "setting" | "attribute"> & { blobseqnr: number; setting: T; attribute: T }>;
@@ -22,6 +25,20 @@ export type Changes<T extends string | number | null> = {
     deletedsettings: number[];
   };
 };
+
+export async function prepareChangesForDatabase(data: Changes<string>["oldsettings"] | Changes<string>["modifications"]) {
+  if (!data.whfslinks.length)
+    return prepareAnyForDatabase(data);
+
+  // WHFS snapshots contain blobs, which typed JSON cannot preserve.
+  const encoded = encodeHSON(data);
+  if (encoded.length <= 4096)
+    return { data: encoded, datablob: null };
+
+  const datablob = WebHareBlob.from(encoded);
+  await uploadBlob(datablob);
+  return { data: "", datablob };
+}
 
 export async function saveEntitySettingAttachments(changeid: number, settings: EntitySettingsRec[]): Promise<ChangesSettings<number | null>> {
   const retval: ChangesSettings<number | null> = [];
@@ -57,17 +74,18 @@ export async function getWHFSLinksForChanges(ids: number[]): Promise<ChangesWHFS
 
   const retval: ChangesWHFSLinks = [];
 
-  //OBJECT whfs_mapper := NEW WHFSResourceNameMapper;
+  // History readers expect the legacy WHFS export format, including mapped references inside widgets.
+  const whfsMapper = links.some(link => link.linktype === 0)
+    ? await makeObject("mod::system/lib/internal/whfs/objects.whlib#WHFSResourceNameMapper")
+    : null;
   for (const link of links) {
     switch (link.linktype) {
       case 0: { // RTD
-        throw new Error(`Recording WHFS RTDs in changesets is not supported yet`);
-        /*
         retval.push({
-          id:link.id,
+          id: link.id,
           linktype: link.linktype,
-          data: retrieveRTDInWHFS(link.id, whfs_mapper)
-        }); */
+          data: await loadlib("mod::wrd/lib/internal/whfs-service.whlib").RetrieveRTDInWHFS(link.id, whfsMapper)
+        });
       } break;
       case 1: { // instance data
         throw new Error(`Recording WHFS instances in changesets is not supported yet`);
