@@ -356,6 +356,9 @@ async function testUnique() {
   await newdomtype.createAttribute("testInteger", { attributeType: "integer", isUnique: true });
   await newdomtype.createAttribute("testInteger64", { attributeType: "integer64", isUnique: true });
   await test.throws(/cannot be set on attributes of type/, newdomtype.createAttribute("testArray", { attributeType: "array", isUnique: true }));
+  await test.throws(/cannot be set on attributes of type/, newdomtype.createAttribute("testDate", { attributeType: "plainDate", isUnique: true }));
+  await test.throws(/cannot be set on attributes of type/, newdomtype.createAttribute("testDateTime", { attributeType: "instant", isUnique: true }));
+  await test.throws(/cannot be set on attributes of type/, newdomtype.createAttribute("testTime", { attributeType: "plainTime", isUnique: true }));
   await newdomtype.createAttribute("testArray", { attributeType: "array" });
   await newdomtype.createAttribute("testArray.email", { attributeType: "email", isUnique: true });
   await newdomtype.createAttribute("testNonUnique", { attributeType: "string", isUnique: false });

@@ -30,6 +30,9 @@ MACRO TestUnique()
   dom_obj->CreateAttribute("TEST_INTEGER",     "INTEGER",   [ isunique := TRUE, isrequired := FALSE, title := "Unique INTEGER" ]);
   dom_obj->CreateAttribute("TEST_INTEGER64",   "INTEGER64", [ isunique := TRUE, isrequired := FALSE, title := "Unique INTEGER64" ]);
   TestThrowsLike("*cannot*ARRAY*", PTR dom_obj->CreateAttribute("TEST_ARRAY",       "ARRAY",     [ isunique := TRUE, isrequired := FALSE, title := "Array with unique stuff" ]));
+  TestThrowsLike("*cannot*DATE*", PTR dom_obj->CreateAttribute("TEST_DATE",         "DATE",      [ isunique := TRUE, isrequired := FALSE, title := "Unique DATE" ]));
+  TestThrowsLike("*cannot*DATETIME*", PTR dom_obj->CreateAttribute("TEST_DATETIME", "DATETIME",  [ isunique := TRUE, isrequired := FALSE, title := "Unique DATETIME" ]));
+  TestThrowsLike("*cannot*TIME*", PTR dom_obj->CreateAttribute("TEST_TIME",         "TIME",      [ isunique := TRUE, isrequired := FALSE, title := "Unique TIME" ]));
   dom_obj->CreateAttribute("TEST_ARRAY",       "ARRAY");
   dom_obj->CreateAttribute("TEST_ARRAY.EMAIL", "EMAIL",     [ isunique := TRUE, isrequired := FALSE, title := "Unique EMAIL" ]);
   dom_obj->CreateAttribute("TEST_NONUNIQUE",   "FREE",      [ isunique := FALSE, isrequired := FALSE, title := "Non-unique FREE" ]);

@@ -437,7 +437,7 @@ const wrdattributes: Record<string, {
   },
   "date": {
     image: "date.gif",
-    options: ["isunique"],
+    options: [],
     canchangeto: ["DATETIME"]
   },
   "password": {
@@ -461,12 +461,12 @@ const wrdattributes: Record<string, {
   },
   "time": {
     image: "dummy.gif",
-    options: ["isunique"],
+    options: [],
     canchangeto: ["INTEGER"] //escape for out-of-range TIME types
   },
   "datetime": {
     image: "dummy.gif",
-    options: ["isunique"],
+    options: [],
     canchangeto: ["DATE"]
   },
   "array": {
