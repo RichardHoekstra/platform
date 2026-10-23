@@ -209,7 +209,7 @@ export function getSharpResizeOptions(infile: Pick<ResourceMetadata, "width" | "
 
   const outputformat = method.format === "keep" ? suggestImageFormat(infile.mediaType) : method.format;
 
-  if (outputformat === infile.mediaType && !extract && !extend && !resize && method.noForce)
+  if (outputformat === infile.mediaType && !extract && !extend && !resize && method.noForce && !method.grayscale && !method.blur)
     return null; //do not modify!
 
   if (outputformat === "image/webp")

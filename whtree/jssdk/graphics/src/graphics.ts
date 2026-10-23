@@ -13,19 +13,25 @@ export { createQRCode } from "./qrcode";
 /** Image resize options using canonical method names, without legacy HareScript aliases. */
 export type ImageResizeMethod = Omit<ResizeMethod, "method"> & { method: keyof typeof PackMethods };
 
+function prepareResizedImage(resource: ResourceDescriptor, method: ImageResizeMethod): Promise<Sharp | null> {
+  const methodName = method.method === "fitCanvas" ? "fitcanvas" : method.method === "scaleCanvas" ? "scalecanvas" : method.method;
+  return resizeImageData(resource, resource.file, { ...method, method: methodName, format: method.format ?? "keep" });
+}
+
 /** Prepare a resized image for further processing with Sharp. Defaults to keeping the source format. */
 export async function createdResizedSharpImage(resource: ResourceDescriptor, method: ImageResizeMethod): Promise<Sharp> {
-  const methodName = method.method === "fitCanvas" ? "fitcanvas" : method.method === "scaleCanvas" ? "scalecanvas" : method.method;
-  return await resizeImageData(resource, resource.file, { ...method, method: methodName, format: method.format ?? "keep" })
+  return await prepareResizedImage(resource, method)
     ?? await createSharpImageFromBlob(resource.file, { mediaType: resource.mediaType });
 }
 
-/** Resize an image and return a File with the output MIME type and matching filename extension. */
+/** Resize an image and return a File with the output MIME type and matching filename extension.
+ * Preserves the original bytes when noForce is set and no processing is needed.
+ */
 export async function resizeImage(resource: ResourceDescriptor, method: ImageResizeMethod): Promise<File> {
-  const image = await createdResizedSharpImage(resource, method);
+  const image = await prepareResizedImage(resource, method);
   const mediaType = !method.format || method.format === "keep" ? suggestImageFormat(resource.mediaType) : method.format;
   const fileName = resource.fileName || "image";
   const extension = extname(fileName);
   const outputName = fileName.slice(0, fileName.length - extension.length) + mimeToExt[mediaType];
-  return new File([await image.toBuffer()], outputName, { type: mediaType });
+  return new File([image ? await image.toBuffer() : await resource.file.arrayBuffer()], outputName, { type: mediaType });
 }

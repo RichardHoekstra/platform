@@ -1,6 +1,7 @@
 import { getResource } from "@mod-webhare_testsuite/tests/system/nodejs/data/calls";
 import { compareSharpImages } from "@mod-webhare_testsuite/tests/system/nodejs/data/image-fetch";
 import { createSharpImage } from "@webhare/deps";
+import { getSharpResizeOptions } from "@mod-platform/js/cache/imgcache";
 import { createQRCode, createdResizedSharpImage, resizeImage } from "@webhare/graphics";
 import { ResourceDescriptor } from "@webhare/services";
 import { createSharpImageFromBlob } from "@webhare/services/src/descriptor";
@@ -55,6 +56,31 @@ test.runTests([
     test.eq("source.image.png", unchangedFile.name);
     test.eq("image/png", unchangedFile.type);
     test.eqPartial({ width: 80, height: 40, format: "png" }, await (await createSharpImage(await unchangedFile.bytes())).metadata());
+    test.eq(Buffer.from(await resource.file.arrayBuffer()), Buffer.from(await unchangedFile.arrayBuffer()));
+
+    const jpegResource = await ResourceDescriptor.from((await getResource("mod::system/web/tests/snowbeagle.jpg")).file, { getImageMetadata: true });
+    for (const method of [
+      { method: "none", noForce: true },
+      { method: "fit", width: 500, height: 500, noForce: true, format: "keep" }
+    ] as const) {
+      const jpegFile = await resizeImage(jpegResource, method);
+      test.eq("image/jpeg", jpegFile.type);
+      test.eq(Buffer.from(await jpegResource.file.arrayBuffer()), Buffer.from(await jpegFile.arrayBuffer()));
+    }
+
+    const grayscaleOptions = { method: "none", noForce: true, grayscale: true } as const;
+    const grayscaleImage = await createdResizedSharpImage(resource, grayscaleOptions);
+    const grayscaleFile = await resizeImage(resource, grayscaleOptions);
+    for (const image of [grayscaleImage, await createSharpImage(await grayscaleFile.bytes())]) {
+      const rendered = await createSharpImage(await image.png().toBuffer());
+      const { data, info } = await rendered.toColourspace("srgb").removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      test.eqPartial({ width: 80, height: 40, channels: 3 }, info);
+      test.eq(data[0], data[1]);
+      test.eq(data[1], data[2]);
+      test.assert(data[0] > 0 && data[0] < 255);
+    }
+    test.assert(getSharpResizeOptions(resource, { method: "none", noForce: true, blur: 1, format: "keep" }) !== null);
+    test.eq(null, getSharpResizeOptions(resource, { method: "none", noForce: true, blur: 0, format: "keep" }));
 
     const unnamed = await ResourceDescriptor.from(await source.png().toBuffer(), { getImageMetadata: true });
     test.eq("image.jpg", (await resizeImage(unnamed, { method: "none", format: "image/jpeg" })).name);

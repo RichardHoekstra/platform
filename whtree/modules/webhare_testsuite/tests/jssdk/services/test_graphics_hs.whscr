@@ -37,6 +37,8 @@ MACRO ResizeWrappedImageTest() {
     TestEqMembers(expected, resized, "*");
     TestEqMembers(expected, ScanBlob(resized.data), "*");
     TestEq(4, Length(UnpackRecord(resized)));
+    IF(testcase.method.method IN ["none", "fit"])
+      TestEq(image.data, resized.data);
   }
 
   TestThrowsLike("Input is not an image", PTR ResizeImage(WrapBlob(StringToBlob("not an image"), "test.txt"), [ method := "none" ]));
