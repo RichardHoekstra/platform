@@ -29,6 +29,7 @@ MACRO ResizeWrappedImageTest() {
     [ method := [ method := "scale", setwidth := 100, setheight := 100 ], width := 100, height := 67, mimetype := "image/jpeg" ],
     [ method := [ method := "fit", setwidth := 500, setheight := 500 ], width := 428, height := 284, mimetype := "image/jpeg" ],
     [ method := [ method := "fill", setwidth := 80, setheight := 60, format := "image/png" ], width := 80, height := 60, mimetype := "image/png" ],
+    [ method := [ method := "fitcanvas", setwidth := 100, setheight := 100, bgcolor := "#ff0000", format := "image/png" ], width := 100, height := 100, mimetype := "image/png" ],
     [ method := [ method := "scalecanvas", setwidth := 100, setheight := 100, bgcolor := "#ff0000", format := "image/webp" ], width := 100, height := 100, mimetype := "image/webp" ]
   ]) {
     RECORD resized := ResizeImage(image, testcase.method);

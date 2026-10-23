@@ -28,6 +28,11 @@ PUBLIC RECORD FUNCTION ResizeImage(RECORD infile, RECORD resizemethod)
     THROW NEW Exception("Input is not an image");
 
   resizemethod := ValidateResizeMethod(CELL[format := "keep", ...resizemethod]);
+  IF(resizemethod.method = "fitcanvas")
+    resizemethod.method := "fitCanvas";
+  ELSE IF(resizemethod.method = "scalecanvas")
+    resizemethod.method := "scaleCanvas";
+
   BLOB data := CallJS([ camelcase := TRUE ], "@webhare/graphics#resizeImage", [
     file := infile.data,
     file_name := CellExists(infile, "filename") ? infile.filename : "image",

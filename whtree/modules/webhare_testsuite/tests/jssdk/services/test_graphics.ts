@@ -23,6 +23,19 @@ test.runTests([
     test.eq("image/png", file.type);
     test.eqPartial({ width: 20, height: 10, format: "png" }, await (await createSharpImage(await file.bytes())).metadata());
 
+    for (const method of ["fitCanvas", "scaleCanvas"] as const) {
+      const options = { method, width: 20, height: 20, bgColor: 0xff0000ff };
+      const canvasImage = await createdResizedSharpImage(resource, options);
+      const canvasFile = await resizeImage(resource, options);
+      for (const image of [canvasImage, await createSharpImage(await canvasFile.bytes())]) {
+        const { data, info } = await image.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+        test.eqPartial({ width: 20, height: 20, channels: 3 }, info);
+        test.eq([0, 0, 255], [...data.subarray(0, 3)]);
+        const center = (10 * info.width + 10) * info.channels;
+        test.eq([255, 0, 0], [...data.subarray(center, center + 3)]);
+      }
+    }
+
     for (const [format, extension, sharpFormat] of [
       ["image/jpeg", ".jpg", "jpeg"],
       ["image/png", ".png", "png"],
