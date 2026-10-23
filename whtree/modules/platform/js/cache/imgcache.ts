@@ -251,14 +251,10 @@ async function renderImageForCache(request: HSImgCacheRequest): Promise<Buffer> 
   return img ? await img.toBuffer() : await readFile(sourceimage); //TODO avoid copying. consider hardlink or reflink?
 }
 
-export async function isImageLossless(mimetype: string, sourceimage: string): Promise<boolean> {
-  if (mimetype === "image/avif") {
-    const fileData = await readFile(sourceimage);
-    return isLosslessAvifImage(fileData);
-  }
-  if (mimetype === "image/webp") {
-    const fileData = await readFile(sourceimage);
-    return isLosslessWebPImage(fileData);
+export async function isImageLossless(mimetype: string, sourceimage: Blob | string): Promise<boolean> {
+  if (mimetype === "image/avif" || mimetype === "image/webp") {
+    const fileData = typeof sourceimage === "string" ? await readFile(sourceimage) : Buffer.from(await sourceimage.arrayBuffer());
+    return mimetype === "image/avif" ? isLosslessAvifImage(fileData) : isLosslessWebPImage(fileData);
   }
   return ["image/x-bmp", "image/png", "image/gif"].includes(mimetype);
 }
