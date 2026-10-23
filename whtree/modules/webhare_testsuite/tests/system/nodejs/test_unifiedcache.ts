@@ -10,6 +10,7 @@ import { createSharpImage } from "@webhare/deps/src/deps";
 import { promises as fs } from "node:fs";
 import { listDirectory } from "@webhare/system-tools";
 import { compareSharpImages, fetchUCLink } from "./data/image-fetch";
+import { throwError } from "@webhare/std";
 
 async function clearUnifiedCache() {
   const ucCacheDir = backendConfig.dataRoot + "caches/platform/uc/";
@@ -617,7 +618,7 @@ async function testWRDImgCache() {
 
   const wrappedGoldfish = await schema.getFields("wrdPerson", personid, ["testImage"]);
   test.assert(wrappedGoldfish);
-  const imgFishPng = await createSharpImage(await wrappedGoldfish.testImage?.file.arrayBuffer());
+  const imgFishPng = await createSharpImage(await wrappedGoldfish.testImage?.file.arrayBuffer() ?? throwError("Failed to load test image"));
 
   const fetchedGoldFishLink = wrappedGoldfish.testImage!.toResized({ method: "none", format: "keep" }).link;
   test.eq(/goudvis\.png$/, fetchedGoldFishLink);
