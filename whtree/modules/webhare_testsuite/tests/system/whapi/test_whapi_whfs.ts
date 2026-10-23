@@ -35,7 +35,7 @@ async function testWHFSAPI() {
   { //test anonymous listing
     const api = new OpenAPIApiClient(directFetch);
     const result = await api.get("/whfs/object");
-    test.assert(result.status === 401, `Expected 401 as we're not sending a token`);
+    test.assert(result.status === 401, `Expected 401 as we're not sending a token, got ${result.status}`);
   }
 
   const api = new OpenAPIApiClient(directFetch, { bearerToken: apiSysopToken });
@@ -173,6 +173,29 @@ async function testWHFSAPI() {
 
   const newFilePath = tempPath + "/newfolder/newfile";
 
+  for (const name of ["newfile", "NEWFILE"]) {
+    const duplicateFileCreated = await api.post("/whfs/object", {
+      ...simpleTestDoc,
+      name
+    }, { params: { path: tempPath + "/newfolder" } });
+    test.eq(409, duplicateFileCreated.status);
+    test.eq({
+      status: 409,
+      code: "object-exists",
+      error: /already exists/
+    }, duplicateFileCreated.body);
+  }
+
+  const duplicateFolderCreated = await api.post("/whfs/object", {
+    name: "newfolder",
+    type: "platform:foldertypes.default"
+  }, { params: { path: tempPath } });
+  test.eq(409, duplicateFolderCreated.status);
+  test.eqPartial({
+    status: 409,
+    error: /already exists/
+  }, duplicateFolderCreated.body);
+
   // Update file content
   const fish = readFileSync(toFSPath("mod::system/web/tests/goudvis.png"));
   const badUpdateResult = await api.patch("/whfs/object", {
@@ -191,6 +214,7 @@ async function testWHFSAPI() {
   test.assert(badUpdateResult.status === 400, `Expected 400 on enabling publish, got ${badUpdateResult.status}`);
   test.eq({
     status: 400,
+    code: "invalid-argument",
     error: /must have a 'file' property.*at instances\[1\].data.blubImg/
   }, badUpdateResult.body);
 
