@@ -87,6 +87,9 @@ async function testExport() { //  tests
   const testPersonId = await wrdschema.insert("wrdPerson", { ...initialPersonData, wrdId: nextWrdId });
   test.eq(nextWrdId, testPersonId);
 
+  //try to reinsert, should throw
+  await test.throws(/wrdId.*already exists/, () => wrdschema.insert("wrdPerson", { ...initialPersonData, wrdId: nextWrdId }));
+
   test.eq({
     wrdId: nextWrdId,
     wrdGuid: nextWrdGuid,
