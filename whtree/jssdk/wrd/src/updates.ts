@@ -641,10 +641,11 @@ export async function __internalUpdEntity<S extends SchemaTypeDefinition, T exte
     //let setGuid: Buffer;
     if (entityData.wrdId !== undefined) {
       if (!isNew && entityId !== entityData.wrdId) {
-        throw new Error(`Cannot change the WRD_ID of an existing entity`);
+        throw new Error(`Cannot change the wrdId of an existing entity (#${entityId})`);
       } else if (isNew) {
-        if (await db<PlatformDB>().selectFrom("wrd.entities").where("id", "=", entityData.wrdId).executeTakeFirst())
-          throw new Error("Cannot create an entity with this WRD_ID value, another entity with that WRD_ID already exists");
+        //must select *something* or the kysely/pg driver crashes
+        if (await db<PlatformDB>().selectFrom("wrd.entities").select("id").where("id", "=", entityData.wrdId).executeTakeFirst())
+          throw new Error(`Cannot create a new entity with the specified wrdId #${entityData.wrdId} value as it already exists`);
 
         entityId = entityData.wrdId;
       }
