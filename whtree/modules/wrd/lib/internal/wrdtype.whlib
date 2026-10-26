@@ -3366,8 +3366,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
 
     INTEGER64 ARRAY checklinks_settingids;
 
-    IF (NOT anyerror)
-    {
+    IF (NOT anyerror) {
       IF(is_new)
       {
         IF(entityid = 0)
@@ -3520,11 +3519,9 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
            AND attribute IN unique_attrs;
       }
 
-      IF (this->__typerec.keephistorydays > 0 OR historydebugging)
-      {
+      IF (this->__typerec.keephistorydays > 0 OR historydebugging) {
         RECORD newrec := CELL[ ...orgentityrec, ...splitdata.entityrec ];
-        IF (newrec.creationdate != MAX_DATETIME) // Entity is now not temporary?
-        {
+        IF (newrec.creationdate != MAX_DATETIME) { // Entity is now not temporary?
           IF (is_temp_coming_alive) // Treat a previously temp entity as completely new
           {
             is_new := TRUE;
@@ -3565,8 +3562,7 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
               }
           }
 
-          IF (LENGTH(changed_attrs) != 0)
-          {
+          IF (LENGTH(changed_attrs) != 0) {
             INTEGER changeid := MakeAutoNumber(wrd.changes, "id");
 
             RECORD changes :=
@@ -3638,13 +3634,10 @@ PUBLIC STATIC OBJECTTYPE WRDTypeBase <
     RETURN result;
   }
 
-  RECORD ARRAY FUNCTION SaveEntitySettingAttachments(INTEGER changeid, RECORD ARRAY settings)
-  {
-    FOREVERY (RECORD setting FROM settings)
-    {
+  RECORD ARRAY FUNCTION SaveEntitySettingAttachments(INTEGER changeid, RECORD ARRAY settings) {
+    FOREVERY (RECORD setting FROM settings) {
       INTEGER attachid;
-      IF (Length(setting.blobdata) > 0)
-      {
+      IF (Length(setting.blobdata) > 0) {
         attachid := MakeAutonumber(wrd.change_attachments, "id");
         INSERT [ id := attachid
                , change := changeid
