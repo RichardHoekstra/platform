@@ -817,7 +817,7 @@ export default class EditorBase extends RTECompBase implements RTEComponent {
   }
 
   getButtonNode(actionname) {
-    return this.toolbarnode.querySelector('span.wh-rtd-button[data-button=' + actionname + ']');
+    return this.toolbarnode.querySelector('.wh-rtd-button[data-button=' + actionname + ']');
   }
 
   isEditable() {
