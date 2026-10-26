@@ -1,4 +1,3 @@
-/// x@ts-nocheck -- TODO ... TestFramework is a LOT to port ... for now we're just providing types
 import * as dompack from '@webhare/dompack';
 import * as test from "@mod-system/js/wh/testframework";
 import { escapeRegExp, throwError } from '@webhare/std';
