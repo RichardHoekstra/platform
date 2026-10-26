@@ -4,7 +4,7 @@
   "license": "MIT",
   "dependencies": {
     "@gitbeaker/rest": "^43.8.0",
-    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "simple-git": "^4.0.2",
     "typedoc": "^0.28.19",
     "typescript": "^6.0.3",
