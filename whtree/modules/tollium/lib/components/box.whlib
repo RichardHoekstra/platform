@@ -5,6 +5,15 @@ LOADLIB "mod::tollium/lib/screenbase.whlib";
 /////////////////////////////////////////////////////////////////////
 // The box component (used to be a TolliumPanel property)
 
+OBJECTTYPE BoxDirtyListener EXTEND TolliumIsDirtyable <
+  UPDATE PUBLIC PROPERTY dirtylistener(^heading->dirtylistener, SetDirtyListeners);
+
+  MACRO SetDirtyListeners(OBJECT listener) {
+    ^heading->dirtylistener := listener;
+    ^boxcontents->dirtylistener := listener;
+  }
+>;
+
 PUBLIC OBJECTTYPE Box EXTEND TolliumFragmentBase
 <
   OBJECT ARRAY pvt_enablecomponents;
@@ -20,7 +29,7 @@ PUBLIC OBJECTTYPE Box EXTEND TolliumFragmentBase
   MACRO NEW()
   {
     EXTEND this BY TolliumIsComposable;
-    EXTEND this BY TolliumIsDirtyable;
+    EXTEND this BY BoxDirtyListener;
   }
 
   UPDATE PUBLIC MACRO StaticInit(RECORD def)
@@ -50,7 +59,6 @@ PUBLIC OBJECTTYPE Box EXTEND TolliumFragmentBase
     this->boxcontents->height := this->height;
     this->boxcontents->defaultbutton := this->defaultbutton;
     this->heading->enablecomponents := this->pvt_enablecomponents;
-    this->heading->dirtylistener := this->dirtylistener;
   }
 
   BOOLEAN FUNCTION GetCheckbox()

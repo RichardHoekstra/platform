@@ -42,6 +42,7 @@ PUBLIC OBJECTTYPE TolliumInlineBlock EXTEND TolliumLinesContainerBase
 
   MACRO NEW()
   {
+    EXTEND this BY TolliumIsDirtyable;
     this->componenttype := "inlineblock";
     this->layout := "form";
     this->pvt_borders := tolliumdefaultborderspacer;

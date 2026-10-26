@@ -49,7 +49,7 @@ PUBLIC OBJECTTYPE DirtyTest EXTEND TolliumScreenBase
 
 PUBLIC STATIC OBJECTTYPE RecursiveDirty EXTEND TolliumScreenBase <
   MACRO Init() {
-    FOREVERY(STRING comp FROM ["outerpanel", "innerpanel", "innertextedit", "box", "box_textedit" ]) {
+    FOREVERY(STRING comp FROM ["outerpanel", "innerpanel", "innertextedit", "box", "box_textedit", "intextlink" ]) {
       GetMember(this, `^${comp}_listener`)->ondirty := PTR this->OnDirty(comp);
       GetMember(this, `^${comp}_dirty`)->onchange := PTR this->OnChange(comp);
     }

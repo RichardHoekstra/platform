@@ -6103,6 +6103,7 @@ To change a <xs:attribute /> for adding descriptions
         <xs:group maxOccurs="unbounded" minOccurs="0" ref="BodyOrRowNode" />
       </xs:sequence>
       <xs:attributeGroup ref="InlineBlockAttributes" />
+      <xs:attributeGroup ref="tc:IsDirtyable" />
       <xs:attributeGroup ref="sc:TidOrTitle" />
     </xs:complexType>
   </xs:element>
