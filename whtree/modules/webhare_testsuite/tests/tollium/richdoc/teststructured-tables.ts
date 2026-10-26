@@ -27,17 +27,34 @@ test.runTests(
 
     {
       name: 'create-table',
-      test: function () {
+      test: async function () {
         test.clickTolliumLabel("Tab with Structured RTE");
 
         const rtenode = test.compByName('structured');
+        test.qR(rtenode, '.wh-rtd__body').focus();
 
         // Insert a 2-by-2 table
-        test.click(rtenode.querySelector('span[data-button="table"]'));
-        const menu = test.getOpenMenu();
-        test.assert(menu && menu.getBoundingClientRect().height > 0, "Table menu should have a measurable height");
+        const tablebutton = test.qR<HTMLButtonElement>(rtenode, 'button[data-button="table"]');
+        const menu = test.qR(rtenode, '.wh-rtd-tablemenu');
+        test.eq(menu, tablebutton.popoverTargetElement);
+        test.eq(false, menu.matches(":popover-open"));
+        test.click(tablebutton);
+        test.eq(true, menu.matches(":popover-open"));
+        const menurect = menu.getBoundingClientRect();
+        const buttonrect = tablebutton.getBoundingClientRect();
+        test.assert(menurect.height > 0, "Table picker should have a measurable height");
+        test.eq(buttonrect.bottom, menurect.top);
+        test.eq(buttonrect.left, menurect.left);
+        test.click(tablebutton);
+        test.eq(false, menu.matches(":popover-open"));
+        test.click(tablebutton);
         const tablecell = menu.querySelector('li[data-col="2"][data-row="2"]');
+        await test.sendMouseGesture([{ el: tablecell, x: "50%", y: "50%" }]);
+        test.eq(4, menu.querySelectorAll(".selected").length);
+        test.eq("2x2", menu.querySelector(".wh-rtd-tablemenustatus").textContent);
+        test.eq(48, menu.querySelectorAll("[data-col][data-row]").length);
         test.click(tablecell);
+        test.eq(false, menu.matches(":popover-open"));
 
         const table = rtenode.querySelector(".wh-rtd-editor-bodynode table");
         test.assert(table, "A 2x2 table should be created");

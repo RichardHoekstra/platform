@@ -1,7 +1,6 @@
 import * as dompack from '@webhare/dompack';
 
 import { ToolbarButton as GenericToolbarButton, type ToolbarButtonOptions } from '@mod-tollium/web/ui/components/toolbar/toolbars';
-import * as menu from '@mod-tollium/web/ui/components/basecontrols/menu';
 import type { RTEComponent } from './types';
 import type { TextFormattingState } from './editorbase';
 import type StructuredEditor from './structurededitor';
@@ -132,48 +131,6 @@ class SimpleToggleButton extends ToolbarSimpleButtonBase {
   }
 }
 
-class MenuButton extends SimpleToggleButton {
-  listnode = dompack.create('ul');
-
-  constructor(toolbar: RTEToolbar, type: string) {
-    super(toolbar, type);
-
-    this.node.appendChild(dompack.create("div", {
-      style: { display: "none" },
-      childNodes: [this.listnode],
-      onClick: (evt: MouseEvent) => this.activateItem(evt)
-    }));
-  }
-
-  updateState(selstate: TextFormattingState | null) {
-    //FIXME: this.active = (menu is currently showing)
-    this.updateButtonRendering();
-  }
-
-  click(event: MouseEvent) {
-    event.stopPropagation();
-    event.preventDefault();
-
-    this.ensureSubMenu();
-    if (!this.available || !this.toolbar.rte.isEditable() || !this.listnode.childNodes.length)
-      return;
-
-    menu.openAt(this.listnode, event, { direction: "down" });
-    this.updateState(null);
-  }
-
-  // Override to fill this.listnode with <li> menuitems
-  ensureSubMenu() {
-    // extension point for subclasses
-  }
-
-  // Override to respond to selected menuitem (event.detail.menuitem is selected <li>)
-  activateItem(event: Event) {
-    dompack.stop(event);
-    this.updateState(null);
-  }
-}
-
 abstract class StyleButtonBase extends ToolbarButtonBase {
   owngroup = true;
   optionlist: HTMLOptionElement[] = [];
@@ -301,20 +258,25 @@ class ShowFormattingButton extends SimpleToggleButton {
   }
 }
 
-class InsertTableButton extends MenuButton {
+class InsertTableButton extends ToolbarButtonBase {
   initialrows = 6;
   initialcolumns = 8;
   statusnode?: HTMLElement;
+  type: string;
+  private button: HTMLButtonElement;
+  private listnode: HTMLUListElement;
 
   constructor(toolbar: RTEToolbar, type: string) {
-    super(toolbar, type);
-  }
+    super(toolbar);
+    this.type = type;
+    this.button = <button type="button" class="wh-rtd-button" data-button={type}
+      onMousedown={(event: MouseEvent) => event.preventDefault()}
+      onClick={(event: MouseEvent) => event.stopPropagation()} />;
+    this.listnode = <ul class="wh-rtd-tablemenu" popover="auto"
+      onMousedown={(event: MouseEvent) => event.preventDefault()} />;
+    this.button.popoverTargetElement = this.listnode;
+    this.node = <span class="wh-rtd-tablepicker">{this.button}{this.listnode}</span>;
 
-  ensureSubMenu() {
-    if (this.listnode.childNodes.length)
-      return;
-
-    this.listnode.classList.add("wh-rtd-tablemenu");
     this.listnode.addEventListener("mouseleave", this.hoverItem.bind(this));
     this.listnode.addEventListener("mousemove", this.hoverItem.bind(this));
     this.listnode.addEventListener("click", event => this.doInsertTable(event));
@@ -335,7 +297,7 @@ class InsertTableButton extends MenuButton {
 
     this.statusnode = dompack.create("li", {
       "textContent": "",
-      "className": "wh-rtd-tablemenustatus disabled"
+      "className": "wh-rtd-tablemenustatus"
     });
     this.listnode.appendChild(this.statusnode);
   }
@@ -343,7 +305,10 @@ class InsertTableButton extends MenuButton {
   updateState(selstate: TextFormattingState | null) {
     // Cannot insert table into a table
     this.available = Boolean(selstate && selstate.tables.length === 0);
-    super.updateState(selstate);
+    this.button.disabled = !(this.available && this.toolbar.rte.isEditable());
+    this.button.classList.toggle("disabled", this.button.disabled);
+    if (this.button.disabled)
+      this.listnode.hidePopover();
   }
 
   isAllowed(allowtags: string[]) {
@@ -375,12 +340,13 @@ class InsertTableButton extends MenuButton {
       return;
 
     const size = this.getItemSize(event.target as HTMLElement);
-    if (size)
+    if (size) {
+      this.listnode.hidePopover();
       editor.executeAction({
         action: 'table',
         size: size
       });
-    super.activateItem(event);
+    }
   }
 
   // Return the col and row for a menu item
