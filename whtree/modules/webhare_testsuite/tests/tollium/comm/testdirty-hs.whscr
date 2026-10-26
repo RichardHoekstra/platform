@@ -22,8 +22,10 @@ ASYNC MACRO TestDirtyListener()
 ASYNC MACRO TestRecursiveDirtyListener() {
   AWAIT ExpectScreenChange(+1, PTR TTLaunchApp("webhare_testsuite:runscreen", [ params := ["tests/dirty.recursivedirty"]]));
 
-  TestEq(FALSE, TT("innerpanel_dirty")->value);
-  TestEq(FALSE, TT("outerpanel_dirty")->value);
+  FOREVERY(STRING comp FROM ["innerpanel", "outerpanel", "intextlink"]) {
+    TestEq(FALSE, TT(`${comp}_dirty`)->value, `${comp} should start clean`);
+    TestEq(FALSE, TT(`${comp}_listener`)->dirty);
+  }
 
   AWAIT ExpectScreenChange(+1, PTR TTClick(":Add"));
   TT("rowedit_column")->value := "R1";

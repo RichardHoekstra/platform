@@ -9,6 +9,72 @@ LOADLIB "mod::publisher/lib/rtd.whlib";
 LOADLIB "mod::webhare_testsuite/lib/system/tests.whlib";
 
 LOADLIB "mod::tollium/lib/testframework.whlib";
+LOADLIB "mod::webhare_testsuite/lib/tollium/handlers.whlib";
+
+ASYNC MACRO TestIntExtLink_OnChange() {
+  testfw->BeginWork();
+  OBJECT target := GetTestsuiteTempFolder()->CreateFolder([ name := "onchange-target" ]);
+  testfw->CommitWork();
+  callcounter := 0;
+  AWAIT ExpectScreenChange(+1, PTR GetTestController()->RunScreen(InlineScreens(`
+    <screen name="test" implementation="none">
+      <body>
+        <p:intextlink name="link" onchange="mod::webhare_testsuite/lib/tollium/handlers.whlib#IncCallCounter">
+          <linkhandlers><test:customlinkhandler/></linkhandlers>
+        </p:intextlink>
+      </body>
+    </screen>`)));
+  OBJECT link := TT("link");
+  TestEq(0, callcounter);
+
+  link->value := MakeIntExtExternalLink("https://example.com/");
+  TestEq(1, callcounter);
+  link->value := MakeIntExtExternalLink("https://example.com/");
+  TestEq(1, callcounter, "Assigning the same value should not notify");
+  link->^external->value := "https://example.org/";
+  link->^external->SetDirty();
+  TestEq(2, callcounter);
+  link->^external->SetDirty();
+  TestEq(2, callcounter, "Repeated dirty notifications should not repeat onchange");
+
+  link->value := MakeIntExtInternalLink(GetTestsuiteTempFolder()->id, "#test");
+  TestEq(3, callcounter, "A compound assignment should notify only once");
+  link->^append->value := "#changed";
+  link->^append->SetDirty();
+  TestEq(4, callcounter);
+  link->^internal->acceptfiles := FALSE;
+  link->internallinkroots := INTEGER[GetTestsuiteTempFolder()->id];
+  AWAIT ExpectScreenChange(+1, PTR TTClick("link->internal->browse"));
+  topscreen->value := target->id;
+  TestEq(target->id, topscreen->value);
+  AWAIT ExpectScreenChange(-1, PTR TTClick(":Ok"));
+  TestEq(target->id, link->^internal->value);
+  TestEq(5, callcounter);
+  link->^external->value := "https://example.net/";
+  link->^external->SetDirty();
+  TestEq(5, callcounter, "An inactive field should not change the link");
+
+  link->SetLinkType("external");
+  TestEq(6, callcounter, "Link conversion should notify only once");
+  link->value := DEFAULT RECORD;
+  TestEq(7, callcounter, "Clearing should notify only once");
+  link->value := DEFAULT RECORD;
+  TestEq(7, callcounter);
+
+  link->value := MakeIntExtExternalLink("x-webharetestsuite-customlink:15");
+  TestEq(8, callcounter);
+  link->^linktype->selection.enablecomponents[0]->value := 16;
+  link->^linktype->selection.enablecomponents[0]->SetDirty();
+  TestEq(9, callcounter);
+  TestEq(MakeIntExtExternalLink("x-webharetestsuite-customlink:16"), link->value);
+  link->^linktype->value := 0;
+  TestEq(10, callcounter);
+
+  link->onchange := DEFAULT MACRO PTR;
+  link->value := MakeIntExtExternalLink("https://example.com/");
+  TestEq(10, callcounter);
+  AWAIT ExpectScreenChange(-1, PTR TTEscape);
+}
 
 ASYNC MACRO TestIntExtLink()
 {
@@ -254,6 +320,7 @@ MACRO TestLinkResolution() {
 
 
 RunTestframework([ PTR TestIntExtLink
+                 , PTR TestIntExtLink_OnChange
                  , PTR TestIntExtLink_WithLinkHandlers
                  , PTR TestIntExtLink_Tabsextension
                  , PTR TestLinkResolution

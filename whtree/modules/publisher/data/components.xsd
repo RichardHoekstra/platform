@@ -666,6 +666,14 @@
       <xs:attributeGroup ref="sc:TidOrTitle" />
       <xs:attributeGroup ref="sc:Errorlabel" />
       <xs:attributeGroup ref="sc:Required" />
+      <xs:attribute name="onchange" type="tc:Handler">
+        <xs:annotation>
+          <xs:documentation>Called when the link value changes, including programmatic changes.</xs:documentation>
+          <xs:appinfo>
+            <tai:callbacksignature />
+          </xs:appinfo>
+        </xs:annotation>
+      </xs:attribute>
       <xs:attribute name="internallinks" type="xs:boolean" default="true">
         <xs:annotation>
           <xs:documentation>Show the internal link option (defaults to true)</xs:documentation>

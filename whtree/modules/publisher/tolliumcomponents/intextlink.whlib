@@ -44,6 +44,8 @@ PUBLIC OBJECTTYPE IntExtLink EXTEND TolliumFragmentBase <
   OBJECT ARRAY handlercomponents;
 
   BOOLEAN __internallinks;
+  BOOLEAN suspendonchange;
+  RECORD lastnotifiedvalue;
 
   // ---------------------------------------------------------------------------
   //
@@ -52,6 +54,8 @@ PUBLIC OBJECTTYPE IntExtLink EXTEND TolliumFragmentBase <
 
   /// Value
   PUBLIC PROPERTY value(GetValue, SetValue);
+
+  PUBLIC MACRO PTR onchange;
 
   /// Title
   UPDATE PUBLIC PROPERTY title(^linktype->title, ^linktype->title);
@@ -87,6 +91,7 @@ PUBLIC OBJECTTYPE IntExtLink EXTEND TolliumFragmentBase <
   {
     TolliumFragmentBase::StaticInit(def);
     this->title := def.title;
+    this->onchange := def.onchange;
     this->__internallinks := def.internallinks;
     IF(ObjectExists(def.linkhandlers))
       this->linkhandlers := def.linkhandlers->linkhandlers;
@@ -227,6 +232,17 @@ PUBLIC OBJECTTYPE IntExtLink EXTEND TolliumFragmentBase <
   }
 
   MACRO SetValue(RECORD value) {
+    BOOLEAN wassuspended := this->suspendonchange;
+    this->suspendonchange := TRUE;
+    TRY {
+      this->ApplyValue(value);
+    } FINALLY {
+      this->suspendonchange := wassuspended;
+    }
+    this->OnValueChange();
+  }
+
+  MACRO ApplyValue(RECORD value) {
     this->EnsurePreInit();
     IF(RecordExists(value) AND value.internallink = 0 AND value.externallink = "") //normalize value
       value := DEFAULT RECORD;
@@ -272,8 +288,40 @@ PUBLIC OBJECTTYPE IntExtLink EXTEND TolliumFragmentBase <
   // Callbacks
   //
 
-  MACRO OnLinkTypeChange()
-  {
+  MACRO OnLinkTypeChange() {
+    BOOLEAN wassuspended := this->suspendonchange;
+    this->suspendonchange := TRUE;
+    TRY {
+      this->ConvertLinkType();
+    } FINALLY {
+      this->suspendonchange := wassuspended;
+    }
+    this->OnValueChange();
+  }
+
+  MACRO OnContentsDirty() {
+    IF(NOT ^contentsdirty->dirty)
+      RETURN;
+
+    ^contentsdirty->ClearDirty();
+    this->SetDirty();
+    this->OnValueChange();
+  }
+
+  MACRO OnValueChange() {
+    IF(this->suspendonchange)
+      RETURN;
+
+    RECORD value := this->GetValue();
+    IF(EncodeHSON(value) = EncodeHSON(this->lastnotifiedvalue))
+      RETURN;
+
+    this->lastnotifiedvalue := value;
+    IF(this->onchange != DEFAULT MACRO PTR)
+      this->onchange();
+  }
+
+  MACRO ConvertLinkType() {
     IF (^linktype->value = 2 AND this->current_linktype = 1)
     { // Try to convert internal links to external links
       IF (this->external->value != "")
