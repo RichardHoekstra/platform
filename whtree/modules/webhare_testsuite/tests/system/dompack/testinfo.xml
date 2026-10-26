@@ -8,5 +8,6 @@
   <jstest file="test_datatransfer.ts" tags="dragdrop" />
   <jstest file="test_dialogapi.tsx" />
   <jstest file="test_storage.ts" />
+  <jstest file="test_pointer.ts" />
   <jstest file="test_overlays.ts" />
 </group>

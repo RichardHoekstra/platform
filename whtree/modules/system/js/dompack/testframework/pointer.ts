@@ -7,8 +7,7 @@ import { getPlatform } from "../extra/browser";
 import { findElement, qSA } from '@webhare/test-frontend';
 import { SimulatedFileSystemFileEntry } from './filesystem';
 
-const default_mousestate =
-{
+const mousestate = {
   cx: 0,
   cy: 0,
   downel: null as Element | null,
@@ -33,9 +32,70 @@ interface PointEventOptions extends ElementActionOptions {
   clickcount?: number;
 }
 
-const mousestate = { ...default_mousestate };
 const browserPlatform = getPlatform();
 const effectAllowedValues = ["none", "copy", "copyLink", "copyMove", "link", "linkMove", "move", "all", "uninitialized"];
+
+type PopoverPointerState = {
+  open: HTMLElement[];
+  sources: WeakMap<HTMLElement, Element>;
+  down: Map<number, HTMLElement | null>;
+};
+
+const popoverPointerStates = new WeakMap<Document, PopoverPointerState>();
+
+function getPopoverPointerState(doc: Document): PopoverPointerState {
+  let state = popoverPointerStates.get(doc);
+  if (!state) {
+    state = {
+      open: Array.from(doc.querySelectorAll<HTMLElement>("[popover]:popover-open")),
+      sources: new WeakMap(),
+      down: new Map()
+    };
+    popoverPointerStates.set(doc, state);
+    const tracked = state;
+    doc.addEventListener("beforetoggle", event => {
+      const popover = event.target;
+      if (!(popover instanceof doc.defaultView!.HTMLElement) || !popover.hasAttribute("popover"))
+        return;
+      const toggle = event as ToggleEvent;
+      tracked.open = tracked.open.filter(node => node !== popover);
+      if (toggle.newState === "open") {
+        tracked.open.push(popover);
+        if (toggle.source)
+          tracked.sources.set(popover, toggle.source);
+        else
+          tracked.sources.delete(popover);
+      }
+    }, true);
+  }
+  // Opening can be canceled after our capture listener has run.
+  state.open = state.open.filter(node => node.isConnected && node.matches(":popover-open"));
+  return state;
+}
+
+function getPopoverEndpoint(state: PopoverPointerState, target: Element): HTMLElement | null {
+  const invoker = target.closest<HTMLButtonElement | HTMLInputElement>("button, input");
+  return state.open.findLast(popover => popover.popover === "auto"
+    && (popover.contains(target) || state.sources.get(popover)?.contains(target)
+      || invoker?.popoverTargetElement === popover)) ?? null;
+}
+
+function lightDismissPopovers(target: Element, button: number) {
+  const state = getPopoverPointerState(target.ownerDocument);
+  const endpoint = getPopoverEndpoint(state, target);
+  const downEndpoint = state.down.get(button);
+  state.down.delete(button);
+  if (downEndpoint !== endpoint)
+    return;
+
+  // Close topmost first; hidePopover supplies the native beforetoggle/toggle events.
+  for (const popover of state.open.slice().reverse()) {
+    if (popover === endpoint)
+      break;
+    if (popover.popover === "auto" && popover.matches(":popover-open"))
+      popover.hidePopover();
+  }
+}
 
 export class SimulatedDragDataStore {
   dataTransfer: DataTransfer;
@@ -648,7 +708,6 @@ function processGestureQueue() {
     //console.log("Get element@" + position.x + "," + position.y + " ",elhere.nodeName,elhere, " was ",part.el.nodeName,part.el, targetdoc&&targetdoc.defaultView?targetdoc.defaultView.getScroll().y:'-');
 
     const target = {
-      view: targetdoc.defaultView,
       cx: position.x,
       cy: position.y,
       el: elhere,
@@ -710,6 +769,8 @@ function processGestureQueue() {
     if (typeof part.down === 'number') {
       if (mousestate.downbuttons.has(part.down))
         throw new Error("Invalid mouse gesture - sending down for button #" + part.down + " when it is aleady down");
+      const popovers = getPopoverPointerState(targetdoc);
+      popovers.down.set(part.down, getPopoverEndpoint(popovers, target.el));
       if (part.down === 0) {
         mousestate.downel = target.el;
         mousestate.downelrect = target.el ? target.el.getBoundingClientRect() : null;
@@ -750,6 +811,7 @@ function processGestureQueue() {
       const toclick = mousestate.downel ? commonAncestor(mousestate.downel, target.el) : null;
 
       if (!mousestate.dndstate) {
+        lightDismissPopovers(target.el, part.up);
         if (toclick && mousestate && mousestate.downel !== target.el) {
           console.log(`[testfw] Mousedown and mouseup target are different${part.up === 0 ? `, click will go to: ${toclick} ${describeTarget(toclick)}` : ''}`);
           console.log(`[testfw] Original mousedown: ${mousestate.downeldescr} ${mousestate.downel}`);
@@ -790,6 +852,7 @@ function processGestureQueue() {
 
             //if element leaves dom, it should no longer receive clicks (confirmed at least for chrome in tollium testautosuggest
             if (isInDeepDom(toclick))
+              // Native click activation handles popovertarget, including beforetoggle/toggle events and cancellation.
               fireMouseEvent("click", target.cx, target.cy, toclick, part.up, null, part);
 
             //TODO these probably shouldn't be in the same gesture/tick?
