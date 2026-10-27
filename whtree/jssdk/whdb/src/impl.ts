@@ -259,6 +259,12 @@ class Work implements WorkObject {
     }
   }
 
+  /** Release local Work state after disconnect, without replaying finish handlers. */
+  discardLocalState() {
+    this.open = false;
+    this.clearWork();
+  }
+
   async [Symbol.asyncDispose]() {
     if (this.open)
       await this.rollback();
@@ -536,7 +542,18 @@ export class WHDBConnectionImpl implements WHDBConnection {
     // pending opening and a successful client's entire close acknowledgement.
     const client = this.client ?? await this.clientPromise?.catch(() => undefined);
     this.client = undefined;
-    await client?.close();
+    const errors: unknown[] = [];
+    try {
+      await client?.close();
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      this.openwork?.discardLocalState();
+    } catch (error) {
+      errors.push(error);
+    }
+    throwCleanupErrors(errors);
   }
 
   async __getConfiguration() {
@@ -557,22 +574,43 @@ export type WHDBConnection = Pick<WHDBConnectionImpl, "db" | "beginWork" | "comm
 const connsymbol = Symbol("WHDBConnection");
 const workqueuesymbol = Symbol("WorkQueueSymbol");
 
-export function getConnection(): WHDBConnection {
-  return ensureScopedResource(connsymbol, () => new WHDBConnectionImpl, async (conn) => {
-    if (conn.isWorkOpen())
-      await conn.rollbackWork();
+function throwCleanupErrors(errors: unknown[]) {
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new AggregateError(errors, "Database cleanup failed");
+}
 
-    return await conn.close();
-  });
+/** Every owned connection is attempted serially, even if a finish handler fails.
+ * Closing the physical connection is still required after a failed rollback.
+ */
+async function disposeConnections(connections: Iterable<WHDBConnectionImpl | undefined>, mode: "rollback" | "disconnect") {
+  const errors: unknown[] = [];
+  for (const connection of connections) {
+    if (!connection) continue;
+    try {
+      if (mode === "rollback" && connection.isWorkOpen()) await connection.rollbackWork();
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      await connection.close();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  throwCleanupErrors(errors);
+}
+
+export function getConnection(): WHDBConnection {
+  return ensureScopedResource(connsymbol, () => new WHDBConnectionImpl, conn => disposeConnections([conn], "rollback"));
 }
 
 /** Stash the current work object, opening a new connection (with potential new work) */
 export function stashWork() {
   const conn = getScopedResource<WHDBConnectionImpl>(connsymbol);
-  const stack = ensureScopedResource<Array<WHDBConnectionImpl | undefined>>(workqueuesymbol, () => new Array<WHDBConnectionImpl>, async (curstack) => {
-    for (const c of curstack)
-      await c?.close();
-  });
+  // Preserve stashed Work's close-only semantics. Starting its finish callbacks
+  // here could wait on locks held by another transaction that is still stashed.
+  const stack = ensureScopedResource<Array<WHDBConnectionImpl | undefined>>(workqueuesymbol,
+    () => new Array<WHDBConnectionImpl>, curstack => disposeConnections(curstack, "disconnect"));
   stack.push(conn);
   setScopedResource(connsymbol, undefined);
 }
