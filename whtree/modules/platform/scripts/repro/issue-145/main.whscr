@@ -1,0 +1,37 @@
+<?wh
+LOADLIB "wh::javascript.whlib";
+LOADLIB "wh::promise.whlib";
+LOADLIB "mod::system/lib/tasks.whlib";
+
+ASYNC FUNCTION RunCase(BOOLEAN detached)
+{
+  STRING target := "mod::platform/scripts/repro/issue-145/targets.ts";
+  RECORD before := AWAIT CallAsync(target || "#reset", VARIANT[]);
+  OBJECT ARRAY pending;
+  FOR (INTEGER token := 0; token < 8; token := token + 1)
+    INSERT CallAsync(target || "#work", VARIANT[token, detached]) INTO pending AT END;
+  VARIANT settled := AWAIT CreatePromiseAllSettled(pending);
+  INTEGER fulfilled := 0, rejected := 0;
+  STRING ARRAY errors;
+  FOR (INTEGER token := 0; token < 8; token := token + 1) {
+    IF (settled[token].status = "fulfilled") fulfilled := fulfilled + 1;
+    ELSE {
+      rejected := rejected + 1;
+      INSERT settled[token].reason->what INTO errors AT END;
+    }
+  }
+  AWAIT CreateSleepPromise(80);
+  RECORD after := AWAIT CallAsync(target || "#status", VARIANT[]);
+  RETURN [detached := detached, fulfilled := fulfilled, rejected := rejected,
+    completed := after.completed, same_runner := before.pid = after.pid, errors := errors];
+}
+
+ASYNC MACRO Main()
+{
+  IF (IsWasm()) THROW NEW Exception("This reproduction requires native HareScript");
+  RECORD returned := AWAIT RunCase(FALSE);
+  RECORD detached := AWAIT RunCase(TRUE);
+  Print("REPRO_145 " || EncodeJSON(CELL[returned, detached]) || "\n");
+}
+
+WaitForPromise(Main());

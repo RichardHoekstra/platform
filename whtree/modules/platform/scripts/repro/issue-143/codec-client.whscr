@@ -1,0 +1,79 @@
+<?wh
+LOADLIB "wh::datetime.whlib";
+LOADLIB "wh::files.whlib";
+LOADLIB "wh::os.whlib";
+LOADLIB "wh::javascript.whlib";
+LOADLIB "wh::promise.whlib";
+LOADLIB "wh::internet/tcpip.whlib";
+LOADLIB "mod::system/lib/services.whlib";
+
+STRING FUNCTION SocketRequest(INTEGER socket, INTEGER id, STRING method, VARIANT ARRAY args)
+{
+  STRING request := EncodeJSON(CELL[id, method, args], DEFAULT RECORD, [typed := TRUE]) || "\n";
+  INTEGER written := WriteTo(socket, request);
+  IF (written != Length(request)) THROW NEW Exception("Short socket write");
+  STRING response := ReadLineFrom(socket, 32768, TRUE);
+  IF (response = "") THROW NEW Exception("No socket response");
+  RETURN response;
+}
+
+ASYNC MACRO Main()
+{
+  STRING ARRAY arguments := GetConsoleArguments();
+  IF (Length(arguments) != 3) THROW NEW Exception("Expected service name, socket path and blob path");
+  STRING name := arguments[0], socketpath := arguments[1], diskpath := arguments[2];
+  Print("HS_SETUP " || EncodeJSON([arguments := arguments, wasm := IsWasm(), disk_text := BlobToString(GetDiskResource(diskpath))]) || "\n");
+  OBJECT ipc := AWAIT OpenWebHareService(name);
+  INTEGER socket := CreateTCPSocket();
+  SetSocketTimeout(socket, 3000);
+  IF (NOT ConnectSocket(socket, socketpath, 0)) THROW NEW Exception(GetLastSocketErrorMessage(socket));
+  RECORD ARRAY results := DEFAULT RECORD ARRAY;
+  INTEGER id := 0;
+  TRY {
+    id := id + 1;
+    RECORD constructorresponse := DecodeJSON(SocketRequest(socket, id, "constructor", VARIANT[]));
+    RECORD ARRAY cases := [
+      [ label := "string", value := "hello é🙂" ],
+      [ label := "money", value := 12.34567m ],
+      [ label := "date", value := MakeDateTime(2026, 10, 27, 12, 34, 56, 789) ],
+      [ label := "integer64", value := 9007199254740993i64 ],
+      [ label := "memory-blob", value := StringToBlob("native HS blob") ],
+      [ label := "disk-blob", value := GetDiskResource(diskpath) ]
+    ];
+    FOREVERY (RECORD testcase FROM cases) {
+      RECORD binary := AWAIT ipc->describe(testcase.value);
+      id := id + 1;
+      STRING raw := SocketRequest(socket, id, "describe", VARIANT[testcase.value]);
+      RECORD decoded := DecodeJSON(raw, DEFAULT RECORD, [typed := TRUE]);
+      INSERT [ label := testcase.label, ipc := binary, unix := decoded.result ] INTO results AT END;
+    }
+    id := id + 1;
+    STRING bigintraw := SocketRequest(socket, id, "getBigInt", VARIANT[]);
+    STRING bigintdecodeerror := "";
+    TRY DecodeJSON(bigintraw, DEFAULT RECORD, [typed := TRUE]);
+    CATCH (OBJECT error) { bigintdecodeerror := error->what; }
+    INTEGER64 ipc_bigint := AWAIT ipc->getBigInt();
+
+    id := id + 1;
+    STRING blobraw := SocketRequest(socket, id, "getPayload", VARIANT["memory"]);
+    RECORD blobdecoded := DecodeJSON(blobraw, DEFAULT RECORD, [typed := TRUE]);
+    BLOB ipc_blob := AWAIT ipc->getPayload("memory");
+
+    id := id + 1;
+    STRING moneyraw := SocketRequest(socket, id, "echo", VARIANT[12.34567m]);
+    RECORD moneydecoded := DecodeJSON(moneyraw, DEFAULT RECORD, [typed := TRUE]);
+    IF (TypeID(moneydecoded.result) != TypeID(MONEY) OR moneydecoded.result != 12.34567m)
+      THROW NEW Exception("Money round trip failed");
+    RECORD result := [ cases := results, ipc_bigint := ToString(ipc_bigint), unix_bigint_raw := bigintraw,
+      unix_bigint_decode_error := bigintdecodeerror, ipc_blob_text := BlobToString(ipc_blob),
+      unix_blob_result_type := GetTypeName(TypeID(blobdecoded.result)),
+      money_round_trip := TRUE, native_socket_connected := TRUE, wasm := IsWasm(),
+      unix_constructor_has_methods := CellExists(constructorresponse, "methods") ];
+    Print("HS_PARITY " || EncodeJSON(result) || "\n");
+  } FINALLY {
+    ipc->CloseService();
+    CloseSocket(socket);
+  }
+}
+
+WaitForPromise(Main());

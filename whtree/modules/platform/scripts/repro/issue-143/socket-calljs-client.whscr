@@ -1,0 +1,38 @@
+<?wh
+LOADLIB "wh::os.whlib";
+LOADLIB "wh::javascript.whlib";
+LOADLIB "wh::internet/tcpip.whlib";
+
+RECORD FUNCTION Request(INTEGER socket, INTEGER id, STRING method, VARIANT ARRAY args)
+{
+  STRING request := EncodeJSON(CELL[id, method, args], DEFAULT RECORD, [typed := TRUE]) || "\n";
+  IF (WriteTo(socket, request) != Length(request)) THROW NEW Exception("Short socket write");
+  STRING response := ReadLineFrom(socket, 32768, TRUE);
+  IF (response = "") THROW NEW Exception("No socket response");
+  RECORD decoded := DecodeJSON(response, DEFAULT RECORD, [typed := TRUE]);
+  IF (CellExists(decoded, "error")) THROW NEW Exception(decoded.error);
+  RETURN decoded;
+}
+
+IF (IsWasm()) THROW NEW Exception("Expected native HareScript");
+STRING ARRAY arguments := GetConsoleArguments();
+IF (Length(arguments) != 1) THROW NEW Exception("Expected the current socket directory");
+STRING target := "mod::platform/scripts/repro/issue-143/warmup.ts";
+INTEGER ipcresult := CallJS(target || "#add", 20, 22); //Warm up the stock CallJS service through its public native API.
+IF (ipcresult != 42) THROW NEW Exception("CallJS baseline failed");
+INTEGER socket := CreateTCPSocket();
+SetSocketTimeout(socket, 5000);
+IF (NOT ConnectSocket(socket, arguments[0] || "platform:calljs", 0)) THROW NEW Exception(GetLastSocketErrorMessage(socket));
+RECORD ARRAY results := DEFAULT RECORD ARRAY;
+TRY {
+  Request(socket, 1, "constructor", VARIANT[[alt := FALSE]]);
+  FOR (INTEGER iteration := 1; iteration <= 3; iteration := iteration + 1) {
+    RECORD response := Request(socket, iteration + 1, "invoke", VARIANT[
+      target, "add", VARIANT[20, 22], [auth := DEFAULT RECORD],
+      [camelcase := FALSE, runinseparatework := FALSE]
+    ]);
+    IF (response.result != 42) THROW NEW Exception("Direct Unix CallJS result was not 42");
+    INSERT [iteration := iteration, result := response.result] INTO results AT END;
+  }
+  Print("CALLJS_SOCKET_RESULT " || EncodeJSON([native := TRUE, ipc_baseline := ipcresult, direct_unix := results]) || "\n");
+} FINALLY { CloseSocket(socket); }

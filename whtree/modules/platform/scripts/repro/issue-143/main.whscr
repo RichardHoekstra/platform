@@ -1,0 +1,21 @@
+<?wh
+LOADLIB "wh::javascript.whlib";
+LOADLIB "wh::promise.whlib";
+LOADLIB "mod::system/lib/services.whlib";
+
+ASYNC MACRO Main()
+{
+  IF (IsWasm()) THROW NEW Exception("This reproduction requires native HareScript");
+  INTEGER result := CallJS("mod::platform/scripts/repro/issue-143/warmup.ts#add", 1, 2);
+  IF (result != 3) THROW NEW Exception("CallJS warm-up failed");
+  OBJECT manager := AWAIT OpenWebHareService("platform:services.node");
+  TRY {
+    FOR (INTEGER iteration := 1; iteration <= 10; iteration := iteration + 1) {
+      Print("REPRO_143 " || EncodeJSON([iteration := iteration, service := "platform:calljs"]) || "\n");
+      AWAIT manager->Restart("platform:calljs");
+    }
+    Print("REPRO_143 ten logical restarts completed\n");
+  } FINALLY { manager->CloseService(); }
+}
+
+WaitForPromise(Main());
