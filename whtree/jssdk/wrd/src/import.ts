@@ -1,4 +1,3 @@
-import { TrackedYAML } from "@mod-platform/js/devsupport/validation";
 import type { AnyWRDSchema } from "./schema";
 import { WRDSchemaType } from "@webhare/wrd/src/schema";
 
@@ -50,6 +49,10 @@ export type ImportEntitiesResult = {
  * @param yamlContent - The YAML content to import, structured as a mapping of type name to an array of entities, eg:
 */
 export async function importIntoWRDSchema(wrdSchema: AnyWRDSchema, yamlContent: string): Promise<ImportEntitiesResult> {
+  // Load validation and its code generators only when importing YAML.
+  // Use the existing CommonJS loader to resolve the module alias.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { TrackedYAML } = require("@mod-platform/js/devsupport/validation") as typeof import("@mod-platform/js/devsupport/validation");
   //Accepting straight YAML might simplify error reporing in the future (we have a chance to give source line numbers.
   //Would be nice to also accept straight objects
   const content = new TrackedYAML<WRDSchemaImport>(yamlContent);

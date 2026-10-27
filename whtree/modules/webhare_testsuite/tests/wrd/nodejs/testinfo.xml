@@ -8,6 +8,7 @@
   <test script="test_wrd_errors.ts" />
   <test script="test_wrd_history.ts" />
   <test script="test_wrd_eximport.ts" />
+  <test script="test_wrd_startup.ts" />
   <test script="test_password_policy.ts" />
   <test script="test_password_breachcount.ts" tags="external" />
   <test script="test_wrd_authapi.ts" />
