@@ -29,7 +29,10 @@ async function failureInHandler(stage: Stage) {
     });
     test.eq(false, await lockAvailable(observer, key), "Control: owner has a live SQL session lock");
     await test.throws(error => error === failure, owner.close());
-    test.eq(true, await lockAvailable(observer, key), "A failed finish handler must not leave its SQL session open");
+    // Client disconnect returns before PostgreSQL necessarily processes EOF.
+    await test.wait(() => lockAvailable(observer, key), {
+      timeout: 5000, annotation: "A failed finish handler must not leave its SQL session open"
+    });
     test.eq(false, connection.isWorkOpen());
     test.eq(0, owner.mutexes.size, "Retiring the connection also releases its Work mutexes");
     await observer.run(async () => {
@@ -86,7 +89,9 @@ async function oneStackFailureCannotSkipOtherConnections() {
     restoreFirst = connections[0].close.bind(connections[0]);
     connections[0].close = async () => { throw failure; };
     await test.throws(error => error === failure, owner.close());
-    test.eq(true, await lockAvailable(observer, key), "A failed stack entry must not skip closing the next connection");
+    await test.wait(() => lockAvailable(observer, key), {
+      timeout: 5000, annotation: "A failed stack entry must not skip closing the next connection"
+    });
   } finally {
     if (restoreFirst) connections[0].close = restoreFirst;
     for (const connection of connections) {
